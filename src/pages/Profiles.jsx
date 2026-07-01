@@ -5,6 +5,7 @@ import ProfileCard from '../components/ProfileCard'
 import { supabase } from '../lib/supabaseClient'
 import { getProfilesWithLastWorkout } from '../services/profileService'
 import { friendlyError } from '../utils/validation'
+import { logEvent } from "../services/telemetryService";
 
 export default function Profiles() {
   const navigate = useNavigate()
@@ -40,7 +41,19 @@ export default function Profiles() {
       {error && <p className="rounded-2xl border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-100">{error}</p>}
 
       <div className="grid gap-4">
-        {profiles.map((profile) => <ProfileCard key={profile.id} profile={profile} />)}
+        {profiles.map((profile) => (
+  <ProfileCard
+    key={profile.id}
+    profile={profile}
+    onSelect={async () => {
+      await logEvent(
+        "profile_selected",
+        { profile_name: profile.name },
+        profile.id
+      )
+    }}
+  />
+))}
       </div>
 
       <section className="card mt-5 flex gap-3 text-sm text-slate-300">
