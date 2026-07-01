@@ -15,7 +15,7 @@ function Avatar({ profile }) {
   )
 }
 
-export default function ProfileCard({ profile }) {
+export default function ProfileCard({ profile, onSelect }) {
   return (
     <article className="card-glow">
       <div className="relative flex items-center gap-4">
@@ -30,12 +30,18 @@ export default function ProfileCard({ profile }) {
         </div>
       </div>
       <Link
-        to={`/dashboard/${profile.id}`}
-        onClick={() => saveSelectedProfile(profile.id)}
-        className="btn-primary relative mt-5 flex w-full items-center justify-center gap-2"
-      >
-        Entrar no perfil <ArrowRight size={18} />
-      </Link>
+  to={`/dashboard/${profile.id}`}
+  onClick={async () => {
+    saveSelectedProfile(profile.id);
+
+    if (onSelect) {
+      await onSelect();
+    }
+  }}
+  className="btn-primary relative mt-5 flex w-full items-center justify-center gap-2"
+>
+  Entrar no perfil <ArrowRight size={18} />
+</Link>
     </article>
   )
 }
