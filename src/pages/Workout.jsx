@@ -26,8 +26,10 @@ export default function Workout() {
 
   useEffect(() => {
     const handle = () => setOnline(isOnline())
+
     window.addEventListener('online', handle)
     window.addEventListener('offline', handle)
+
     return () => {
       window.removeEventListener('online', handle)
       window.removeEventListener('offline', handle)
@@ -35,33 +37,62 @@ export default function Workout() {
   }, [])
 
   useEffect(() => {
-    getProfile(profileId).then(setProfile).catch((error) => setMessage(friendlyError(error)))
+    getProfile(profileId)
+      .then(setProfile)
+      .catch((error) => setMessage(friendlyError(error)))
   }, [profileId])
 
-  const workout = useMemo(() => profile ? getWorkout(profile.name, type) : null, [profile, type])
+  const workout = useMemo(() => {
+    return profile ? getWorkout(profile.name, type) : null
+  }, [profile, type])
 
   useEffect(() => {
     if (!workout) return
+
     const initial = {}
+
     workout.exercises.forEach((exercise) => {
-      initial[exercise.id] = { weight: '', actualReps: '', notes: '', completed: false, difficulty: 'normal', selectedName: exercise.name }
+      initial[exercise.id] = {
+        weight: '',
+        actualReps: '',
+        notes: '',
+        completed: false,
+        completedSets: Array(Number(exercise.sets || 0)).fill(false),
+        difficulty: 'normal',
+        selectedName: exercise.name,
+        expanded: true,
+        restTimerKey: null
+      }
     })
+
     setExerciseValues(initial)
-    getExerciseRecords(profileId, workout.exercises.flatMap((exercise) => [exercise.name, ...(exercise.alternatives || [])]))
+
+    getExerciseRecords(
+      profileId,
+      workout.exercises.flatMap((exercise) => [
+        exercise.name,
+        ...(exercise.alternatives || [])
+      ])
+    )
       .then(setRecords)
       .catch(() => undefined)
   }, [workout, profileId])
 
   function updateExercise(id, value) {
-    setExerciseValues((current) => ({ ...current, [id]: value }))
+    setExerciseValues((current) => ({
+      ...current,
+      [id]: value
+    }))
   }
 
   async function finalizeWorkout() {
     setSaving(true)
     setMessage('')
+
     try {
       const exercises = workout.exercises.map((exercise) => {
         const values = exerciseValues[exercise.id] || {}
+
         return {
           ...exercise,
           ...values,
@@ -69,6 +100,7 @@ export default function Workout() {
           originalName: exercise.name
         }
       })
+
       const payload = {
         profileId,
         workoutType: type,
@@ -96,40 +128,111 @@ export default function Workout() {
     }
   }
 
-  if (!profile || !workout) return <p className="text-slate-400">Carregando treino...</p>
+  if (!profile || !workout) {
+    return <p className="text-slate-400">Carregando treino...</p>
+  }
 
   const done = Object.values(exerciseValues).filter((item) => item.completed).length
+  const total = workout.exercises.length
+  const progress = total ? Math.round((done / total) * 100) : 0
 
   return (
     <div>
       <header className="mb-5">
-        <Link to={`/dashboard/${profileId}`} className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-emerald-300"><ArrowLeft size={18} /> Voltar</Link>
+        <Link
+          to={`/dashboard/${profileId}`}
+          className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-emerald-300"
+        >
+          <ArrowLeft size={18} />
+          Voltar
+        </Link>
+
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-sm font-bold text-emerald-300">Treino {type}</p>
             <h1 className="text-3xl font-black">{workout.title}</h1>
-            <p className="text-slate-400">{profile.name} • {done}/{workout.exercises.length} concluídos</p>
+            <p className="text-slate-400">
+              {profile.name} • {done}/{total} exercícios concluídos
+            </p>
           </div>
-          <span className={`badge ${online ? 'border-emerald-400/50 text-emerald-200' : 'border-amber-400/50 text-amber-200'}`}>{online ? 'Online' : 'Offline'}</span>
+
+          <span
+            className={`badge ${
+              online
+                ? 'border-emerald-400/50 text-emerald-200'
+                : 'border-amber-400/50 text-amber-200'
+            }`}
+          >
+            {online ? 'Online' : 'Offline'}
+          </span>
         </div>
       </header>
 
+      <section className="card mb-4">
+        <div className="mb-3 flex items-center justify-between">
+          <p className="font-bold">Progresso do treino</p>
+          <p className="text-sm font-bold text-emerald-300">{progress}%</p>
+        </div>
+
+        <div className="h-3 overflow-hidden rounded-full bg-slate-800">
+          <div
+            className="h-full rounded-full bg-emerald-400 transition-all"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+
+        <p className="mt-2 text-sm text-slate-400">
+          {done} de {total} exercícios concluídos
+        </p>
+      </section>
+
       <section className="card mb-4 grid gap-3 md:grid-cols-3">
         <label>
-          <span className="mb-1 block text-sm font-semibold text-slate-300">Academia</span>
-          <input value={gymName} onChange={(event) => setGymName(event.target.value)} maxLength={80} placeholder="Ex: Smart Fit Centro" />
+          <span className="mb-1 block text-sm font-semibold text-slate-300">
+            Academia
+          </span>
+          <input
+            value={gymName}
+            onChange={(event) => setGymName(event.target.value)}
+            maxLength={80}
+            placeholder="Ex: Smart Fit Centro"
+          />
         </label>
+
         <label>
-          <span className="mb-1 block text-sm font-semibold text-slate-300">Data</span>
-          <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+          <span className="mb-1 block text-sm font-semibold text-slate-300">
+            Data
+          </span>
+          <input
+            type="date"
+            value={date}
+            onChange={(event) => setDate(event.target.value)}
+          />
         </label>
+
         <label>
-          <span className="mb-1 block text-sm font-semibold text-slate-300">Duração (min)</span>
-          <input type="number" min="0" value={durationMinutes} onChange={(event) => setDurationMinutes(event.target.value)} />
+          <span className="mb-1 block text-sm font-semibold text-slate-300">
+            Duração
+          </span>
+          <input
+            type="number"
+            min="0"
+            value={durationMinutes}
+            onChange={(event) => setDurationMinutes(event.target.value)}
+          />
         </label>
+
         <label className="md:col-span-3">
-          <span className="mb-1 block text-sm font-semibold text-slate-300">Observação geral</span>
-          <textarea rows="2" maxLength={500} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Como foi o treino?" />
+          <span className="mb-1 block text-sm font-semibold text-slate-300">
+            Observação geral
+          </span>
+          <textarea
+            rows="2"
+            maxLength={500}
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+            placeholder="Como foi o treino?"
+          />
         </label>
       </section>
 
@@ -145,10 +248,19 @@ export default function Workout() {
         ))}
       </div>
 
-      {message && <p className="mt-4 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-sm text-emerald-100">{message}</p>}
+      {message && (
+        <p className="mt-4 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-sm text-emerald-100">
+          {message}
+        </p>
+      )}
 
-      <button onClick={finalizeWorkout} disabled={saving} className="btn-primary mt-5 flex w-full items-center justify-center gap-2">
-        {online ? <Save size={20} /> : <CloudOff size={20} />} {saving ? 'Salvando...' : 'Finalizar treino'}
+      <button
+        onClick={finalizeWorkout}
+        disabled={saving}
+        className="btn-primary mt-5 flex w-full items-center justify-center gap-2"
+      >
+        {online ? <Save size={20} /> : <CloudOff size={20} />}
+        {saving ? 'Salvando...' : 'Finalizar treino'}
       </button>
     </div>
   )
