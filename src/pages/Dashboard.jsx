@@ -1,6 +1,7 @@
 import {
   Activity,
   BarChart3,
+  Camera,
   Dumbbell,
   Flame,
   History,
@@ -11,6 +12,13 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import Badge from '../components/ui/Badge'
+import Button from '../components/ui/Button'
+import Card from '../components/ui/Card'
+import PageHeader from '../components/ui/PageHeader'
+import ProgressBar from '../components/ui/ProgressBar'
+import SectionTitle from '../components/ui/SectionTitle'
+import StatCard from '../components/ui/StatCard'
 import { getWorkoutTypes } from '../data/workouts'
 import { getProfile } from '../services/profileService'
 import { getDashboardSummary } from '../services/workoutService'
@@ -26,7 +34,6 @@ const workoutDescriptions = {
 
 function getNextWorkoutType(lastWorkoutType, availableTypes) {
   if (!availableTypes.length) return 'A'
-
   if (!lastWorkoutType) return availableTypes[0]
 
   const currentIndex = availableTypes.indexOf(lastWorkoutType)
@@ -63,9 +70,9 @@ export default function Dashboard() {
 
   if (error) {
     return (
-      <p className="rounded-2xl border border-red-400/30 bg-red-400/10 p-3 text-red-100">
+      <Card className="border-red-400/30 bg-red-400/10 text-red-100">
         {error}
-      </p>
+      </Card>
     )
   }
 
@@ -75,30 +82,30 @@ export default function Dashboard() {
 
   const weeklyTarget = profile.name === 'Nicole' ? 3 : 5
   const weeklyPercent = Math.min(100, Math.round((summary.weekCount / weeklyTarget) * 100))
+  const lastWorkoutDate = summary.lastWorkout?.date || 'Nenhum treino registrado'
 
   return (
     <div>
-      <header className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm text-slate-400">Bom treino,</p>
-          <h1 className="text-3xl font-black">
-            {profile.name}
-            <span className="text-emerald-300">.</span>
-          </h1>
-          <p className="mt-1 text-slate-400">Foco hoje, resultado sempre.</p>
+      <PageHeader
+        eyebrow="RHC Training"
+        title={`Bom treino, ${profile.name}`}
+        subtitle="Foco hoje, resultado sempre."
+        action={
+          <Link
+            to="/profiles"
+            className="grid h-12 w-12 place-items-center rounded-2xl border border-slate-800 bg-slate-900 text-slate-300 transition hover:border-emerald-400/40 hover:text-emerald-300"
+            aria-label="Trocar perfil"
+          >
+            <UserRound size={21} />
+          </Link>
+        }
+      />
+
+      <Card glow className="mb-5">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <Badge variant="green">Treino de hoje</Badge>
+          <Badge variant="slate">{lastWorkoutDate}</Badge>
         </div>
-
-        <Link
-          to="/profiles"
-          className="grid h-12 w-12 place-items-center rounded-2xl border border-slate-800 bg-slate-900 text-slate-300"
-          aria-label="Trocar perfil"
-        >
-          <UserRound size={21} />
-        </Link>
-      </header>
-
-      <section className="card-glow mb-5">
-        <p className="mb-3 text-sm font-bold text-slate-300">Treino de hoje</p>
 
         <div className="flex items-center gap-4">
           <div className="grid h-16 w-16 shrink-0 place-items-center rounded-3xl border border-emerald-400/40 bg-emerald-400/10 text-emerald-300">
@@ -106,126 +113,147 @@ export default function Dashboard() {
           </div>
 
           <div className="min-w-0 flex-1">
-            <h2 className="text-2xl font-black">Treino {nextWorkout}</h2>
-            <p className="text-sm text-slate-400">
+            <h2 className="text-3xl font-black text-white">Treino {nextWorkout}</h2>
+            <p className="mt-1 text-sm text-slate-400">
               {workoutDescriptions[nextWorkout] || 'Treino personalizado'}
             </p>
           </div>
         </div>
 
-        <Link
-          to={`/workout/${profileId}/${nextWorkout}`}
-          className="btn-primary mt-5 flex w-full items-center justify-center gap-2"
-        >
-          <Play size={18} />
-          Iniciar treino
+        <Link to={`/workout/${profileId}/${nextWorkout}`} className="mt-5 block">
+          <Button className="w-full" icon={Play}>
+            Iniciar treino
+          </Button>
         </Link>
-      </section>
+      </Card>
 
-      <section className="card mb-5">
-        <div className="mb-3 flex items-center justify-between">
-          <p className="font-bold">Progresso semanal</p>
-          <p className="text-sm text-slate-300">
-            {summary.weekCount} de {weeklyTarget} treinos
-          </p>
+      <Card className="mb-5">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <p className="font-bold text-white">Meta semanal</p>
+            <p className="text-sm text-slate-400">
+              {summary.weekCount} de {weeklyTarget} treinos concluídos
+            </p>
+          </div>
+
+          <Badge variant={weeklyPercent >= 100 ? 'green' : 'slate'}>
+            {weeklyPercent}%
+          </Badge>
         </div>
 
-        <div className="h-3 overflow-hidden rounded-full bg-slate-800">
-          <div
-            className="h-full rounded-full bg-emerald-400 transition-all"
-            style={{ width: `${weeklyPercent}%` }}
-          />
-        </div>
+        <ProgressBar value={weeklyPercent} />
 
-        <p className="mt-2 text-right text-sm font-bold text-emerald-300">
-          {weeklyPercent}%
-        </p>
-      </section>
+        <div className="mt-4 grid grid-cols-5 gap-2">
+          {Array.from({ length: weeklyTarget }).map((_, index) => {
+            const completed = index < summary.weekCount
+
+            return (
+              <div
+                key={index}
+                className={`h-2 rounded-full ${
+                  completed ? 'bg-emerald-400' : 'bg-slate-800'
+                }`}
+              />
+            )
+          })}
+        </div>
+      </Card>
 
       <section className="mb-5 grid grid-cols-2 gap-3">
-        <div className="card">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="text-sm text-slate-400">Volume total</p>
-            <Dumbbell size={18} className="text-emerald-300" />
-          </div>
-          <p className="text-2xl font-black">{Math.round(summary.totalVolume)} kg</p>
-          <p className="mt-1 text-xs text-slate-500">levantado</p>
-        </div>
+        <StatCard
+          title="Volume total"
+          value={`${Math.round(summary.totalVolume)} kg`}
+          subtitle="levantado"
+          icon={Dumbbell}
+        />
 
-        <div className="card">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="text-sm text-slate-400">Peso atual</p>
-            <Scale size={18} className="text-emerald-300" />
-          </div>
-          <p className="text-2xl font-black">
-            {summary.lastMeasurement?.weight ? `${summary.lastMeasurement.weight} kg` : '-'}
-          </p>
-          <p className="mt-1 text-xs text-slate-500">
-            {summary.lastMeasurement?.date || 'sem registro'}
-          </p>
-        </div>
+        <StatCard
+          title="Peso atual"
+          value={summary.lastMeasurement?.weight ? `${summary.lastMeasurement.weight} kg` : '-'}
+          subtitle={summary.lastMeasurement?.date || 'sem registro'}
+          icon={Scale}
+        />
 
-        <div className="card">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="text-sm text-slate-400">Sequência</p>
-            <Flame size={18} className="text-emerald-300" />
-          </div>
-          <p className="text-2xl font-black">{summary.currentStreak}</p>
-          <p className="mt-1 text-xs text-slate-500">dias</p>
-        </div>
+        <StatCard
+          title="Sequência"
+          value={summary.currentStreak}
+          subtitle="dias"
+          icon={Flame}
+        />
 
-        <div className="card">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="text-sm text-slate-400">Melhor seq.</p>
-            <Trophy size={18} className="text-emerald-300" />
-          </div>
-          <p className="text-2xl font-black">{summary.bestStreak}</p>
-          <p className="mt-1 text-xs text-slate-500">dias</p>
-        </div>
+        <StatCard
+          title="Melhor seq."
+          value={summary.bestStreak}
+          subtitle="dias"
+          icon={Trophy}
+        />
       </section>
 
-      <section className={`grid gap-3 ${availableWorkoutTypes.length > 3 ? 'grid-cols-5' : 'grid-cols-3'}`}>
+      <SectionTitle
+        title="Escolher treino"
+        subtitle={profile.name === 'Nicole' ? 'Rotina A/B/C' : 'Rotina A/B/C/D/E'}
+      />
+
+      <section
+        className={`mb-5 grid gap-3 ${
+          availableWorkoutTypes.length > 3 ? 'grid-cols-5' : 'grid-cols-3'
+        }`}
+      >
         {availableWorkoutTypes.map((workoutType) => (
           <Link
             key={workoutType}
             to={`/workout/${profileId}/${workoutType}`}
-            className="btn-secondary flex flex-col items-center justify-center gap-2 text-center"
+            className={`rounded-3xl border px-3 py-4 text-center transition ${
+              workoutType === nextWorkout
+                ? 'border-emerald-400 bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-950/40'
+                : 'border-slate-800 bg-slate-900/80 text-slate-300 hover:border-emerald-400/50 hover:text-white'
+            }`}
           >
-            <Dumbbell size={22} />
-            Treino {workoutType}
+            <Dumbbell size={22} className="mx-auto mb-2" />
+            <p className="font-black">Treino {workoutType}</p>
           </Link>
         ))}
       </section>
 
-      <section className="mt-5 grid grid-cols-2 gap-3">
+      <SectionTitle title="Acessos rápidos" />
+
+      <section className="grid grid-cols-2 gap-3">
         <Link
           to={`/history/${profileId}`}
-          className="btn-secondary flex items-center justify-between"
+          className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4 text-slate-300 transition hover:border-emerald-400/50 hover:text-white"
         >
-          Histórico <History size={20} />
+          <History size={22} className="mb-3 text-emerald-300" />
+          <p className="font-black">Histórico</p>
+          <p className="text-xs text-slate-500">Treinos salvos</p>
         </Link>
 
         <Link
           to={`/progress/${profileId}`}
-          className="btn-secondary flex items-center justify-between"
+          className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4 text-slate-300 transition hover:border-emerald-400/50 hover:text-white"
         >
-          Evolução <BarChart3 size={20} />
+          <BarChart3 size={22} className="mb-3 text-emerald-300" />
+          <p className="font-black">Evolução</p>
+          <p className="text-xs text-slate-500">Gráficos e cargas</p>
         </Link>
 
         <Link
           to={`/measurements/${profileId}`}
-          className="btn-secondary flex items-center justify-between"
+          className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4 text-slate-300 transition hover:border-emerald-400/50 hover:text-white"
         >
-          Medidas <Activity size={20} />
+          <Activity size={22} className="mb-3 text-emerald-300" />
+          <p className="font-black">Medidas</p>
+          <p className="text-xs text-slate-500">Peso e corpo</p>
         </Link>
 
         <Link
-          to="/profiles"
-          className="btn-secondary flex items-center justify-between"
+          to={`/photos/${profileId}`}
+          className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4 text-slate-300 transition hover:border-emerald-400/50 hover:text-white"
         >
-          Trocar perfil <UserRound size={20} />
+          <Camera size={22} className="mb-3 text-emerald-300" />
+          <p className="font-black">Fotos</p>
+          <p className="text-xs text-slate-500">Evolução visual</p>
         </Link>
       </section>
     </div>
   )
-}
+} 

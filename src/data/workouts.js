@@ -105,10 +105,45 @@ const henriqueWorkouts = {
     ]
   }
 }
+const rudneyWorkouts = {
+  A: {
+    title: 'Peito, ombro e tríceps',
+    exercises: [
+      ex('Supino Reto', 'Peito', { ...defaults.upper, sets: 3, reps: '8–12' }, ['Supino Máquina', 'Supino com halteres']),
+      ex('Supino Inclinado', 'Peito', { ...defaults.upper, sets: 3, reps: '8–12' }, ['Supino inclinado máquina', 'Supino inclinado halteres']),
+      ex('Supino Declinado', 'Peito', { ...defaults.upper, sets: 3, reps: '8–12' }, ['Peck Deck', 'Cross Over']),
+      ex('Flexão de Ombros', 'Ombro', defaults.isolation, ['Desenvolvimento', 'Elevação lateral']),
+      ex('Tríceps Polia', 'Tríceps', defaults.isolation, ['Tríceps corda', 'Tríceps barra']),
+      ex('Tríceps Corda', 'Tríceps', defaults.isolation, ['Tríceps mergulho', 'Tríceps francês'])
+    ]
+  },
+  B: {
+    title: 'Costas e bíceps',
+    exercises: [
+      ex('Puxador Frente', 'Costas', defaults.upper, ['Puxador costas', 'Puxador convergente']),
+      ex('Remada Baixa', 'Costas', defaults.upper, ['Remada com apoio', 'Remada articulada']),
+      ex('Remada com Apoio', 'Costas', defaults.upper, ['Remada baixa', 'Remada unilateral']),
+      ex('Graviton', 'Costas', defaults.upper, ['Barra fixa', 'Puxada frente']),
+      ex('Rosca Direta', 'Bíceps', defaults.isolation, ['Rosca polia', 'Rosca convergente']),
+      ex('Rosca Scott', 'Bíceps', defaults.isolation, ['Rosca direta', 'Rosca inversa'])
+    ]
+  },
+  C: {
+    title: 'Pernas e core',
+    exercises: [
+      ex('Leg Press Horizontal', 'Pernas', defaults.lower, ['Leg Press 45°', 'Leg Press Articulado', 'Leg Press 90°']),
+      ex('Cadeira Extensora', 'Quadríceps', defaults.isolation, ['Agachamento guiado', 'Hack horizontal']),
+      ex('Cadeira Flexora', 'Posterior', defaults.isolation, ['Mesa flexora', 'Flexão de joelho vertical']),
+      ex('Cadeira Abdutora', 'Glúteos', defaults.isolation, ['Cadeira adutora', 'Abdução máquina']),
+      ex('Stiff', 'Posterior', defaults.lower, ['Levantamento terra', 'Extensão de quadril']),
+      ex('Flexão Plantar no Leg', 'Panturrilha', { ...defaults.isolation, reps: '12–20' }, ['Flexão plantar em pé'])
+    ]
+  }
+}
 
 export const workouts = {
   Henrique: henriqueWorkouts,
-  Rudney: henriqueWorkouts,
+  Rudney: rudneyWorkouts,
   Nicole: {
     A: {
       title: 'Pernas e glúteos',

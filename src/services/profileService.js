@@ -20,12 +20,23 @@ export async function ensureDefaultProfiles() {
   if (listError) throw listError
 
   const existingNames = new Set((existing || []).map((profile) => profile.name))
+
   const missing = profilesSeed.filter((profile) => !existingNames.has(profile.name))
 
   if (missing.length) {
-    const payload = missing.map((profile) => ({ ...profile, user_id: user.id }))
-    const { error: insertError } = await supabase.from('profiles').insert(payload)
-    if (insertError) throw insertError
+    const payload = missing.map((profile) => ({
+      ...profile,
+      user_id: user.id
+    }))
+
+    const { error: upsertError } = await supabase
+      .from('profiles')
+      .upsert(payload, {
+        onConflict: 'user_id,name',
+        ignoreDuplicates: true
+      })
+
+    if (upsertError) throw upsertError
   }
 
   const { data, error } = await supabase
@@ -40,6 +51,7 @@ export async function ensureDefaultProfiles() {
 
 export async function getProfilesWithLastWorkout() {
   const profiles = await ensureDefaultProfiles()
+
   const withLast = await Promise.all(
     profiles.map(async (profile) => {
       const { data } = await supabase
@@ -53,6 +65,7 @@ export async function getProfilesWithLastWorkout() {
       return { ...profile, lastWorkout: data }
     })
   )
+
   return withLast
 }
 
