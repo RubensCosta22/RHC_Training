@@ -1,6 +1,17 @@
-import { ArrowLeft, CloudOff, Save } from 'lucide-react'
+import {
+  ArrowLeft,
+  ChevronDown,
+  ChevronUp,
+  CloudOff,
+  Save
+} from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import Badge from '../components/ui/Badge'
+import Button from '../components/ui/Button'
+import Card from '../components/ui/Card'
+import PageHeader from '../components/ui/PageHeader'
+import ProgressBar from '../components/ui/ProgressBar'
 import ExerciseCard from '../components/ExerciseCard'
 import { getWorkout } from '../data/workouts'
 import { getProfile } from '../services/profileService'
@@ -13,6 +24,7 @@ const today = () => new Date().toISOString().slice(0, 10)
 export default function Workout() {
   const { profileId, type } = useParams()
   const navigate = useNavigate()
+
   const [profile, setProfile] = useState(null)
   const [records, setRecords] = useState({})
   const [gymName, setGymName] = useState('')
@@ -23,6 +35,7 @@ export default function Workout() {
   const [message, setMessage] = useState('')
   const [saving, setSaving] = useState(false)
   const [online, setOnline] = useState(isOnline())
+  const [showDetails, setShowDetails] = useState(false)
 
   useEffect(() => {
     const handle = () => setOnline(isOnline())
@@ -138,103 +151,120 @@ export default function Workout() {
 
   return (
     <div>
-      <header className="mb-5">
-        <Link
-          to={`/dashboard/${profileId}`}
-          className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-emerald-300"
-        >
-          <ArrowLeft size={18} />
-          Voltar
-        </Link>
+      <Link
+        to={`/dashboard/${profileId}`}
+        className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-emerald-300"
+      >
+        <ArrowLeft size={18} />
+        Voltar
+      </Link>
 
-        <div className="flex items-start justify-between gap-4">
+      <PageHeader
+        eyebrow={`Treino ${type}`}
+        title={workout.title}
+        subtitle={`${profile.name} • ${done}/${total} exercícios concluídos`}
+        action={
+          <Badge variant={online ? 'green' : 'amber'}>
+            {online ? 'Online' : 'Offline'}
+          </Badge>
+        }
+      />
+
+      {workout.description && (
+        <Card className="mb-4">
+          <p className="text-sm text-slate-400">{workout.description}</p>
+        </Card>
+      )}
+
+      <Card className="mb-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-bold text-emerald-300">Treino {type}</p>
-            <h1 className="text-3xl font-black">{workout.title}</h1>
-            <p className="text-slate-400">
-              {profile.name} • {done}/{total} exercícios concluídos
+            <p className="font-bold text-white">Progresso do treino</p>
+            <p className="text-sm text-slate-400">
+              {done} de {total} exercícios concluídos
             </p>
           </div>
 
-          <span
-            className={`badge ${
-              online
-                ? 'border-emerald-400/50 text-emerald-200'
-                : 'border-amber-400/50 text-amber-200'
-            }`}
-          >
-            {online ? 'Online' : 'Offline'}
-          </span>
-        </div>
-      </header>
-
-      <section className="card mb-4">
-        <div className="mb-3 flex items-center justify-between">
-          <p className="font-bold">Progresso do treino</p>
-          <p className="text-sm font-bold text-emerald-300">{progress}%</p>
+          <Badge variant={progress === 100 ? 'green' : 'slate'}>
+            {progress}%
+          </Badge>
         </div>
 
-        <div className="h-3 overflow-hidden rounded-full bg-slate-800">
-          <div
-            className="h-full rounded-full bg-emerald-400 transition-all"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
+        <ProgressBar value={progress} />
+      </Card>
 
-        <p className="mt-2 text-sm text-slate-400">
-          {done} de {total} exercícios concluídos
-        </p>
-      </section>
+      <Card className="mb-4">
+        <button
+          type="button"
+          onClick={() => setShowDetails((current) => !current)}
+          className="flex w-full items-center justify-between text-left"
+        >
+          <div>
+            <p className="font-bold text-white">Detalhes do treino</p>
+            <p className="text-sm text-slate-400">
+              Academia, data, duração e observação
+            </p>
+          </div>
 
-      <section className="card mb-4 grid gap-3 md:grid-cols-3">
-        <label>
-          <span className="mb-1 block text-sm font-semibold text-slate-300">
-            Academia
-          </span>
-          <input
-            value={gymName}
-            onChange={(event) => setGymName(event.target.value)}
-            maxLength={80}
-            placeholder="Ex: Smart Fit Centro"
-          />
-        </label>
+          {showDetails ? (
+            <ChevronUp size={20} className="text-slate-400" />
+          ) : (
+            <ChevronDown size={20} className="text-slate-400" />
+          )}
+        </button>
 
-        <label>
-          <span className="mb-1 block text-sm font-semibold text-slate-300">
-            Data
-          </span>
-          <input
-            type="date"
-            value={date}
-            onChange={(event) => setDate(event.target.value)}
-          />
-        </label>
+        {showDetails && (
+          <div className="mt-4 grid gap-3 border-t border-slate-800 pt-4 md:grid-cols-3">
+            <label>
+              <span className="mb-1 block text-sm font-semibold text-slate-300">
+                Academia
+              </span>
+              <input
+                value={gymName}
+                onChange={(event) => setGymName(event.target.value)}
+                maxLength={80}
+                placeholder="Ex: Smart Fit Centro"
+              />
+            </label>
 
-        <label>
-          <span className="mb-1 block text-sm font-semibold text-slate-300">
-            Duração
-          </span>
-          <input
-            type="number"
-            min="0"
-            value={durationMinutes}
-            onChange={(event) => setDurationMinutes(event.target.value)}
-          />
-        </label>
+            <label>
+              <span className="mb-1 block text-sm font-semibold text-slate-300">
+                Data
+              </span>
+              <input
+                type="date"
+                value={date}
+                onChange={(event) => setDate(event.target.value)}
+              />
+            </label>
 
-        <label className="md:col-span-3">
-          <span className="mb-1 block text-sm font-semibold text-slate-300">
-            Observação geral
-          </span>
-          <textarea
-            rows="2"
-            maxLength={500}
-            value={notes}
-            onChange={(event) => setNotes(event.target.value)}
-            placeholder="Como foi o treino?"
-          />
-        </label>
-      </section>
+            <label>
+              <span className="mb-1 block text-sm font-semibold text-slate-300">
+                Duração
+              </span>
+              <input
+                type="number"
+                min="0"
+                value={durationMinutes}
+                onChange={(event) => setDurationMinutes(event.target.value)}
+              />
+            </label>
+
+            <label className="md:col-span-3">
+              <span className="mb-1 block text-sm font-semibold text-slate-300">
+                Observação geral
+              </span>
+              <textarea
+                rows="2"
+                maxLength={500}
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="Como foi o treino?"
+              />
+            </label>
+          </div>
+        )}
+      </Card>
 
       <div className="grid gap-4">
         {workout.exercises.map((exercise) => (
@@ -254,14 +284,14 @@ export default function Workout() {
         </p>
       )}
 
-      <button
+      <Button
         onClick={finalizeWorkout}
         disabled={saving}
-        className="btn-primary mt-5 flex w-full items-center justify-center gap-2"
+        className="mt-5 w-full"
+        icon={online ? Save : CloudOff}
       >
-        {online ? <Save size={20} /> : <CloudOff size={20} />}
         {saving ? 'Salvando...' : 'Finalizar treino'}
-      </button>
+      </Button>
     </div>
   )
 }

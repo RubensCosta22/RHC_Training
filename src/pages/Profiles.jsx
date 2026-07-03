@@ -1,11 +1,13 @@
-import { LogOut, Users } from 'lucide-react'
+import { LogOut } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import LoadingCard from '../components/ui/LoadingCard'
+import PageHeader from '../components/ui/PageHeader'
 import ProfileCard from '../components/ProfileCard'
 import { supabase } from '../lib/supabaseClient'
 import { getProfilesWithLastWorkout } from '../services/profileService'
+import { logEvent } from '../services/telemetryService'
 import { friendlyError } from '../utils/validation'
-import { logEvent } from "../services/telemetryService";
 
 export default function Profiles() {
   const navigate = useNavigate()
@@ -27,39 +29,47 @@ export default function Profiles() {
 
   return (
     <div>
-      <header className="mb-6 flex items-center justify-between gap-4">
-        <div>
-          <p className="text-sm font-bold text-emerald-300">TotalPass casal</p>
-          <h1 className="text-3xl font-black">Escolha o perfil</h1>
+      <PageHeader
+        eyebrow="RHC Training"
+        title="Escolha o perfil"
+        subtitle="Selecione quem vai treinar agora."
+        action={
+          <button
+            onClick={logout}
+            className="rounded-2xl bg-slate-900 p-3 text-slate-300 transition hover:bg-slate-800 hover:text-white"
+            aria-label="Sair"
+            type="button"
+          >
+            <LogOut size={22} />
+          </button>
+        }
+      />
+
+      {loading && <LoadingCard lines={4} />}
+
+      {error && (
+        <p className="rounded-2xl border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-100">
+          {error}
+        </p>
+      )}
+
+      {!loading && !error && (
+        <div className="grid gap-4">
+          {profiles.map((profile) => (
+            <ProfileCard
+              key={profile.id}
+              profile={profile}
+              onSelect={async () => {
+                await logEvent(
+                  'profile_selected',
+                  { profile_name: profile.name },
+                  profile.id
+                )
+              }}
+            />
+          ))}
         </div>
-        <button onClick={logout} className="rounded-2xl bg-slate-900 p-3 text-slate-300" aria-label="Sair">
-          <LogOut size={22} />
-        </button>
-      </header>
-
-      {loading && <p className="text-slate-400">Preparando perfis...</p>}
-      {error && <p className="rounded-2xl border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-100">{error}</p>}
-
-      <div className="grid gap-4">
-        {profiles.map((profile) => (
-  <ProfileCard
-    key={profile.id}
-    profile={profile}
-    onSelect={async () => {
-      await logEvent(
-        "profile_selected",
-        { profile_name: profile.name },
-        profile.id
-      )
-    }}
-  />
-))}
-      </div>
-
-      <section className="card mt-5 flex gap-3 text-sm text-slate-300">
-        <Users className="text-emerald-300" />
-        <p>O progresso fica salvo na nuvem por login. Entrando em outro celular com a mesma conta, os dados são carregados novamente.</p>
-      </section>
+      )}
     </div>
   )
 }

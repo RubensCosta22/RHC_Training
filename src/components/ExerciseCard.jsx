@@ -11,13 +11,11 @@ import {
   RotateCcw
 } from 'lucide-react'
 import { useState } from 'react'
+import Counter from './ui/Counter'
+import ExerciseImage from './ui/ExerciseImage'
 import RestTimer from './RestTimer'
 import { getProgressionStatus, getProgressionSuggestion } from '../utils/progression'
 import { youtubeSearchUrl } from '../utils/youtube'
-
-function getExerciseImage(exercise) {
-  return `/exercise-images/${exercise.id}.webp`
-}
 
 function getInitialReps(exercise, value) {
   if (value.actualReps !== undefined && value.actualReps !== null && value.actualReps !== '') {
@@ -31,6 +29,7 @@ function getInitialReps(exercise, value) {
 
 export default function ExerciseCard({ exercise, value = {}, record, onChange }) {
   const [showSwapOptions, setShowSwapOptions] = useState(false)
+
   const selectedName = value.selectedName || exercise.name
   const options = [exercise.name, ...(exercise.alternatives || [])]
   const isAlternative = selectedName !== exercise.name
@@ -38,6 +37,7 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
   const completedSetCount = completedSets.filter(Boolean).length
   const isExpanded = value.expanded !== false
   const repsValue = getInitialReps(exercise, value)
+
   const progression = getProgressionStatus(value.weight, record?.last_weight)
   const suggestion = getProgressionSuggestion(
     exercise,
@@ -63,12 +63,12 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
       completedSets: Array(Number(exercise.sets || 0)).fill(false),
       expanded: true
     })
+
     setShowSwapOptions(false)
   }
 
   function updateReps(nextValue) {
-    const safeValue = Math.max(0, Number(nextValue) || 0)
-    update({ actualReps: String(safeValue) })
+    update({ actualReps: String(Math.max(0, Number(nextValue) || 0)) })
   }
 
   function toggleSet(index) {
@@ -82,7 +82,9 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
       completedSets: nextSets,
       completed,
       expanded: !completed,
-      restTimerKey: nextSets[index] ? `${exercise.id}-${index}-${Date.now()}` : value.restTimerKey
+      restTimerKey: nextSets[index]
+        ? `${exercise.id}-${index}-${Date.now()}`
+        : value.restTimerKey
     })
   }
 
@@ -100,7 +102,7 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
 
   if (value.completed && !isExpanded) {
     return (
-      <article className="rounded-3xl border border-emerald-400/30 bg-slate-900/90 p-4 shadow-xl shadow-black/20">
+      <article className="rounded-3xl border border-emerald-400/30 bg-slate-900/90 p-4 shadow-xl shadow-black/20 transition-all duration-300">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-400 text-slate-950">
@@ -111,6 +113,7 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
               <h3 className="truncate font-black text-white line-through decoration-emerald-400/70">
                 {selectedName}
               </h3>
+
               <p className="text-sm text-slate-400">
                 {value.weight ? `${value.weight} kg` : 'Sem carga'} • {repsValue || '-'} reps • {completedSetCount}/{exercise.sets} séries
               </p>
@@ -120,7 +123,7 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
           <button
             type="button"
             onClick={() => update({ expanded: true })}
-            className="rounded-2xl bg-slate-800 p-3 text-slate-300"
+            className="rounded-2xl bg-slate-800 p-3 text-slate-300 transition hover:bg-slate-700 hover:text-white"
             aria-label="Expandir exercício"
           >
             <ChevronDown size={18} />
@@ -131,37 +134,24 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
   }
 
   return (
-    <article className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/90 shadow-xl shadow-black/20">
-      <div className="relative h-40 overflow-hidden bg-gradient-to-br from-slate-800 to-slate-950">
-        <img
-          src={getExerciseImage(exercise)}
-          alt={selectedName}
-          className="h-full w-full object-cover opacity-80"
-          onError={(event) => {
-            event.currentTarget.style.display = 'none'
-          }}
-        />
-
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/35 to-transparent" />
-
-        <div className="absolute inset-0 grid place-items-center">
-          <div className="grid h-16 w-16 place-items-center rounded-3xl border border-emerald-400/20 bg-slate-950/50 text-emerald-300 backdrop-blur">
-            <ImageIcon size={28} />
-          </div>
-        </div>
-
+    <article className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/90 shadow-xl shadow-black/20 transition-all duration-300">
+      <ExerciseImage exercise={exercise} alt={selectedName} className="h-40">
         <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-3">
           <div className="min-w-0">
             <p className="mb-1 inline-flex rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-300">
               {exercise.muscleGroup}
             </p>
-            <h3 className="truncate text-2xl font-black text-white">{selectedName}</h3>
+
+            <h3 className="truncate text-2xl font-black text-white">
+              {selectedName}
+            </h3>
           </div>
 
           <a
             href={youtubeSearchUrl(selectedName)}
             target="_blank"
             rel="noreferrer"
+            title="Ver execução"
             className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-slate-700 bg-slate-950/80 text-slate-200 backdrop-blur transition hover:border-emerald-400 hover:text-emerald-300"
             aria-label="Ver execução"
           >
@@ -174,7 +164,7 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
             substituído
           </div>
         )}
-      </div>
+      </ExerciseImage>
 
       <div className="p-4">
         <div className="mb-4 flex items-center justify-between gap-3">
@@ -201,46 +191,31 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
             <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">
               Carga
             </span>
-            <input
-              type="number"
-              min="0"
-              step="0.5"
-              value={value.weight || ''}
-              onChange={(event) => update({ weight: event.target.value })}
-              placeholder="0"
-              className="border-0 bg-transparent p-0 text-2xl font-black text-white outline-none placeholder:text-slate-700"
-            />
-            <span className="text-xs text-slate-500">kg</span>
+
+            <div className="flex items-end gap-1">
+              <input
+                type="number"
+                min="0"
+                step="0.5"
+                value={value.weight || ''}
+                onChange={(event) => update({ weight: event.target.value })}
+                placeholder="0"
+                className="min-w-0 flex-1 border-0 bg-transparent p-0 text-3xl font-black text-white outline-none placeholder:text-slate-700"
+              />
+
+              <span className="pb-1 text-sm font-bold text-slate-500">kg</span>
+            </div>
           </label>
 
-          <div className="col-span-2 rounded-3xl border border-slate-800 bg-slate-950/60 p-3">
-            <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">
-              Repetições
-            </span>
-
-            <div className="flex items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={() => updateReps(repsValue - 1)}
-                className="grid h-11 w-11 place-items-center rounded-2xl bg-slate-800 text-slate-200 transition hover:bg-slate-700"
-                aria-label="Diminuir repetições"
-              >
-                <Minus size={18} />
-              </button>
-
-              <p className="min-w-12 text-center text-3xl font-black text-white">
-                {repsValue}
-              </p>
-
-              <button
-                type="button"
-                onClick={() => updateReps(repsValue + 1)}
-                className="grid h-11 w-11 place-items-center rounded-2xl bg-emerald-400 text-slate-950 transition hover:bg-emerald-300"
-                aria-label="Aumentar repetições"
-              >
-                <Plus size={18} />
-              </button>
-            </div>
+          <div className="col-span-2">
+            <Counter
+              label="Repetições"
+              value={repsValue}
+              min={0}
+              max={999}
+              step={1}
+              onChange={updateReps}
+            />
           </div>
         </div>
 
@@ -259,6 +234,7 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
         <div className="mt-4 rounded-3xl border border-slate-800 bg-slate-950/50 p-4">
           <div className="mb-3 flex items-center justify-between">
             <p className="font-bold">Séries</p>
+
             <p className="text-sm text-emerald-300">
               {completedSetCount} de {exercise.sets}
             </p>
@@ -270,24 +246,31 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
                 key={index}
                 type="button"
                 onClick={() => toggleSet(index)}
-                className={`rounded-2xl border px-3 py-3 text-sm font-black transition ${
+                className={`grid min-h-14 place-items-center rounded-2xl border text-lg font-black transition ${
                   done
-                    ? 'border-emerald-400 bg-emerald-400 text-slate-950'
-                    : 'border-slate-700 bg-slate-800 text-slate-300 hover:border-emerald-400'
+                    ? 'border-emerald-400 bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-950/30'
+                    : 'border-slate-700 bg-slate-800 text-slate-300 hover:border-emerald-400 hover:text-white'
                 }`}
+                aria-label={`Marcar série ${index + 1}`}
               >
-                {index + 1}
+                {done ? <Check size={21} /> : index + 1}
               </button>
             ))}
           </div>
-        </div>
 
-        <div className="mt-4">
-          <RestTimer seconds={Number(exercise.rest || 60)} autoStartKey={value.restTimerKey} />
+          <div className="mt-4">
+            <RestTimer
+              seconds={Number(exercise.rest || 60)}
+              autoStartKey={value.restTimerKey}
+            />
+          </div>
         </div>
 
         <div className="mt-4 rounded-3xl border border-slate-800 bg-slate-950/60 p-3 text-sm">
-          <p className="font-bold text-emerald-300">{progression}</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+            Progressão
+          </p>
+          <p className="mt-1 font-bold text-emerald-300">{progression}</p>
           <p className="mt-1 text-slate-400">{suggestion}</p>
         </div>
 
@@ -299,8 +282,9 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
           >
             <span className="inline-flex items-center gap-2">
               <RotateCcw size={16} />
-              Trocar exercício
+              Trocar exercício ({options.length - 1})
             </span>
+
             {showSwapOptions ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
           </button>
 
