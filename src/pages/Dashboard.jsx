@@ -11,14 +11,29 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { getWorkoutTypes } from '../data/workouts'
 import { getProfile } from '../services/profileService'
 import { getDashboardSummary } from '../services/workoutService'
 import { friendlyError } from '../utils/validation'
 
-function getNextWorkoutType(lastWorkoutType) {
-  if (lastWorkoutType === 'A') return 'B'
-  if (lastWorkoutType === 'B') return 'C'
-  return 'A'
+const workoutDescriptions = {
+  A: 'Peito • Ombro • Tríceps',
+  B: 'Costas • Bíceps',
+  C: 'Pernas • Core',
+  D: 'Força funcional • Posterior',
+  E: 'Condicionamento • Corrida'
+}
+
+function getNextWorkoutType(lastWorkoutType, availableTypes) {
+  if (!availableTypes.length) return 'A'
+
+  if (!lastWorkoutType) return availableTypes[0]
+
+  const currentIndex = availableTypes.indexOf(lastWorkoutType)
+
+  if (currentIndex === -1) return availableTypes[0]
+
+  return availableTypes[(currentIndex + 1) % availableTypes.length]
 }
 
 export default function Dashboard() {
@@ -36,9 +51,15 @@ export default function Dashboard() {
       .catch((err) => setError(friendlyError(err)))
   }, [profileId])
 
+  const availableWorkoutTypes = useMemo(() => {
+    if (!profile?.name) return ['A', 'B', 'C']
+
+    return getWorkoutTypes(profile.name)
+  }, [profile])
+
   const nextWorkout = useMemo(() => {
-    return getNextWorkoutType(summary?.lastWorkout?.workout_type)
-  }, [summary])
+    return getNextWorkoutType(summary?.lastWorkout?.workout_type, availableWorkoutTypes)
+  }, [summary, availableWorkoutTypes])
 
   if (error) {
     return (
@@ -52,7 +73,7 @@ export default function Dashboard() {
     return <p className="text-slate-400">Carregando dashboard...</p>
   }
 
-  const weeklyTarget = 5
+  const weeklyTarget = profile.name === 'Nicole' ? 3 : 5
   const weeklyPercent = Math.min(100, Math.round((summary.weekCount / weeklyTarget) * 100))
 
   return (
@@ -87,9 +108,7 @@ export default function Dashboard() {
           <div className="min-w-0 flex-1">
             <h2 className="text-2xl font-black">Treino {nextWorkout}</h2>
             <p className="text-sm text-slate-400">
-              {nextWorkout === 'A' && 'Peito • Ombro • Tríceps'}
-              {nextWorkout === 'B' && 'Costas • Bíceps'}
-              {nextWorkout === 'C' && 'Pernas • Core'}
+              {workoutDescriptions[nextWorkout] || 'Treino personalizado'}
             </p>
           </div>
         </div>
@@ -165,8 +184,8 @@ export default function Dashboard() {
         </div>
       </section>
 
-      <section className="grid grid-cols-3 gap-3">
-        {['A', 'B', 'C'].map((workoutType) => (
+      <section className={`grid gap-3 ${availableWorkoutTypes.length > 3 ? 'grid-cols-5' : 'grid-cols-3'}`}>
+        {availableWorkoutTypes.map((workoutType) => (
           <Link
             key={workoutType}
             to={`/workout/${profileId}/${workoutType}`}

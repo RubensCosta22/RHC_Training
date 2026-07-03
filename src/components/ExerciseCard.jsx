@@ -5,31 +5,55 @@ import {
   ChevronUp,
   ExternalLink,
   ImageIcon,
+  Minus,
+  Plus,
   Repeat2,
   RotateCcw
 } from 'lucide-react'
+import { useState } from 'react'
 import RestTimer from './RestTimer'
 import { getProgressionStatus, getProgressionSuggestion } from '../utils/progression'
 import { youtubeSearchUrl } from '../utils/youtube'
 
+function getExerciseImage(exercise) {
+  return `/exercise-images/${exercise.id}.webp`
+}
+
+function getInitialReps(exercise, value) {
+  if (value.actualReps !== undefined && value.actualReps !== null && value.actualReps !== '') {
+    const parsed = Number(String(value.actualReps).replace(/\D/g, ''))
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
+  }
+
+  const match = String(exercise.reps || '').match(/\d+/)
+  return match ? Number(match[0]) : 0
+}
+
 export default function ExerciseCard({ exercise, value = {}, record, onChange }) {
+  const [showSwapOptions, setShowSwapOptions] = useState(false)
   const selectedName = value.selectedName || exercise.name
   const options = [exercise.name, ...(exercise.alternatives || [])]
   const isAlternative = selectedName !== exercise.name
   const completedSets = value.completedSets || Array(Number(exercise.sets || 0)).fill(false)
   const completedSetCount = completedSets.filter(Boolean).length
   const isExpanded = value.expanded !== false
+  const repsValue = getInitialReps(exercise, value)
   const progression = getProgressionStatus(value.weight, record?.last_weight)
   const suggestion = getProgressionSuggestion(
     exercise,
     value.weight,
     value.completed,
-    value.difficulty,
+    value.difficulty || 'normal',
     value.actualReps
   )
 
   function update(patch) {
-    onChange({ ...value, ...patch })
+    onChange({
+      ...value,
+      notes: value.notes || '',
+      difficulty: value.difficulty || 'normal',
+      ...patch
+    })
   }
 
   function selectExercise(name) {
@@ -39,6 +63,12 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
       completedSets: Array(Number(exercise.sets || 0)).fill(false),
       expanded: true
     })
+    setShowSwapOptions(false)
+  }
+
+  function updateReps(nextValue) {
+    const safeValue = Math.max(0, Number(nextValue) || 0)
+    update({ actualReps: String(safeValue) })
   }
 
   function toggleSet(index) {
@@ -70,11 +100,11 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
 
   if (value.completed && !isExpanded) {
     return (
-      <article className="rounded-3xl border border-emerald-400/30 bg-slate-900/80 p-4 shadow-xl shadow-black/20">
+      <article className="rounded-3xl border border-emerald-400/30 bg-slate-900/90 p-4 shadow-xl shadow-black/20">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-emerald-400 text-slate-950">
-              <Check size={20} />
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-400 text-slate-950">
+              <Check size={21} />
             </div>
 
             <div className="min-w-0">
@@ -82,7 +112,7 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
                 {selectedName}
               </h3>
               <p className="text-sm text-slate-400">
-                {value.weight ? `${value.weight} kg` : 'Carga não informada'} • {completedSetCount}/{exercise.sets} séries
+                {value.weight ? `${value.weight} kg` : 'Sem carga'} • {repsValue || '-'} reps • {completedSetCount}/{exercise.sets} séries
               </p>
             </div>
           </div>
@@ -101,16 +131,42 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
   }
 
   return (
-    <article className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/80 shadow-xl shadow-black/20">
-      <div className="relative h-36 bg-gradient-to-br from-slate-800 to-slate-950">
+    <article className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/90 shadow-xl shadow-black/20">
+      <div className="relative h-40 overflow-hidden bg-gradient-to-br from-slate-800 to-slate-950">
+        <img
+          src={getExerciseImage(exercise)}
+          alt={selectedName}
+          className="h-full w-full object-cover opacity-80"
+          onError={(event) => {
+            event.currentTarget.style.display = 'none'
+          }}
+        />
+
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/35 to-transparent" />
+
         <div className="absolute inset-0 grid place-items-center">
-          <div className="grid h-20 w-20 place-items-center rounded-3xl border border-emerald-400/30 bg-emerald-400/10 text-emerald-300">
-            <ImageIcon size={34} />
+          <div className="grid h-16 w-16 place-items-center rounded-3xl border border-emerald-400/20 bg-slate-950/50 text-emerald-300 backdrop-blur">
+            <ImageIcon size={28} />
           </div>
         </div>
 
-        <div className="absolute bottom-3 left-3 rounded-full bg-slate-950/80 px-3 py-1 text-xs font-bold text-emerald-300">
-          {exercise.muscleGroup}
+        <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <p className="mb-1 inline-flex rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-300">
+              {exercise.muscleGroup}
+            </p>
+            <h3 className="truncate text-2xl font-black text-white">{selectedName}</h3>
+          </div>
+
+          <a
+            href={youtubeSearchUrl(selectedName)}
+            target="_blank"
+            rel="noreferrer"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-slate-700 bg-slate-950/80 text-slate-200 backdrop-blur transition hover:border-emerald-400 hover:text-emerald-300"
+            aria-label="Ver execução"
+          >
+            <ExternalLink size={18} />
+          </a>
         </div>
 
         {isAlternative && (
@@ -121,18 +177,10 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
       </div>
 
       <div className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h3 className="text-xl font-black">{selectedName}</h3>
-
-            {isAlternative && (
-              <p className="mt-1 text-xs text-slate-500">Original: {exercise.name}</p>
-            )}
-
-            <p className="mt-1 text-sm text-slate-400">
-              {exercise.sets} séries • {exercise.reps} reps • descanso {exercise.rest}s
-            </p>
-          </div>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <p className="text-sm text-slate-400">
+            {exercise.sets} séries • alvo {exercise.reps} • descanso {exercise.rest}s
+          </p>
 
           <button
             type="button"
@@ -148,11 +196,71 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
           </button>
         </div>
 
+        <div className="grid grid-cols-3 gap-3">
+          <label className="rounded-3xl border border-slate-800 bg-slate-950/60 p-3">
+            <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">
+              Carga
+            </span>
+            <input
+              type="number"
+              min="0"
+              step="0.5"
+              value={value.weight || ''}
+              onChange={(event) => update({ weight: event.target.value })}
+              placeholder="0"
+              className="border-0 bg-transparent p-0 text-2xl font-black text-white outline-none placeholder:text-slate-700"
+            />
+            <span className="text-xs text-slate-500">kg</span>
+          </label>
+
+          <div className="col-span-2 rounded-3xl border border-slate-800 bg-slate-950/60 p-3">
+            <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">
+              Repetições
+            </span>
+
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => updateReps(repsValue - 1)}
+                className="grid h-11 w-11 place-items-center rounded-2xl bg-slate-800 text-slate-200 transition hover:bg-slate-700"
+                aria-label="Diminuir repetições"
+              >
+                <Minus size={18} />
+              </button>
+
+              <p className="min-w-12 text-center text-3xl font-black text-white">
+                {repsValue}
+              </p>
+
+              <button
+                type="button"
+                onClick={() => updateReps(repsValue + 1)}
+                className="grid h-11 w-11 place-items-center rounded-2xl bg-emerald-400 text-slate-950 transition hover:bg-emerald-300"
+                aria-label="Aumentar repetições"
+              >
+                <Plus size={18} />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+          <div className="rounded-2xl bg-slate-950/60 p-3">
+            <p className="text-slate-500">Última carga</p>
+            <p className="font-bold">{record?.last_weight ?? '-'} kg</p>
+          </div>
+
+          <div className="rounded-2xl bg-slate-950/60 p-3">
+            <p className="text-slate-500">Melhor carga</p>
+            <p className="font-bold">{record?.best_weight ?? '-'} kg</p>
+          </div>
+        </div>
+
         <div className="mt-4 rounded-3xl border border-slate-800 bg-slate-950/50 p-4">
           <div className="mb-3 flex items-center justify-between">
             <p className="font-bold">Séries</p>
             <p className="text-sm text-emerald-300">
-              {completedSetCount} de {exercise.sets} concluídas
+              {completedSetCount} de {exercise.sets}
             </p>
           </div>
 
@@ -174,96 +282,8 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-          <div className="rounded-2xl bg-slate-950/60 p-3">
-            <p className="text-slate-500">Última carga</p>
-            <p className="font-bold">{record?.last_weight ?? '-'} kg</p>
-          </div>
-
-          <div className="rounded-2xl bg-slate-950/60 p-3">
-            <p className="text-slate-500">Melhor carga</p>
-            <p className="font-bold">{record?.best_weight ?? '-'} kg</p>
-          </div>
-        </div>
-
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <label>
-            <span className="mb-1 block text-sm font-semibold text-slate-300">
-              Carga usada
-            </span>
-            <input
-              type="number"
-              min="0"
-              step="0.5"
-              value={value.weight || ''}
-              onChange={(event) => update({ weight: event.target.value })}
-              placeholder="Ex: 40"
-            />
-          </label>
-
-          <label>
-            <span className="mb-1 block text-sm font-semibold text-slate-300">
-              Reps feitas
-            </span>
-            <input
-              value={value.actualReps || ''}
-              onChange={(event) => update({ actualReps: event.target.value })}
-              maxLength={40}
-              placeholder={`Ex: ${exercise.reps}`}
-            />
-          </label>
-
-          <label>
-            <span className="mb-1 block text-sm font-semibold text-slate-300">
-              Sensação
-            </span>
-            <select
-              value={value.difficulty || 'normal'}
-              onChange={(event) => update({ difficulty: event.target.value })}
-            >
-              <option value="normal">Normal</option>
-              <option value="easy">Fácil</option>
-              <option value="hard">Difícil</option>
-              <option value="pain">Dor/desconforto</option>
-            </select>
-          </label>
-        </div>
-
-        <label className="mt-3 block">
-          <span className="mb-1 block text-sm font-semibold text-slate-300">
-            Observação
-          </span>
-          <textarea
-            maxLength={500}
-            rows="2"
-            value={value.notes || ''}
-            onChange={(event) => update({ notes: event.target.value })}
-            placeholder="Ex: aumentar na próxima, máquina ocupada..."
-          />
-        </label>
-
-        <div className="mt-4 rounded-3xl border border-slate-800 bg-slate-950/50 p-3">
-          <p className="mb-2 text-sm font-bold text-slate-300">
-            Trocar exercício
-          </p>
-
-          <div className="flex flex-wrap gap-2">
-            {options.map((option) => (
-              <button
-                key={option}
-                type="button"
-                onClick={() => selectExercise(option)}
-                className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-bold transition ${
-                  selectedName === option
-                    ? 'border-emerald-400 bg-emerald-400 text-slate-950'
-                    : 'border-slate-700 bg-slate-800 text-slate-200 hover:border-emerald-400'
-                }`}
-              >
-                <RotateCcw size={12} />
-                {option}
-              </button>
-            ))}
-          </div>
+        <div className="mt-4">
+          <RestTimer seconds={Number(exercise.rest || 60)} autoStartKey={value.restTimerKey} />
         </div>
 
         <div className="mt-4 rounded-3xl border border-slate-800 bg-slate-950/60 p-3 text-sm">
@@ -271,28 +291,48 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
           <p className="mt-1 text-slate-400">{suggestion}</p>
         </div>
 
-        <div className="mt-4">
-          <RestTimer seconds={Number(exercise.rest || 60)} autoStartKey={value.restTimerKey} />
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <a
-            href={youtubeSearchUrl(selectedName)}
-            target="_blank"
-            rel="noreferrer"
-            className="btn-secondary flex items-center justify-center gap-2"
-          >
-            Ver vídeo <ExternalLink size={18} />
-          </a>
-
+        <div className="mt-4 rounded-3xl border border-slate-800 bg-slate-950/50">
           <button
             type="button"
-            onClick={() => update({ expanded: false })}
-            className="btn-secondary flex items-center justify-center gap-2"
+            onClick={() => setShowSwapOptions((current) => !current)}
+            className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-bold text-slate-300"
           >
-            Minimizar <Repeat2 size={18} />
+            <span className="inline-flex items-center gap-2">
+              <RotateCcw size={16} />
+              Trocar exercício
+            </span>
+            {showSwapOptions ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
           </button>
+
+          {showSwapOptions && (
+            <div className="border-t border-slate-800 p-3">
+              <div className="flex flex-wrap gap-2">
+                {options.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => selectExercise(option)}
+                    className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-bold transition ${
+                      selectedName === option
+                        ? 'border-emerald-400 bg-emerald-400 text-slate-950'
+                        : 'border-slate-700 bg-slate-800 text-slate-200 hover:border-emerald-400'
+                    }`}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
+
+        <button
+          type="button"
+          onClick={() => update({ expanded: false })}
+          className="btn-secondary mt-4 flex w-full items-center justify-center gap-2"
+        >
+          Minimizar <Repeat2 size={18} />
+        </button>
       </div>
     </article>
   )
