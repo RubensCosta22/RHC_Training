@@ -1,4 +1,4 @@
-# Meu Treino TotalPass
+# Meu Treino
 
 App web mobile-first para treino A/B/C de Henrique e Nicole, com progresso salvo na nuvem, Supabase Auth, PostgreSQL com RLS, fotos privadas de evolução via Supabase Storage, gráficos com Recharts e PWA.
 
