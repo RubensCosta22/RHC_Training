@@ -64,10 +64,12 @@ completo. Execute somente as migrations novas, em ordem. A migration atual e:
 
 ```text
 supabase/migrations/20260717190000_v1_data_safety.sql
+supabase/migrations/20260717210000_archived_items_restore.sql
 ```
 
-Ela preserva todos os registros existentes e adiciona o salvamento transacional,
-a importacao idempotente de backup e a estrutura de telemetria.
+Elas preservam todos os registros existentes e adicionam o salvamento transacional,
+a importacao idempotente de backup, a estrutura de telemetria e o arquivamento
+reversivel de treinos, medidas e fotos.
 
 ## 2. Configurar Auth no Supabase
 

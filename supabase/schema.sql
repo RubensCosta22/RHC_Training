@@ -48,6 +48,7 @@ create table if not exists public.workout_sessions (
   completion_percentage numeric not null default 0 check (completion_percentage >= 0 and completion_percentage <= 100),
   total_volume numeric not null default 0 check (total_volume >= 0),
   notes text check (public.is_safe_text(notes)),
+  archived_at timestamptz,
   created_at timestamptz not null default now(),
   constraint workout_sessions_profile_owner_fk foreign key (profile_id, user_id) references public.profiles(id, user_id) on delete cascade
 );
@@ -91,6 +92,7 @@ create table if not exists public.body_measurements (
   thigh numeric check (thigh is null or thigh >= 0),
   hip numeric check (hip is null or hip >= 0),
   notes text check (public.is_safe_text(notes)),
+  archived_at timestamptz,
   created_at timestamptz not null default now(),
   constraint body_measurements_profile_owner_fk foreign key (profile_id, user_id) references public.profiles(id, user_id) on delete cascade
 );
@@ -103,6 +105,7 @@ create table if not exists public.progress_photos (
   photo_type text not null check (photo_type in ('frente', 'lado', 'costas')),
   photo_url text not null check (length(photo_url) <= 700),
   notes text check (public.is_safe_text(notes)),
+  archived_at timestamptz,
   created_at timestamptz not null default now(),
   constraint progress_photos_profile_owner_fk foreign key (profile_id, user_id) references public.profiles(id, user_id) on delete cascade
 );

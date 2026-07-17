@@ -10,6 +10,7 @@ export async function listPhotos(profileId) {
     .from('progress_photos')
     .select('*')
     .eq('profile_id', profileId)
+    .is('archived_at', null)
     .order('date', { ascending: false })
   if (error) throw error
 
@@ -63,4 +64,13 @@ export async function uploadProgressPhoto({ profileId, date, photoType, file, no
     throw error
   }
   return data
+}
+
+export async function archivePhoto(photoId) {
+  const { error } = await supabase
+    .from('progress_photos')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', photoId)
+
+  if (error) throw error
 }

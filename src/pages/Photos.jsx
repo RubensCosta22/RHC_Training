@@ -1,7 +1,7 @@
-import { Camera, Upload } from 'lucide-react'
+import { Archive, Camera, Upload } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { listPhotos, uploadProgressPhoto } from '../services/photoService'
+import { archivePhoto, listPhotos, uploadProgressPhoto } from '../services/photoService'
 import { friendlyError } from '../utils/validation'
 import { toLocalDateKey } from '../utils/date'
 
@@ -38,6 +38,19 @@ export default function Photos() {
     }
   }
 
+  async function archiveItem(photo) {
+    if (!window.confirm(`Arquivar esta foto de ${photo.date}? O arquivo nao sera apagado.`)) return
+
+    setMessage('')
+    try {
+      await archivePhoto(photo.id)
+      load()
+      setMessage('Foto arquivada sem apagar o arquivo original.')
+    } catch (error) {
+      setMessage(friendlyError(error))
+    }
+  }
+
   return (
     <div>
       <header className="mb-5">
@@ -68,6 +81,9 @@ export default function Photos() {
               <div className="grid h-72 place-items-center rounded-2xl bg-slate-950 text-slate-500"><Camera size={32} /></div>
             )}
             {photo.notes && <p className="mt-3 text-sm text-slate-400">{photo.notes}</p>}
+            <button type="button" onClick={() => archiveItem(photo)} className="mt-3 flex items-center gap-2 text-sm font-bold text-amber-300">
+              <Archive size={16} /> Arquivar foto
+            </button>
           </article>
         ))}
       </div>

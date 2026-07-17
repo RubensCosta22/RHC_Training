@@ -135,6 +135,7 @@ export async function getWorkoutSessions(profileId, filters = {}) {
     .from('workout_sessions')
     .select('*, workout_exercises(*)')
     .eq('profile_id', profileId)
+    .is('archived_at', null)
     .order('date', { ascending: false })
     .order('created_at', { ascending: false })
 
@@ -169,6 +170,7 @@ export async function getDashboardSummary(profileId) {
     .from('workout_sessions')
     .select('*')
     .eq('profile_id', profileId)
+    .is('archived_at', null)
     .order('date', { ascending: false })
     .order('created_at', { ascending: false })
 
@@ -203,6 +205,7 @@ export async function getDashboardSummary(profileId) {
     .from('body_measurements')
     .select('weight,date')
     .eq('profile_id', profileId)
+    .is('archived_at', null)
     .order('date', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -280,6 +283,7 @@ export async function getProgressData(profileId) {
     .from('body_measurements')
     .select('*')
     .eq('profile_id', profileId)
+    .is('archived_at', null)
     .order('date', { ascending: true })
 
   if (measurementsError) throw measurementsError
@@ -358,4 +362,13 @@ export function syncPendingWorkouts() {
     })
 
   return pendingSyncPromise
+}
+
+export async function archiveWorkoutSession(sessionId) {
+  const { error } = await supabase
+    .from('workout_sessions')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', sessionId)
+
+  if (error) throw error
 }

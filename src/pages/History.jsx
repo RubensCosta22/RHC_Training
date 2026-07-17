@@ -1,7 +1,7 @@
-import { Filter, Search } from 'lucide-react'
+import { Archive, Filter, Search } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { getWorkoutSessions } from '../services/workoutService'
+import { archiveWorkoutSession, getWorkoutSessions } from '../services/workoutService'
 import { friendlyError } from '../utils/validation'
 
 export default function History() {
@@ -10,12 +10,31 @@ export default function History() {
   const [filters, setFilters] = useState({ type: '', gymName: '', from: '', to: '' })
   const [error, setError] = useState('')
   const [open, setOpen] = useState(null)
+  const [archiving, setArchiving] = useState(null)
 
   function load() {
     getWorkoutSessions(profileId, filters).then(setSessions).catch((err) => setError(friendlyError(err)))
   }
 
   useEffect(() => { load() }, [profileId])
+
+  async function archiveSession(session) {
+    const confirmed = window.confirm(
+      `Arquivar o treino ${session.workout_type} de ${session.date}? Voce podera restaura-lo depois.`
+    )
+    if (!confirmed) return
+
+    setArchiving(session.id)
+    setError('')
+    try {
+      await archiveWorkoutSession(session.id)
+      load()
+    } catch (err) {
+      setError(friendlyError(err))
+    } finally {
+      setArchiving(null)
+    }
+  }
 
   return (
     <div>
@@ -32,6 +51,8 @@ export default function History() {
             <option value="A">Treino A</option>
             <option value="B">Treino B</option>
             <option value="C">Treino C</option>
+            <option value="D">Treino D</option>
+            <option value="E">Treino E</option>
           </select>
         </label>
         <label>
@@ -72,6 +93,14 @@ export default function History() {
                 <p><span className="text-slate-500">Obs:</span> {session.notes || '-'}</p>
               </div>
               <button onClick={() => setOpen(open === session.id ? null : session.id)} className="mt-4 flex items-center gap-2 text-sm font-bold text-emerald-300"><Filter size={16} /> Detalhes do treino</button>
+              <button
+                type="button"
+                disabled={archiving === session.id}
+                onClick={() => archiveSession(session)}
+                className="mt-3 flex items-center gap-2 text-sm font-bold text-amber-300"
+              >
+                <Archive size={16} /> {archiving === session.id ? 'Arquivando...' : 'Arquivar treino'}
+              </button>
               {open === session.id && (
                 <div className="mt-3 space-y-2">
                   {exercises.map((exercise) => (

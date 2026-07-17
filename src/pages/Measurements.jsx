@@ -1,7 +1,7 @@
-import { Save } from 'lucide-react'
+import { Archive, Save } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { listMeasurements, saveMeasurement } from '../services/measurementService'
+import { archiveMeasurement, listMeasurements, saveMeasurement } from '../services/measurementService'
 import { friendlyError } from '../utils/validation'
 import { toLocalDateKey } from '../utils/date'
 
@@ -39,6 +39,19 @@ export default function Measurements() {
     setForm((current) => ({ ...current, [field]: value }))
   }
 
+  async function archiveItem(item) {
+    if (!window.confirm(`Arquivar as medidas de ${item.date}?`)) return
+
+    setMessage('')
+    try {
+      await archiveMeasurement(item.id)
+      load()
+      setMessage('Medidas arquivadas. Voce pode restaura-las nas configuracoes.')
+    } catch (error) {
+      setMessage(friendlyError(error))
+    }
+  }
+
   return (
     <div>
       <header className="mb-5">
@@ -67,6 +80,9 @@ export default function Measurements() {
             <p className="mt-2 text-slate-300">Peso: {item.weight ?? '-'} kg • Cintura: {item.waist ?? '-'} cm • Peito: {item.chest ?? '-'} cm</p>
             <p className="text-slate-400">Braço: {item.arm ?? '-'} cm • Coxa: {item.thigh ?? '-'} cm • Quadril: {item.hip ?? '-'} cm</p>
             {item.notes && <p className="mt-2 text-slate-500">{item.notes}</p>}
+            <button type="button" onClick={() => archiveItem(item)} className="mt-3 flex items-center gap-2 font-bold text-amber-300">
+              <Archive size={16} /> Arquivar medidas
+            </button>
           </article>
         ))}
       </div>
