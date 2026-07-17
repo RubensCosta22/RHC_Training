@@ -33,69 +33,25 @@ export async function exportHistoryJson(profileId) {
 }
 
 export async function importBackupJson(profileId, file) {
+  if (file.size > 10 * 1024 * 1024) {
+    throw new Error('Backup muito grande. Use um arquivo de ate 10 MB.')
+  }
+
   const text = await file.text()
   const backup = JSON.parse(text)
-  if (!backup || backup.version !== 1) throw new Error('Backup inválido.')
-
-  const { data: userData, error: userError } = await supabase.auth.getUser()
-  if (userError) throw userError
-  const userId = userData.user?.id
-  if (!userId) throw new Error('Faça login novamente para importar.')
-
-  let importedSessions = 0
-  for (const session of backup.sessions || []) {
-    const { data: insertedSession, error: sessionError } = await supabase
-      .from('workout_sessions')
-      .insert({
-        user_id: userId,
-        profile_id: profileId,
-        workout_type: session.workout_type,
-        date: session.date,
-        gym_name: session.gym_name,
-        duration_minutes: session.duration_minutes,
-        completion_percentage: session.completion_percentage,
-        total_volume: session.total_volume,
-        notes: session.notes
-      })
-      .select('*')
-      .single()
-    if (sessionError) throw sessionError
-
-    const exercises = (session.workout_exercises || []).map((exercise) => ({
-      session_id: insertedSession.id,
-      exercise_name: exercise.exercise_name,
-      muscle_group: exercise.muscle_group,
-      sets: exercise.sets,
-      reps: exercise.reps,
-      actual_reps: exercise.actual_reps || '',
-      weight: exercise.weight,
-      completed: exercise.completed,
-      notes: exercise.notes
-    }))
-    if (exercises.length) {
-      const { error: exerciseError } = await supabase.from('workout_exercises').insert(exercises)
-      if (exerciseError) throw exerciseError
-    }
-    importedSessions += 1
+  if (!backup || ![1, 2].includes(backup.version)) throw new Error('Backup invalido.')
+  if (!Array.isArray(backup.sessions) || !Array.isArray(backup.measurements)) {
+    throw new Error('Backup invalido: listas de dados ausentes.')
+  }
+  if (backup.sessions.length > 5000 || backup.measurements.length > 5000) {
+    throw new Error('Backup excede o limite seguro de registros.')
   }
 
-  const measurements = (backup.measurements || []).map((item) => ({
-    user_id: userId,
-    profile_id: profileId,
-    date: item.date,
-    weight: item.weight,
-    waist: item.waist,
-    chest: item.chest,
-    arm: item.arm,
-    thigh: item.thigh,
-    hip: item.hip,
-    notes: item.notes
-  }))
+  const { data, error } = await supabase.rpc('import_profile_backup_atomic', {
+    p_profile_id: profileId,
+    p_backup: backup
+  })
 
-  if (measurements.length) {
-    const { error } = await supabase.from('body_measurements').insert(measurements)
-    if (error) throw error
-  }
-
-  return { sessions: importedSessions, measurements: measurements.length }
+  if (error) throw error
+  return data
 }

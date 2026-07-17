@@ -21,9 +21,16 @@ export function getPendingWorkouts() {
   }
 }
 
-export function addPendingWorkout(payload) {
+export function addPendingWorkout(payload, ownerUserId) {
+  if (!ownerUserId) {
+    throw new Error('Nao foi possivel identificar a conta para o salvamento offline.')
+  }
+
   const current = getPendingWorkouts()
-  localStorage.setItem(PENDING_KEY, JSON.stringify([...current, { ...payload, offlineId: crypto.randomUUID() }]))
+  localStorage.setItem(PENDING_KEY, JSON.stringify([
+    ...current,
+    { ...payload, ownerUserId, offlineId: crypto.randomUUID() }
+  ]))
 }
 
 export function replacePendingWorkouts(items) {

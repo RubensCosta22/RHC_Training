@@ -3,11 +3,12 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { listPhotos, uploadProgressPhoto } from '../services/photoService'
 import { friendlyError } from '../utils/validation'
+import { toLocalDateKey } from '../utils/date'
 
 export default function Photos() {
   const { profileId } = useParams()
   const [photos, setPhotos] = useState([])
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
+  const [date, setDate] = useState(toLocalDateKey())
   const [photoType, setPhotoType] = useState('frente')
   const [file, setFile] = useState(null)
   const [notes, setNotes] = useState('')
