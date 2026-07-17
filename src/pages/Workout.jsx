@@ -5,7 +5,7 @@ import {
   CloudOff,
   Save
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
@@ -36,6 +36,7 @@ export default function Workout() {
   const [exerciseValues, setExerciseValues] = useState({})
   const [message, setMessage] = useState('')
   const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
   const [online, setOnline] = useState(isOnline())
   const [showDetails, setShowDetails] = useState(false)
 
@@ -101,6 +102,9 @@ export default function Workout() {
   }
 
   async function finalizeWorkout() {
+    if (savingRef.current) return
+
+    savingRef.current = true
     setSaving(true)
     setMessage('')
 
@@ -141,6 +145,7 @@ export default function Workout() {
     } catch (error) {
       setMessage(friendlyError(error))
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }

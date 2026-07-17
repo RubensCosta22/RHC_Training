@@ -4,6 +4,8 @@ import { getPendingWorkouts, replacePendingWorkouts } from '../utils/storage'
 import { sanitizeText, validateWorkoutInput, parsePositiveNumber } from '../utils/validation'
 import { parseLocalDate, toLocalDateKey } from '../utils/date'
 
+let pendingSyncPromise = null
+
 function normalizeExerciseForDb(item) {
   return {
     exercise_name: sanitizeText(item.name || item.exercise_name, 120),
@@ -134,6 +136,7 @@ export async function getWorkoutSessions(profileId, filters = {}) {
     .select('*, workout_exercises(*)')
     .eq('profile_id', profileId)
     .order('date', { ascending: false })
+    .order('created_at', { ascending: false })
 
   if (filters.type) {
     query = query.eq('workout_type', filters.type)
@@ -167,6 +170,7 @@ export async function getDashboardSummary(profileId) {
     .select('*')
     .eq('profile_id', profileId)
     .order('date', { ascending: false })
+    .order('created_at', { ascending: false })
 
   if (error) throw error
 
@@ -303,7 +307,7 @@ export async function getProgressData(profileId) {
   }
 }
 
-export async function syncPendingWorkouts() {
+async function runPendingWorkoutSync() {
   const pending = getPendingWorkouts()
 
   if (!pending.length || !navigator.onLine) {
@@ -343,4 +347,15 @@ export async function syncPendingWorkouts() {
     synced,
     remaining: remaining.length
   }
+}
+
+export function syncPendingWorkouts() {
+  if (pendingSyncPromise) return pendingSyncPromise
+
+  pendingSyncPromise = runPendingWorkoutSync()
+    .finally(() => {
+      pendingSyncPromise = null
+    })
+
+  return pendingSyncPromise
 }

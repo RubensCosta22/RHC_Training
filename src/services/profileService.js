@@ -56,9 +56,10 @@ export async function getProfilesWithLastWorkout() {
     profiles.map(async (profile) => {
       const { data } = await supabase
         .from('workout_sessions')
-        .select('workout_type,date,gym_name')
+        .select('workout_type,date,gym_name,created_at')
         .eq('profile_id', profile.id)
         .order('date', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
 
