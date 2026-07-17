@@ -1,14 +1,15 @@
 import { getProgressData } from './workoutService'
+import { parseLocalDate, toLocalDateKey } from '../utils/date'
 
 function getWeekKey(date) {
-  const current = new Date(date)
+  const current = parseLocalDate(date)
   const start = new Date(current)
   start.setDate(current.getDate() - current.getDay())
-  return start.toISOString().slice(0, 10)
+  return toLocalDateKey(start)
 }
 
 function getDayName(date) {
-  return new Intl.DateTimeFormat('pt-BR', { weekday: 'short' }).format(new Date(date))
+  return new Intl.DateTimeFormat('pt-BR', { weekday: 'short' }).format(parseLocalDate(date))
 }
 
 function average(numbers) {
@@ -32,7 +33,7 @@ export async function getStatsCenter(profileId) {
 
   const now = new Date()
   const weekKey = getWeekKey(now)
-  const monthKey = now.toISOString().slice(0, 7)
+  const monthKey = toLocalDateKey(now).slice(0, 7)
 
   const weeklyVolume = sessions
     .filter((item) => getWeekKey(item.date) === weekKey)

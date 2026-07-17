@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabaseClient'
 import { sanitizeText } from '../utils/validation'
+import { toLocalDateKey } from '../utils/date'
 
 const BUCKET = 'progress-photos'
 const PHOTO_TYPES = ['frente', 'lado', 'costas']
@@ -33,7 +34,7 @@ export async function uploadProgressPhoto({ profileId, date, photoType, file, no
   if (!userId) throw new Error('Faça login novamente para enviar foto.')
 
   const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-  const safeDate = date || new Date().toISOString().slice(0, 10)
+  const safeDate = date || toLocalDateKey()
   const path = `${userId}/${profileId}/${safeDate}/${photoType}-${crypto.randomUUID()}.${ext}`
 
   const { error: uploadError } = await supabase.storage
@@ -57,6 +58,9 @@ export async function uploadProgressPhoto({ profileId, date, photoType, file, no
     })
     .select('*')
     .single()
-  if (error) throw error
+  if (error) {
+    await supabase.storage.from(BUCKET).remove([path])
+    throw error
+  }
   return data
 }

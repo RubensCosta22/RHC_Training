@@ -41,7 +41,7 @@ create table if not exists public.workout_sessions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   profile_id uuid not null references public.profiles(id) on delete cascade,
-  workout_type text not null check (workout_type in ('A', 'B', 'C')),
+  workout_type text not null check (workout_type in ('A', 'B', 'C', 'D', 'E')),
   date date not null default current_date,
   gym_name text not null check (length(gym_name) between 1 and 80 and public.is_safe_text(gym_name)),
   duration_minutes int not null default 0 check (duration_minutes >= 0 and duration_minutes <= 600),

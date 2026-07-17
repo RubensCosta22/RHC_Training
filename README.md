@@ -59,6 +59,16 @@ supabase/schema.sql
 
 Esse SQL cria tabelas, índices, RLS, políticas e o bucket privado `progress-photos`.
 
+Para um banco que ja possui perfis e progresso, nao execute novamente o schema
+completo. Execute somente as migrations novas, em ordem. A migration atual e:
+
+```text
+supabase/migrations/20260717190000_v1_data_safety.sql
+```
+
+Ela preserva todos os registros existentes e adiciona o salvamento transacional,
+a importacao idempotente de backup e a estrutura de telemetria.
+
 ## 2. Configurar Auth no Supabase
 
 Em **Authentication > Providers**:
@@ -168,6 +178,20 @@ dist
 
 8. Faça o deploy.
 9. Volte no Supabase e ajuste as URLs de Auth para o domínio final da Vercel.
+
+## Publicar no Render
+
+O arquivo `render.yaml` inclui o rewrite `/*` para `/index.html`, necessario para
+que atualizar ou abrir diretamente uma rota do React nao retorne 404.
+
+Se o site ja foi criado manualmente no painel do Render, adicione em
+**Redirects/Rewrites** uma regra com:
+
+```text
+Source: /*
+Destination: /index.html
+Action: Rewrite
+```
 
 ## 8. Como o progresso é mantido em outro celular
 

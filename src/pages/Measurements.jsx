@@ -3,9 +3,10 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { listMeasurements, saveMeasurement } from '../services/measurementService'
 import { friendlyError } from '../utils/validation'
+import { toLocalDateKey } from '../utils/date'
 
 const blank = {
-  date: new Date().toISOString().slice(0, 10),
+  date: toLocalDateKey(),
   weight: '', waist: '', chest: '', arm: '', thigh: '', hip: '', notes: ''
 }
 

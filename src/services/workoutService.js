@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabaseClient'
 import { calculateVolume, getProgressionStatus } from '../utils/progression'
 import { getPendingWorkouts, replacePendingWorkouts } from '../utils/storage'
 import { sanitizeText, validateWorkoutInput, parsePositiveNumber } from '../utils/validation'
+import { parseLocalDate, toLocalDateKey } from '../utils/date'
 
 function normalizeExerciseForDb(item) {
   return {
@@ -104,87 +105,27 @@ export async function saveWorkoutSession({
     }))
   )
 
-  const { data: session, error: sessionError } = await supabase
-    .from('workout_sessions')
-    .insert({
-      user_id: userId,
-      profile_id: profileId,
-      workout_type: workoutType,
-      date,
-      gym_name: cleanWorkout.gymName,
-      duration_minutes: cleanWorkout.durationMinutes,
-      completion_percentage: completionPercentage,
-      total_volume: totalVolume,
-      notes: cleanWorkout.notes
-    })
-    .select('*')
-    .single()
+  const { data: session, error: sessionError } = await supabase.rpc(
+    'save_workout_session_atomic',
+    {
+      p_profile_id: profileId,
+      p_workout_type: workoutType,
+      p_date: date,
+      p_gym_name: cleanWorkout.gymName,
+      p_duration_minutes: cleanWorkout.durationMinutes,
+      p_completion_percentage: completionPercentage,
+      p_total_volume: totalVolume,
+      p_notes: cleanWorkout.notes || null,
+      p_exercises: cleanExercises
+    }
+  )
 
   if (sessionError) throw sessionError
-
-  const exercisesPayload = cleanExercises.map((item) => ({
-    ...item,
-    session_id: session.id
-  }))
-
-  const { error: exercisesError } = await supabase
-    .from('workout_exercises')
-    .insert(exercisesPayload)
-
-  if (exercisesError) throw exercisesError
-
-  await updateExerciseRecords({
-    userId,
-    profileId,
-    date,
-    exercises: cleanExercises
-  })
 
   return {
     ...session,
     personalRecords
   }
-}
-
-async function updateExerciseRecords({
-  userId,
-  profileId,
-  date,
-  exercises
-}) {
-  const existing = await getExerciseRecords(
-    profileId,
-    exercises.map((item) => item.exercise_name)
-  )
-
-  const payload = exercises
-    .filter((item) => item.completed)
-    .map((item) => {
-      const previous = existing[item.exercise_name]
-
-      return {
-        user_id: userId,
-        profile_id: profileId,
-        exercise_name: item.exercise_name,
-        last_weight: Number(item.weight || 0),
-        best_weight: Math.max(
-          Number(item.weight || 0),
-          Number(previous?.best_weight || 0)
-        ),
-        last_date: date,
-        updated_at: new Date().toISOString()
-      }
-    })
-
-  if (!payload.length) return
-
-  const { error } = await supabase
-    .from('exercise_records')
-    .upsert(payload, {
-      onConflict: 'user_id,profile_id,exercise_name'
-    })
-
-  if (error) throw error
 }
 
 export async function getWorkoutSessions(profileId, filters = {}) {
@@ -232,6 +173,7 @@ export async function getDashboardSummary(profileId) {
   const today = new Date()
   const startOfWeek = new Date(today)
   startOfWeek.setDate(today.getDate() - today.getDay())
+  startOfWeek.setHours(0, 0, 0, 0)
 
   const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
 
@@ -239,11 +181,11 @@ export async function getDashboardSummary(profileId) {
   const lastWorkout = normalized[0]
 
   const weekCount = normalized.filter((session) => {
-    return new Date(session.date) >= startOfWeek
+    return parseLocalDate(session.date) >= startOfWeek
   }).length
 
   const monthCount = normalized.filter((session) => {
-    return new Date(session.date) >= startOfMonth
+    return parseLocalDate(session.date) >= startOfMonth
   }).length
 
   const totalVolume = normalized.reduce((acc, session) => {
@@ -273,7 +215,7 @@ export async function getDashboardSummary(profileId) {
 }
 
 function dayKey(date) {
-  return new Date(date).toISOString().slice(0, 10)
+  return toLocalDateKey(parseLocalDate(date))
 }
 
 function calculateStreak(dates) {
@@ -292,7 +234,7 @@ function calculateStreak(dates) {
 
     if (date === expected || date === dayKey(yesterday)) {
       streak += 1
-      cursor = new Date(date)
+      cursor = parseLocalDate(date)
       cursor.setDate(cursor.getDate() - 1)
     } else {
       break
@@ -311,8 +253,8 @@ function calculateBestStreak(dates) {
   let current = 1
 
   for (let index = 1; index < unique.length; index += 1) {
-    const previous = new Date(unique[index - 1])
-    const actual = new Date(unique[index])
+    const previous = parseLocalDate(unique[index - 1])
+    const actual = parseLocalDate(unique[index])
 
     previous.setDate(previous.getDate() + 1)
 
@@ -371,12 +313,24 @@ export async function syncPendingWorkouts() {
     }
   }
 
+  const { data: userData, error: userError } = await supabase.auth.getUser()
+  if (userError) throw userError
+
+  const userId = userData.user?.id
+  if (!userId) return { synced: 0, remaining: pending.length }
+
   const remaining = []
   let synced = 0
 
   for (const item of pending) {
+    if (!item.ownerUserId || item.ownerUserId !== userId) {
+      remaining.push(item)
+      continue
+    }
+
     try {
-      await saveWorkoutSession(item)
+      const { ownerUserId: _ownerUserId, offlineId: _offlineId, ...payload } = item
+      await saveWorkoutSession(payload)
       synced += 1
     } catch {
       remaining.push(item)

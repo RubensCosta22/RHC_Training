@@ -14,12 +14,14 @@ import PageHeader from '../components/ui/PageHeader'
 import ProgressBar from '../components/ui/ProgressBar'
 import ExerciseCard from '../components/ExerciseCard'
 import { getWorkout } from '../data/workouts'
+import { supabase } from '../lib/supabaseClient'
 import { getProfile } from '../services/profileService'
 import { getExerciseRecords, saveWorkoutSession } from '../services/workoutService'
 import { addPendingWorkout, isOnline } from '../utils/storage'
 import { friendlyError, sanitizeText } from '../utils/validation'
+import { toLocalDateKey } from '../utils/date'
 
-const today = () => new Date().toISOString().slice(0, 10)
+const today = () => toLocalDateKey()
 
 export default function Workout() {
   const { profileId, type } = useParams()
@@ -125,7 +127,9 @@ export default function Workout() {
       }
 
       if (!isOnline()) {
-        addPendingWorkout(payload)
+        const { data: sessionData } = await supabase.auth.getSession()
+        const ownerUserId = sessionData.session?.user?.id
+        addPendingWorkout(payload, ownerUserId)
         setMessage('Você está offline. Treino salvo no aparelho e será sincronizado quando a internet voltar.')
         setTimeout(() => navigate(`/dashboard/${profileId}`), 900)
         return
