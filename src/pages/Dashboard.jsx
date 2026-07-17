@@ -23,6 +23,7 @@ import { getWorkoutTypes } from '../data/workouts'
 import { getProfile } from '../services/profileService'
 import { getDashboardSummary } from '../services/workoutService'
 import { friendlyError } from '../utils/validation'
+import { getNextWorkoutType } from '../utils/workoutRotation'
 
 const workoutDescriptions = {
   A: 'Peito • Ombro • Tríceps',
@@ -30,17 +31,6 @@ const workoutDescriptions = {
   C: 'Pernas • Core',
   D: 'Força funcional • Posterior',
   E: 'Condicionamento • Corrida'
-}
-
-function getNextWorkoutType(lastWorkoutType, availableTypes) {
-  if (!availableTypes.length) return 'A'
-  if (!lastWorkoutType) return availableTypes[0]
-
-  const currentIndex = availableTypes.indexOf(lastWorkoutType)
-
-  if (currentIndex === -1) return availableTypes[0]
-
-  return availableTypes[(currentIndex + 1) % availableTypes.length]
 }
 
 export default function Dashboard() {
@@ -256,4 +246,4 @@ export default function Dashboard() {
       </section>
     </div>
   )
-} 
+}
