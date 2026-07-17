@@ -6,6 +6,7 @@ import TopBar from './components/TopBar'
 import { syncPendingWorkouts } from './services/workoutService'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Archived = lazy(() => import('./pages/Archived'))
 const History = lazy(() => import('./pages/History'))
 const Login = lazy(() => import('./pages/Login'))
 const Measurements = lazy(() => import('./pages/Measurements'))
@@ -54,6 +55,7 @@ export default function App() {
           <Route path="/measurements/:profileId" element={<AppShell><Measurements /></AppShell>} />
           <Route path="/photos/:profileId" element={<AppShell><Photos /></AppShell>} />
           <Route path="/settings/:profileId" element={<AppShell><Settings /></AppShell>} />
+          <Route path="/archived/:profileId" element={<AppShell><Archived /></AppShell>} />
         </Route>
         <Route path="*" element={<Navigate to="/profiles" replace />} />
       </Routes>

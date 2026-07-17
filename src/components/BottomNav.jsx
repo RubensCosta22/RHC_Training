@@ -1,4 +1,4 @@
-import { BarChart3, Dumbbell, History, Home, UserRound } from 'lucide-react'
+import { BarChart3, Dumbbell, History, Home, Settings } from 'lucide-react'
 import { NavLink, useParams } from 'react-router-dom'
 
 const baseItems = [
@@ -6,7 +6,7 @@ const baseItems = [
   { label: 'Histórico', icon: History, path: 'history' },
   { label: 'Treino', icon: Dumbbell, path: 'workout' },
   { label: 'Evolução', icon: BarChart3, path: 'progress' },
-  { label: 'Perfil', icon: UserRound, path: 'profiles' }
+  { label: 'Ajustes', icon: Settings, path: 'settings' }
 ]
 
 export default function BottomNav() {
@@ -14,7 +14,6 @@ export default function BottomNav() {
   if (!profileId) return null
 
   function getPath(item) {
-    if (item.path === 'profiles') return '/profiles'
     if (item.path === 'workout') return `/workout/${profileId}/A`
     return `/${item.path}/${profileId}`
   }

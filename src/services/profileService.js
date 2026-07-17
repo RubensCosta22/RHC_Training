@@ -58,6 +58,7 @@ export async function getProfilesWithLastWorkout() {
         .from('workout_sessions')
         .select('workout_type,date,gym_name,created_at')
         .eq('profile_id', profile.id)
+        .is('archived_at', null)
         .order('date', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(1)

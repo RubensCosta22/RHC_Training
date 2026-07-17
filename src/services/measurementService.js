@@ -6,6 +6,7 @@ export async function listMeasurements(profileId) {
     .from('body_measurements')
     .select('*')
     .eq('profile_id', profileId)
+    .is('archived_at', null)
     .order('date', { ascending: false })
   if (error) throw error
   return data || []
@@ -37,4 +38,13 @@ export async function saveMeasurement(profileId, values) {
 
   if (error) throw error
   return data
+}
+
+export async function archiveMeasurement(measurementId) {
+  const { error } = await supabase
+    .from('body_measurements')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', measurementId)
+
+  if (error) throw error
 }

@@ -1,6 +1,6 @@
-import { Download, FileJson, LogOut, ShieldCheck, Upload } from 'lucide-react'
+import { Archive, Download, FileJson, LogOut, ShieldCheck, Upload } from 'lucide-react'
 import { useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { exportHistoryCsv, exportHistoryJson, importBackupJson } from '../services/backupService'
 import { getPendingWorkouts } from '../utils/storage'
@@ -41,6 +41,9 @@ export default function Settings() {
       </header>
 
       <section className="card mb-4 space-y-3">
+        <Link to={`/archived/${profileId}`} className="btn-secondary flex w-full items-center justify-center gap-2">
+          <Archive size={18} /> Arquivados e restauracao
+        </Link>
         <button onClick={() => run(() => exportHistoryCsv(profileId))} className="btn-secondary flex w-full items-center justify-center gap-2"><Download size={18} /> Exportar CSV</button>
         <button onClick={() => run(() => exportHistoryJson(profileId))} className="btn-secondary flex w-full items-center justify-center gap-2"><FileJson size={18} /> Exportar JSON</button>
         <label className="btn-secondary flex w-full cursor-pointer items-center justify-center gap-2">
