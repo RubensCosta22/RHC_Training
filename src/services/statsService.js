@@ -50,12 +50,25 @@ export async function getStatsCenter(profileId) {
       exerciseName: name,
       total: 0,
       maxWeight: 0,
-      totalVolume: 0
+      totalVolume: 0,
+      firstWeight: null,
+      lastWeight: 0,
+      lastDate: null,
+      recordDate: null
     }
 
     byExercise[name].total += 1
-    byExercise[name].maxWeight = Math.max(byExercise[name].maxWeight, Number(item.weight || 0))
+    const weight = Number(item.weight || 0)
+    if (weight > 0 && byExercise[name].firstWeight === null) byExercise[name].firstWeight = weight
+    if (weight > 0) { byExercise[name].lastWeight = weight; byExercise[name].lastDate = item.date }
+    if (weight > byExercise[name].maxWeight) { byExercise[name].maxWeight = weight; byExercise[name].recordDate = item.date }
     byExercise[name].totalVolume += Number(item.volume || 0)
+  })
+
+  Object.values(byExercise).forEach((item) => {
+    item.progress = item.firstWeight > 0
+      ? Math.round(((item.lastWeight - item.firstWeight) / item.firstWeight) * 100)
+      : 0
   })
 
   const exerciseRanking = Object.values(byExercise).sort((a, b) => b.total - a.total)

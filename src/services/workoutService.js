@@ -278,6 +278,7 @@ function calculateBestStreak(dates) {
 
 export async function getProgressData(profileId) {
   const sessions = await getWorkoutSessions(profileId)
+  const chronologicalSessions = [...sessions].reverse()
 
   const { data: measurements, error: measurementsError } = await supabase
     .from('body_measurements')
@@ -288,8 +289,8 @@ export async function getProgressData(profileId) {
 
   if (measurementsError) throw measurementsError
 
-  const exercises = sessions.flatMap((session) =>
-    (session.workout_exercises || []).map((exercise) => ({
+  const exercises = chronologicalSessions.flatMap((session) =>
+    (session.workout_exercises || []).filter((exercise) => exercise.completed).map((exercise) => ({
       date: session.date,
       workout_type: session.workout_type,
       exercise_name: exercise.exercise_name,
@@ -305,7 +306,7 @@ export async function getProgressData(profileId) {
   )
 
   return {
-    sessions: sessions.reverse(),
+    sessions: chronologicalSessions,
     measurements: measurements || [],
     exercises
   }
