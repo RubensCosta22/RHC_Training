@@ -13,6 +13,7 @@ const Measurements = lazy(() => import('./pages/Measurements'))
 const Photos = lazy(() => import('./pages/Photos'))
 const Profiles = lazy(() => import('./pages/Profiles'))
 const Progress = lazy(() => import('./pages/Progress'))
+const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 const Settings = lazy(() => import('./pages/Settings'))
 const Workout = lazy(() => import('./pages/Workout'))
 
@@ -46,6 +47,7 @@ export default function App() {
     <Suspense fallback={<PageFallback />}>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route element={<ProtectedRoute />}>
           <Route path="/profiles" element={<AppShell><Profiles /></AppShell>} />
           <Route path="/dashboard/:profileId" element={<AppShell><Dashboard /></AppShell>} />

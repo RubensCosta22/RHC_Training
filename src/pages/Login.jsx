@@ -1,11 +1,12 @@
-import { Dumbbell, Mail } from 'lucide-react'
+import { Dumbbell, KeyRound, Mail } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { friendlyError } from '../utils/validation'
 
 export default function Login() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [mode, setMode] = useState('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -13,10 +14,15 @@ export default function Login() {
   const [message, setMessage] = useState('')
 
   useEffect(() => {
+    if (location.state?.passwordUpdated) {
+      setMessage('Senha atualizada. Entre com sua nova senha.')
+      navigate('/login', { replace: true, state: null })
+    }
+
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) navigate('/profiles', { replace: true })
     })
-  }, [navigate])
+  }, [location.state, navigate])
 
   async function handleGoogle() {
     setMessage('')
@@ -52,6 +58,28 @@ export default function Login() {
       } else {
         setMessage('Cadastro criado. Confirme seu e-mail se o Supabase solicitar.')
       }
+    } catch (error) {
+      setMessage(friendlyError(error))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handlePasswordReset() {
+    setMessage('')
+    if (!email) {
+      setMessage('Informe seu e-mail para receber o link de recuperacao.')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`
+      })
+      if (error) throw error
+
+      setMessage('Se o e-mail estiver cadastrado, voce recebera um link temporario para criar uma nova senha.')
     } catch (error) {
       setMessage(friendlyError(error))
     } finally {
@@ -113,6 +141,17 @@ export default function Login() {
             {loading ? 'Aguarde...' : mode === 'login' ? 'Entrar com e-mail' : 'Criar conta'}
           </button>
         </form>
+
+        {mode === 'login' && (
+          <button
+            className="mt-4 flex w-full items-center justify-center gap-2 text-sm font-semibold text-slate-300 hover:text-emerald-300"
+            onClick={handlePasswordReset}
+            disabled={loading}
+            type="button"
+          >
+            <KeyRound size={16} /> Esqueci minha senha
+          </button>
+        )}
 
         <button
           className="mt-4 w-full text-sm font-semibold text-emerald-300"
