@@ -9,7 +9,7 @@ create table if not exists public.family_groups (
 create table if not exists public.family_members (
   group_id uuid not null references public.family_groups(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
-  role text not null check (role in ('admin','member')),
+  role text not null check (role in ('admin','member','bootstrap')),
   created_at timestamptz not null default now(),
   primary key (group_id, user_id),
   unique (user_id)
@@ -28,8 +28,9 @@ create table if not exists public.profile_access (
 create table if not exists public.family_invitations (
   id uuid primary key default gen_random_uuid(),
   group_id uuid not null references public.family_groups(id) on delete cascade,
-  profile_id uuid not null references public.profiles(id) on delete cascade,
+  profile_id uuid references public.profiles(id) on delete cascade,
   email text not null,
+  role text not null default 'owner' check (role in ('admin','owner')),
   invited_by uuid not null references auth.users(id),
   accepted_at timestamptz,
   created_at timestamptz not null default now(),
@@ -52,7 +53,7 @@ $$;
 
 create or replace function public.is_family_admin(target_group_id uuid)
 returns boolean language sql stable security definer set search_path=public as $$
-  select exists(select 1 from public.family_members m where m.group_id=target_group_id and m.user_id=auth.uid() and m.role='admin');
+  select exists(select 1 from public.family_members m where m.group_id=target_group_id and m.user_id=auth.uid() and m.role in ('admin','bootstrap'));
 $$;
 
 revoke all on function public.can_access_profile(uuid) from public;
@@ -75,18 +76,21 @@ create policy "access_own_or_admin_read" on public.profile_access for select to 
 );
 create policy "invitations_admin_read" on public.family_invitations for select to authenticated using (public.is_family_admin(group_id));
 
-create or replace function public.create_family_group(p_name text default 'Minha familia')
+create or replace function public.create_family_group(p_name text, p_admin_email text)
 returns uuid language plpgsql security definer set search_path=public as $$
 declare v_group uuid;
 begin
   if auth.uid() is null then raise exception 'Sessao invalida'; end if;
+  if lower(trim(p_admin_email)) !~ '^[^@[:space:]]+@[^@[:space:]]+[.][^@[:space:]]+$' then raise exception 'Email administrativo invalido'; end if;
   if exists(select 1 from public.family_members where user_id=auth.uid()) then raise exception 'Conta ja pertence a um grupo'; end if;
   insert into public.family_groups(name,created_by) values(left(trim(p_name),80),auth.uid()) returning id into v_group;
-  insert into public.family_members(group_id,user_id,role) values(v_group,auth.uid(),'admin');
+  insert into public.family_members(group_id,user_id,role) values(v_group,auth.uid(),'bootstrap');
   update public.profiles set family_group_id=v_group where user_id=auth.uid() and family_group_id is null;
   insert into public.profile_access(profile_id,user_id,role)
     select id,auth.uid(),'admin' from public.profiles where family_group_id=v_group
     on conflict(profile_id,user_id) do update set role='admin';
+  insert into public.family_invitations(group_id,profile_id,email,role,invited_by)
+  values(v_group,null,lower(trim(p_admin_email)),'admin',auth.uid());
   return v_group;
 end; $$;
 
@@ -97,9 +101,9 @@ begin
   select family_group_id into v_group from public.profiles where id=p_profile_id;
   if v_group is null or not public.is_family_admin(v_group) then raise exception 'Acesso de administrador necessario'; end if;
   if v_email !~ '^[^@[:space:]]+@[^@[:space:]]+[.][^@[:space:]]+$' then raise exception 'Email invalido'; end if;
-  insert into public.family_invitations(group_id,profile_id,email,invited_by)
-  values(v_group,p_profile_id,v_email,auth.uid())
-  on conflict(profile_id) do update set email=excluded.email,invited_by=auth.uid(),accepted_at=null,created_at=now();
+  insert into public.family_invitations(group_id,profile_id,email,role,invited_by)
+  values(v_group,p_profile_id,v_email,'owner',auth.uid())
+  on conflict(profile_id) do update set email=excluded.email,role='owner',invited_by=auth.uid(),accepted_at=null,created_at=now();
 end; $$;
 
 create or replace function public.claim_family_profile()
@@ -108,18 +112,22 @@ declare v_email text:=lower(coalesce(auth.jwt()->>'email','')); v_count int:=0; 
 begin
   if auth.uid() is null or v_email='' then return 0; end if;
   for r in select * from public.family_invitations where email=v_email and accepted_at is null loop
-    insert into public.family_members(group_id,user_id,role) values(r.group_id,auth.uid(),'member') on conflict(user_id) do nothing;
+    insert into public.family_members(group_id,user_id,role) values(r.group_id,auth.uid(),case when r.role='admin' then 'admin' else 'member' end) on conflict(user_id) do update set role=case when r.role='admin' then 'admin' else public.family_members.role end;
     if not exists(select 1 from public.family_members where group_id=r.group_id and user_id=auth.uid()) then raise exception 'Conta pertence a outro grupo'; end if;
-    delete from public.profile_access where profile_id=r.profile_id and role='owner' and user_id<>auth.uid();
-    insert into public.profile_access(profile_id,user_id,role) values(r.profile_id,auth.uid(),'owner') on conflict(profile_id,user_id) do update set role='owner';
+    if r.role='admin' then
+      insert into public.profile_access(profile_id,user_id,role) select id,auth.uid(),'admin' from public.profiles where family_group_id=r.group_id on conflict(profile_id,user_id) do update set role='admin';
+    else
+      delete from public.profile_access where profile_id=r.profile_id and role='owner' and user_id<>auth.uid();
+      insert into public.profile_access(profile_id,user_id,role) values(r.profile_id,auth.uid(),'owner') on conflict(profile_id,user_id) do update set role='owner';
+    end if;
     update public.family_invitations set accepted_at=now() where id=r.id;
     v_count:=v_count+1;
   end loop;
   return v_count;
 end; $$;
 
-revoke all on function public.create_family_group(text), public.invite_profile_user(uuid,text), public.claim_family_profile() from public;
-grant execute on function public.create_family_group(text), public.invite_profile_user(uuid,text), public.claim_family_profile() to authenticated;
+revoke all on function public.create_family_group(text,text), public.invite_profile_user(uuid,text), public.claim_family_profile() from public;
+grant execute on function public.create_family_group(text,text), public.invite_profile_user(uuid,text), public.claim_family_profile() to authenticated;
 
 -- Perfis ficam visiveis somente ao titular associado e aos administradores.
 drop policy if exists "profiles_select_own" on public.profiles;
@@ -187,26 +195,43 @@ create policy "exercises_insert_access" on public.workout_exercises for insert t
 create policy "exercises_update_access" on public.workout_exercises for update to authenticated using (exists(select 1 from public.workout_sessions s where s.id=session_id and public.can_access_profile(s.profile_id))) with check (exists(select 1 from public.workout_sessions s where s.id=session_id and public.can_access_profile(s.profile_id)));
 create policy "exercises_delete_access" on public.workout_exercises for delete to authenticated using (exists(select 1 from public.workout_sessions s where s.id=session_id and public.can_access_profile(s.profile_id)));
 
--- Mantem os RPCs atomicos e troca somente a verificacao de dono por acesso ao perfil.
-do $$
-declare fn record; definition text;
+-- RPC familiar independente. Nenhuma funcao existente e alterada.
+create or replace function public.save_family_workout_session_atomic(
+  p_profile_id uuid, p_workout_type text, p_date date, p_gym_name text,
+  p_duration_minutes integer, p_completion_percentage numeric,
+  p_total_volume numeric, p_notes text, p_exercises jsonb
+) returns jsonb language plpgsql security definer set search_path=public as $$
+declare
+  v_user_id uuid; v_session public.workout_sessions; v_exercise jsonb;
+  v_weight numeric; v_name text;
 begin
-  for fn in
-    select p.oid from pg_proc p join pg_namespace n on n.oid=p.pronamespace
-    where n.nspname='public' and p.proname='save_workout_session_atomic'
-  loop
-    definition:=pg_get_functiondef(fn.oid);
-    definition:=regexp_replace(definition,
-      'where id = p_profile_id[[:space:]]+and user_id = v_user_id',
-      'where id = p_profile_id and public.can_access_profile(id)', 'g');
-    definition:=replace(definition,
-      '  if jsonb_typeof(p_exercises) is distinct from ''array'' then',
-      '  select user_id into v_user_id from public.profiles where id = p_profile_id;' || chr(10) || chr(10) ||
-      '  if jsonb_typeof(p_exercises) is distinct from ''array'' then');
-    if position('select user_id into v_user_id from public.profiles where id = p_profile_id' in definition)=0
-       or position('public.can_access_profile(id)' in definition)=0 then
-      raise exception 'Nao foi possivel atualizar com seguranca a funcao atomica %', fn.oid;
+  if auth.uid() is null then raise exception 'authentication required'; end if;
+  select user_id into v_user_id from public.profiles where id=p_profile_id and public.can_access_profile(id);
+  if v_user_id is null then raise exception 'profile not found or access denied'; end if;
+  if jsonb_typeof(p_exercises) is distinct from 'array' then raise exception 'exercises must be an array'; end if;
+
+  insert into public.workout_sessions(user_id,profile_id,workout_type,date,gym_name,duration_minutes,completion_percentage,total_volume,notes)
+  values(v_user_id,p_profile_id,p_workout_type,p_date,p_gym_name,p_duration_minutes,p_completion_percentage,p_total_volume,p_notes)
+  returning * into v_session;
+
+  for v_exercise in select value from jsonb_array_elements(p_exercises) loop
+    v_name:=v_exercise->>'exercise_name';
+    v_weight:=coalesce((v_exercise->>'weight')::numeric,0);
+    insert into public.workout_exercises(session_id,exercise_name,muscle_group,sets,reps,actual_reps,weight,completed,notes)
+    values(v_session.id,v_name,v_exercise->>'muscle_group',coalesce((v_exercise->>'sets')::integer,0),coalesce(v_exercise->>'reps',''),nullif(v_exercise->>'actual_reps',''),v_weight,coalesce((v_exercise->>'completed')::boolean,false),nullif(v_exercise->>'notes',''));
+
+    if coalesce((v_exercise->>'completed')::boolean,false) then
+      insert into public.exercise_records(user_id,profile_id,exercise_name,last_weight,best_weight,last_date,updated_at)
+      values(v_user_id,p_profile_id,v_name,v_weight,v_weight,p_date,now())
+      on conflict(user_id,profile_id,exercise_name) do update set
+        last_weight=case when public.exercise_records.last_date is null or excluded.last_date>=public.exercise_records.last_date then excluded.last_weight else public.exercise_records.last_weight end,
+        best_weight=greatest(public.exercise_records.best_weight,excluded.best_weight),
+        last_date=case when public.exercise_records.last_date is null or excluded.last_date>=public.exercise_records.last_date then excluded.last_date else public.exercise_records.last_date end,
+        updated_at=excluded.updated_at;
     end if;
-    execute definition;
   end loop;
+  return to_jsonb(v_session);
 end $$;
+
+revoke all on function public.save_family_workout_session_atomic(uuid,text,date,text,integer,numeric,numeric,text,jsonb) from public;
+grant execute on function public.save_family_workout_session_atomic(uuid,text,date,text,integer,numeric,numeric,text,jsonb) to authenticated;

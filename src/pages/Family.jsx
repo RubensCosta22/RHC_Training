@@ -8,13 +8,14 @@ export default function Family() {
   const [context, setContext] = useState(null)
   const [profiles, setProfiles] = useState([])
   const [emails, setEmails] = useState({})
+  const [adminEmail, setAdminEmail] = useState('')
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
 
   async function load() {
     const family = await getFamilyContext()
     setContext(family)
-    setProfiles(family?.role === 'admin' ? await listProfileAssociations() : [])
+    setProfiles(['admin', 'bootstrap'].includes(family?.role) ? await listProfileAssociations() : [])
   }
 
   useEffect(() => {
@@ -24,7 +25,7 @@ export default function Family() {
   async function createGroup() {
     setMessage('')
     try {
-      await createFamilyGroup('Familia RHC')
+      await createFamilyGroup('Familia RHC', adminEmail)
       await load()
       setMessage('Grupo familiar criado. Agora associe cada perfil ao e-mail correto.')
     } catch (error) { setMessage(friendlyError(error)) }
@@ -46,14 +47,17 @@ export default function Family() {
       {!loading && !context && (
         <section className="card text-center">
           <UsersRound className="mx-auto mb-3 text-emerald-300" size={34} />
-          <p className="mb-4 text-sm text-slate-300">Crie o grupo usando a conta administradora que possui os perfis atuais.</p>
+          <p className="mb-4 text-sm text-slate-300">Use uma vez a conta que possui os perfis atuais para autorizar o administrador exclusivo.</p>
+          <label className="mb-4 block text-left text-sm text-slate-300">E-mail administrativo exclusivo
+            <input className="mt-1" type="email" required value={adminEmail} onChange={(event) => setAdminEmail(event.target.value)} />
+          </label>
           <button className="btn-primary w-full" onClick={createGroup}>Criar grupo familiar</button>
         </section>
       )}
       {!loading && context?.role !== 'admin' && (
         <section className="card flex gap-3"><UserRoundCheck className="text-emerald-300" /><p>Conta vinculada. Voce acessa somente o seu perfil.</p></section>
       )}
-      {context?.role === 'admin' && profiles.map((profile) => (
+      {['admin', 'bootstrap'].includes(context?.role) && profiles.map((profile) => (
         <section className="card mb-4" key={profile.id}>
           <div className="mb-3 flex items-center gap-2"><ShieldCheck className="text-emerald-300" /><h2 className="font-black">{profile.name}</h2></div>
           <label className="text-sm text-slate-300">E-mail do titular

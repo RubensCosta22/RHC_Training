@@ -24,9 +24,10 @@ export async function getFamilyContext() {
   return data || null
 }
 
-export async function createFamilyGroup(name) {
+export async function createFamilyGroup(name, adminEmail) {
   const { data, error } = await supabase.rpc('create_family_group', {
-    p_name: name || 'Familia RHC'
+    p_name: name || 'Familia RHC',
+    p_admin_email: adminEmail
   })
   if (error) throw error
   return data
