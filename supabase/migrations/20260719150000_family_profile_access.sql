@@ -193,23 +193,16 @@ declare fn record; definition text;
 begin
   for fn in
     select p.oid from pg_proc p join pg_namespace n on n.oid=p.pronamespace
-    where n.nspname='public' and p.proname in ('save_workout_session_atomic','import_profile_backup_atomic')
+    where n.nspname='public' and p.proname='save_workout_session_atomic'
   loop
     definition:=pg_get_functiondef(fn.oid);
     definition:=regexp_replace(definition,
       'where id = p_profile_id[[:space:]]+and user_id = v_user_id',
       'where id = p_profile_id and public.can_access_profile(id)', 'g');
-    if position('import_profile_backup_atomic' in definition)>0 then
-      definition:=replace(definition,
-        '  if coalesce((p_backup->>''version'')::integer, 0) not in (1, 2) then',
-        '  select user_id into v_user_id from public.profiles where id = p_profile_id;' || chr(10) || chr(10) ||
-        '  if coalesce((p_backup->>''version'')::integer, 0) not in (1, 2) then');
-    else
-      definition:=replace(definition,
-        '  if jsonb_typeof(p_exercises) is distinct from ''array'' then',
-        '  select user_id into v_user_id from public.profiles where id = p_profile_id;' || chr(10) || chr(10) ||
-        '  if jsonb_typeof(p_exercises) is distinct from ''array'' then');
-    end if;
+    definition:=replace(definition,
+      '  if jsonb_typeof(p_exercises) is distinct from ''array'' then',
+      '  select user_id into v_user_id from public.profiles where id = p_profile_id;' || chr(10) || chr(10) ||
+      '  if jsonb_typeof(p_exercises) is distinct from ''array'' then');
     if position('select user_id into v_user_id from public.profiles where id = p_profile_id' in definition)=0
        or position('public.can_access_profile(id)' in definition)=0 then
       raise exception 'Nao foi possivel atualizar com seguranca a funcao atomica %', fn.oid;
