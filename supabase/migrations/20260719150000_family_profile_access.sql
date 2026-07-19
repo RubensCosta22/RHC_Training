@@ -197,16 +197,13 @@ begin
   loop
     definition:=pg_get_functiondef(fn.oid);
     definition:=replace(definition,
-      'v_user_id uuid := auth.uid();',
-      'v_actor_id uuid := auth.uid();' || chr(10) || '  v_user_id uuid;');
+      'where id = p_profile_id and user_id = v_user_id',
+      'where id = p_profile_id and public.can_access_profile(id)');
     definition:=replace(definition,
-      'if v_user_id is null then' || chr(10) || '    raise exception ''authentication required'';' || chr(10) || '  end if;' || chr(10) || chr(10) ||
-      '  if not exists (' || chr(10) || '    select 1 from public.profiles' || chr(10) || '    where id = p_profile_id and user_id = v_user_id' || chr(10) || '  ) then' || chr(10) ||
-      '    raise exception ''profile not found or access denied'';' || chr(10) || '  end if;',
-      'if v_actor_id is null then' || chr(10) || '    raise exception ''authentication required'';' || chr(10) || '  end if;' || chr(10) || chr(10) ||
-      '  select user_id into v_user_id from public.profiles' || chr(10) || '  where id = p_profile_id and public.can_access_profile(id);' || chr(10) ||
-      '  if v_user_id is null then' || chr(10) || '    raise exception ''profile not found or access denied'';' || chr(10) || '  end if;');
-    if position('v_actor_id uuid := auth.uid()' in definition)=0
+      'raise exception ''profile not found or access denied'';' || chr(10) || '  end if;',
+      'raise exception ''profile not found or access denied'';' || chr(10) || '  end if;' || chr(10) || chr(10) ||
+      '  select user_id into v_user_id from public.profiles where id = p_profile_id;');
+    if position('select user_id into v_user_id from public.profiles where id = p_profile_id' in definition)=0
        or position('public.can_access_profile(id)' in definition)=0 then
       raise exception 'Nao foi possivel atualizar com seguranca a funcao atomica %', fn.oid;
     end if;
