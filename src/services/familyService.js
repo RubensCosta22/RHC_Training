@@ -39,7 +39,7 @@ export async function associateProfileEmail(profileId, email) {
 
 export async function listProfileAssociations() {
   const [{ data: profiles, error: profileError }, { data: invitations, error: inviteError }] = await Promise.all([
-    supabase.from('profiles').select('id,name,family_group_id,profile_access(user_id,role)').order('name'),
+    supabase.from('profiles').select('id,name,family_group_id').order('name'),
     supabase.from('family_invitations').select('profile_id,email,accepted_at').order('created_at')
   ])
   if (profileError) throw profileError
