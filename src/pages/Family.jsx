@@ -1,5 +1,6 @@
 import { ShieldCheck, UserRoundCheck, UsersRound } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import PageHeader from '../components/ui/PageHeader'
 import { associateProfileEmail, createFamilyGroup, getFamilyContext, listProfileAssociations } from '../services/familyService'
 import { friendlyError } from '../utils/validation'
@@ -67,6 +68,7 @@ export default function Family() {
           {profile.invitation && <p className="mt-2 text-xs text-slate-400">{profile.invitation.accepted_at ? 'Acesso ativo' : 'Aguardando primeiro acesso'}</p>}
         </section>
       ))}
+      {context?.role === 'admin' && <Link to="/plans" className="btn-primary mt-4 flex w-full items-center justify-center">Editar planos de treino</Link>}
       {message && <p className="mt-4 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-sm">{message}</p>}
     </div>
   )
