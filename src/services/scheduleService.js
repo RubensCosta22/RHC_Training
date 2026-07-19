@@ -21,6 +21,17 @@ export async function saveWeeklySchedule(profileId, schedule) {
   if (error) throw error
 }
 
+export async function listWeeklySchedules(profileIds) {
+  if (!profileIds.length) return {}
+  const { data, error } = await supabase.from('workout_weekly_schedule').select('profile_id,day_of_week,workout_type').in('profile_id', profileIds)
+  if (error) throw error
+  return (data || []).reduce((schedules, row) => {
+    if (!schedules[row.profile_id]) schedules[row.profile_id] = Array(7).fill(null)
+    schedules[row.profile_id][row.day_of_week] = row.workout_type
+    return schedules
+  }, {})
+}
+
 export async function applyRequestedPlan(profile) {
   const preset=requestedPlans[profile.name]
   if(!preset) throw new Error('Nao existe cronograma preparado para este perfil.')
