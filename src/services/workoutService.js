@@ -108,7 +108,7 @@ export async function saveWorkoutSession({
   )
 
   const { data: session, error: sessionError } = await supabase.rpc(
-    'save_workout_session_atomic',
+    'save_family_workout_session_atomic',
     {
       p_profile_id: profileId,
       p_workout_type: workoutType,

@@ -15,14 +15,15 @@ export async function listMeasurements(profileId) {
 export async function saveMeasurement(profileId, values) {
   const { data: userData, error: userError } = await supabase.auth.getUser()
   if (userError) throw userError
-  const userId = userData.user?.id
-  if (!userId) throw new Error('Faça login novamente para salvar medidas.')
+  if (!userData.user?.id) throw new Error('Faça login novamente para salvar medidas.')
+  const { data: profile, error: profileError } = await supabase.from('profiles').select('user_id').eq('id', profileId).single()
+  if (profileError) throw profileError
   const clean = validateMeasurementInput(values)
 
   const { data, error } = await supabase
     .from('body_measurements')
     .insert({
-      user_id: userId,
+      user_id: profile.user_id,
       profile_id: profileId,
       date: clean.date,
       weight: clean.weight,

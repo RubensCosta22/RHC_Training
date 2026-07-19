@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabaseClient'
 import { profilesSeed } from '../data/workouts'
+import { claimFamilyProfile, getFamilyContext } from './familyService'
 
 export async function getSessionUser() {
   const { data, error } = await supabase.auth.getUser()
@@ -11,17 +12,21 @@ export async function ensureDefaultProfiles() {
   const user = await getSessionUser()
   if (!user) return []
 
-  const { data: existing, error: listError } = await supabase
+  await claimFamilyProfile()
+  const family = await getFamilyContext()
+
+  let existingQuery = supabase
     .from('profiles')
     .select('*')
-    .eq('user_id', user.id)
     .order('name')
+  if (family) existingQuery = existingQuery.eq('family_group_id', family.group_id)
+  const { data: existing, error: listError } = await existingQuery
 
   if (listError) throw listError
 
   const existingNames = new Set((existing || []).map((profile) => profile.name))
 
-  const missing = profilesSeed.filter((profile) => !existingNames.has(profile.name))
+  const missing = family ? [] : profilesSeed.filter((profile) => !existingNames.has(profile.name))
 
   if (missing.length) {
     const payload = missing.map((profile) => ({
@@ -39,11 +44,12 @@ export async function ensureDefaultProfiles() {
     if (upsertError) throw upsertError
   }
 
-  const { data, error } = await supabase
+  let finalQuery = supabase
     .from('profiles')
     .select('*')
-    .eq('user_id', user.id)
     .order('name')
+  if (family) finalQuery = finalQuery.eq('family_group_id', family.group_id)
+  const { data, error } = await finalQuery
 
   if (error) throw error
   return data || []
