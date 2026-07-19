@@ -38,14 +38,13 @@ export async function associateProfileEmail(profileId, email) {
 }
 
 export async function listProfileAssociations() {
-  const [{ data: profiles, error: profileError }, { data: invitations, error: inviteError }] = await Promise.all([
-    supabase.from('profiles').select('id,name,family_group_id').order('name'),
-    supabase.from('family_invitations').select('profile_id,email,accepted_at').order('created_at')
-  ])
-  if (profileError) throw profileError
-  if (inviteError) throw inviteError
-  return (profiles || []).map((profile) => ({
+  const { data, error } = await supabase.rpc('get_family_profile_associations')
+  if (error) throw error
+  return (data || []).map((profile) => ({
     ...profile,
-    invitation: (invitations || []).find((item) => item.profile_id === profile.id) || null
+    invitation: profile.invitation_email ? {
+      email: profile.invitation_email,
+      accepted_at: profile.invitation_accepted_at
+    } : null
   }))
 }
