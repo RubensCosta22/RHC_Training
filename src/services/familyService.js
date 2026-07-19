@@ -14,11 +14,7 @@ export async function getFamilyContext() {
 
   await claimFamilyProfile()
 
-  const { data, error } = await supabase
-    .from('family_members')
-    .select('group_id,role,family_groups(id,name)')
-    .eq('user_id', userId)
-    .maybeSingle()
+  const { data, error } = await supabase.rpc('get_my_family_context')
 
   if (error) throw error
   return data || null
