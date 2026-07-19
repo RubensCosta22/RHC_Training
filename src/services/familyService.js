@@ -3,6 +3,8 @@ import { supabase } from '../lib/supabaseClient'
 export async function claimFamilyProfile() {
   const { data, error } = await supabase.rpc('claim_family_profile')
   if (error && error.code !== 'PGRST202') throw error
+  const { error: normalizeError } = await supabase.rpc('normalize_my_family_access')
+  if (normalizeError && normalizeError.code !== 'PGRST202') throw normalizeError
   return Number(data || 0)
 }
 
