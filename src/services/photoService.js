@@ -31,12 +31,14 @@ export async function uploadProgressPhoto({ profileId, date, photoType, file, no
 
   const { data: userData, error: userError } = await supabase.auth.getUser()
   if (userError) throw userError
-  const userId = userData.user?.id
-  if (!userId) throw new Error('Faça login novamente para enviar foto.')
+  if (!userData.user?.id) throw new Error('Faça login novamente para enviar foto.')
+  const { data: profile, error: profileError } = await supabase.from('profiles').select('user_id').eq('id', profileId).single()
+  if (profileError) throw profileError
+  const ownerUserId = profile.user_id
 
   const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
   const safeDate = date || toLocalDateKey()
-  const path = `${userId}/${profileId}/${safeDate}/${photoType}-${crypto.randomUUID()}.${ext}`
+  const path = `${ownerUserId}/${profileId}/${safeDate}/${photoType}-${crypto.randomUUID()}.${ext}`
 
   const { error: uploadError } = await supabase.storage
     .from(BUCKET)
@@ -50,7 +52,7 @@ export async function uploadProgressPhoto({ profileId, date, photoType, file, no
   const { data, error } = await supabase
     .from('progress_photos')
     .insert({
-      user_id: userId,
+      user_id: ownerUserId,
       profile_id: profileId,
       date: safeDate,
       photo_type: photoType,

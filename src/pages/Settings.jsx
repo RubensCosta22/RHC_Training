@@ -1,4 +1,4 @@
-import { Archive, Download, FileJson, LogOut, ShieldCheck, Upload } from 'lucide-react'
+import { Archive, Download, FileJson, LogOut, ShieldCheck, Upload, UsersRound } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
@@ -41,6 +41,9 @@ export default function Settings() {
       </header>
 
       <section className="card mb-4 space-y-3">
+        <Link to="/family" className="btn-secondary flex w-full items-center justify-center gap-2">
+          <UsersRound size={18} /> Grupo familiar
+        </Link>
         <Link to={`/archived/${profileId}`} className="btn-secondary flex w-full items-center justify-center gap-2">
           <Archive size={18} /> Arquivados e restauracao
         </Link>
