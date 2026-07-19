@@ -54,7 +54,7 @@ export default function Family() {
           <button className="btn-primary w-full" onClick={createGroup}>Criar grupo familiar</button>
         </section>
       )}
-      {!loading && context?.role !== 'admin' && (
+      {!loading && context && !['admin', 'bootstrap'].includes(context.role) && (
         <section className="card flex gap-3"><UserRoundCheck className="text-emerald-300" /><p>Conta vinculada. Voce acessa somente o seu perfil.</p></section>
       )}
       {['admin', 'bootstrap'].includes(context?.role) && profiles.map((profile) => (
