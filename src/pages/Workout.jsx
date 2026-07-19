@@ -5,7 +5,7 @@ import {
   CloudOff,
   Save
 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
@@ -13,9 +13,9 @@ import Card from '../components/ui/Card'
 import PageHeader from '../components/ui/PageHeader'
 import ProgressBar from '../components/ui/ProgressBar'
 import ExerciseCard from '../components/ExerciseCard'
-import { getWorkout } from '../data/workouts'
 import { supabase } from '../lib/supabaseClient'
 import { getProfile } from '../services/profileService'
+import { getWorkoutPlan } from '../services/planService'
 import { getExerciseRecords, saveWorkoutSession } from '../services/workoutService'
 import { addPendingWorkout, isOnline } from '../utils/storage'
 import { friendlyError, sanitizeText } from '../utils/validation'
@@ -28,6 +28,7 @@ export default function Workout() {
   const navigate = useNavigate()
 
   const [profile, setProfile] = useState(null)
+  const [workout, setWorkout] = useState(null)
   const [records, setRecords] = useState({})
   const [gymName, setGymName] = useState('')
   const [date, setDate] = useState(today())
@@ -54,13 +55,12 @@ export default function Workout() {
 
   useEffect(() => {
     getProfile(profileId)
-      .then(setProfile)
+      .then(async (value) => {
+        setProfile(value)
+        setWorkout(await getWorkoutPlan(value, type))
+      })
       .catch((error) => setMessage(friendlyError(error)))
   }, [profileId])
-
-  const workout = useMemo(() => {
-    return profile ? getWorkout(profile.name, type) : null
-  }, [profile, type])
 
   useEffect(() => {
     if (!workout) return

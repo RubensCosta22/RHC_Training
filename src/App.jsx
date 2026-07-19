@@ -11,6 +11,7 @@ const History = lazy(() => import('./pages/History'))
 const Login = lazy(() => import('./pages/Login'))
 const Measurements = lazy(() => import('./pages/Measurements'))
 const Photos = lazy(() => import('./pages/Photos'))
+const Plans = lazy(() => import('./pages/Plans'))
 const Family = lazy(() => import('./pages/Family'))
 const Profiles = lazy(() => import('./pages/Profiles'))
 const Progress = lazy(() => import('./pages/Progress'))
@@ -52,6 +53,7 @@ export default function App() {
         <Route element={<ProtectedRoute />}>
           <Route path="/profiles" element={<AppShell><Profiles /></AppShell>} />
           <Route path="/family" element={<AppShell><Family /></AppShell>} />
+          <Route path="/plans" element={<AppShell><Plans /></AppShell>} />
           <Route path="/dashboard/:profileId" element={<AppShell><Dashboard /></AppShell>} />
           <Route path="/workout/:profileId/:type" element={<AppShell><Workout /></AppShell>} />
           <Route path="/history/:profileId" element={<AppShell><History /></AppShell>} />

@@ -19,8 +19,8 @@ import PageHeader from '../components/ui/PageHeader'
 import ProgressBar from '../components/ui/ProgressBar'
 import SectionTitle from '../components/ui/SectionTitle'
 import StatCard from '../components/ui/StatCard'
-import { getWorkoutTypes } from '../data/workouts'
 import { getProfile } from '../services/profileService'
+import { getAvailablePlanTypes } from '../services/planService'
 import { getDashboardSummary } from '../services/workoutService'
 import { friendlyError } from '../utils/validation'
 import { getNextWorkoutType } from '../utils/workoutRotation'
@@ -37,22 +37,18 @@ export default function Dashboard() {
   const { profileId } = useParams()
   const [profile, setProfile] = useState(null)
   const [summary, setSummary] = useState(null)
+  const [availableWorkoutTypes, setAvailableWorkoutTypes] = useState(['A','B','C'])
   const [error, setError] = useState('')
 
   useEffect(() => {
-    Promise.all([getProfile(profileId), getDashboardSummary(profileId)])
-      .then(([p, s]) => {
+    getProfile(profileId).then(async (p) => {
+      const [s, types] = await Promise.all([getDashboardSummary(profileId), getAvailablePlanTypes(p)])
         setProfile(p)
         setSummary(s)
+        setAvailableWorkoutTypes(types)
       })
       .catch((err) => setError(friendlyError(err)))
   }, [profileId])
-
-  const availableWorkoutTypes = useMemo(() => {
-    if (!profile?.name) return ['A', 'B', 'C']
-
-    return getWorkoutTypes(profile.name)
-  }, [profile])
 
   const nextWorkout = useMemo(() => {
     return getNextWorkoutType(summary?.lastWorkout?.workout_type, availableWorkoutTypes)
