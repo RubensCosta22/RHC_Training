@@ -66,6 +66,11 @@ export default function Progress() {
     return stats.raw.exercises.filter((item) => item.exercise_name === selectedExercise)
   }, [stats, selectedExercise])
 
+  const selectedRecord = useMemo(() => {
+    if (!stats) return null
+    return stats.rankings.personalRecords.find((item) => item.exerciseName === selectedExercise) || null
+  }, [stats, selectedExercise])
+
   if (error) {
     return (
       <p className="rounded-2xl border border-red-400/30 bg-red-400/10 p-3 text-red-100">
@@ -223,6 +228,13 @@ export default function Progress() {
             </select>
           </div>
 
+          {selectedRecord && <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="rounded-2xl bg-slate-950/60 p-3"><p className="text-xs text-slate-500">Primeira carga</p><p className="text-lg font-black">{selectedRecord.firstWeight} kg</p></div>
+            <div className="rounded-2xl bg-slate-950/60 p-3"><p className="text-xs text-slate-500">Carga atual</p><p className="text-lg font-black">{selectedRecord.lastWeight} kg</p></div>
+            <div className="rounded-2xl bg-emerald-400/10 p-3"><p className="text-xs text-emerald-200/70">Recorde</p><p className="text-lg font-black text-emerald-300">{selectedRecord.maxWeight} kg</p></div>
+            <div className={`rounded-2xl p-3 ${selectedRecord.progress >= 0?'bg-sky-400/10':'bg-amber-400/10'}`}><p className="text-xs text-slate-400">Evolucao</p><p className={`text-lg font-black ${selectedRecord.progress >= 0?'text-sky-300':'text-amber-300'}`}>{selectedRecord.progress > 0?'+':''}{selectedRecord.progress}%</p></div>
+          </div>}
+
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={exerciseWeights}>
@@ -266,13 +278,11 @@ export default function Progress() {
                 <div>
                   <p className="font-bold text-white">{item.exerciseName}</p>
                   <p className="text-xs text-slate-500">
-                    {Math.round(item.totalVolume)} kg de volume acumulado
+                    {item.total} registros · recorde em {item.recordDate || '-'}
                   </p>
                 </div>
 
-                <p className="text-lg font-black text-emerald-300">
-                  {item.maxWeight} kg
-                </p>
+                <div className="text-right"><p className="text-lg font-black text-emerald-300">{item.maxWeight} kg</p><p className={`text-xs font-bold ${item.progress>=0?'text-sky-300':'text-amber-300'}`}>{item.progress>0?'+':''}{item.progress}% atual</p></div>
               </div>
             ))}
           </div>
