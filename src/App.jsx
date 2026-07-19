@@ -7,6 +7,7 @@ import { syncPendingWorkouts } from './services/workoutService'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Archived = lazy(() => import('./pages/Archived'))
+const Admin = lazy(() => import('./pages/Admin'))
 const History = lazy(() => import('./pages/History'))
 const Login = lazy(() => import('./pages/Login'))
 const Measurements = lazy(() => import('./pages/Measurements'))
@@ -52,6 +53,7 @@ export default function App() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route element={<ProtectedRoute />}>
           <Route path="/profiles" element={<AppShell><Profiles /></AppShell>} />
+          <Route path="/admin" element={<AppShell><Admin /></AppShell>} />
           <Route path="/family" element={<AppShell><Family /></AppShell>} />
           <Route path="/plans" element={<AppShell><Plans /></AppShell>} />
           <Route path="/dashboard/:profileId" element={<AppShell><Dashboard /></AppShell>} />
