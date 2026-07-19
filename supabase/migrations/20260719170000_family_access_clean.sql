@@ -1,4 +1,4 @@
--- Acesso familiar por perfil, sem mover ou apagar historicos existentes.
+-- MIGRACAO LIMPA: acesso familiar por perfil, sem alterar funcoes existentes.
 create table if not exists public.family_groups (
   id uuid primary key default gen_random_uuid(),
   name text not null check (length(name) between 1 and 80),
