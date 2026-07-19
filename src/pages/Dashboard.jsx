@@ -24,6 +24,7 @@ import { getAvailablePlanTypes } from '../services/planService'
 import { getDashboardSummary } from '../services/workoutService'
 import { friendlyError } from '../utils/validation'
 import { getNextWorkoutType } from '../utils/workoutRotation'
+import { getTodaySchedule } from '../services/scheduleService'
 
 const workoutDescriptions = {
   A: 'Peito • Ombro • Tríceps',
@@ -38,21 +39,24 @@ export default function Dashboard() {
   const [profile, setProfile] = useState(null)
   const [summary, setSummary] = useState(null)
   const [availableWorkoutTypes, setAvailableWorkoutTypes] = useState(['A','B','C'])
+  const [todaySchedule,setTodaySchedule]=useState({configured:false,workoutType:null})
   const [error, setError] = useState('')
 
   useEffect(() => {
     getProfile(profileId).then(async (p) => {
-      const [s, types] = await Promise.all([getDashboardSummary(profileId), getAvailablePlanTypes(p)])
+      const [s, types, schedule] = await Promise.all([getDashboardSummary(profileId), getAvailablePlanTypes(p),getTodaySchedule(profileId)])
         setProfile(p)
         setSummary(s)
         setAvailableWorkoutTypes(types)
+        setTodaySchedule(schedule)
       })
       .catch((err) => setError(friendlyError(err)))
   }, [profileId])
 
   const nextWorkout = useMemo(() => {
+    if(todaySchedule.configured) return todaySchedule.workoutType
     return getNextWorkoutType(summary?.lastWorkout?.workout_type, availableWorkoutTypes)
-  }, [summary, availableWorkoutTypes])
+  }, [summary, availableWorkoutTypes,todaySchedule])
 
   if (error) {
     return (
@@ -99,18 +103,18 @@ export default function Dashboard() {
           </div>
 
           <div className="min-w-0 flex-1">
-            <h2 className="text-3xl font-black text-white">Treino {nextWorkout}</h2>
+            <h2 className="text-3xl font-black text-white">{nextWorkout?`Treino ${nextWorkout}`:'Dia de descanso'}</h2>
             <p className="mt-1 text-sm text-slate-400">
-              {workoutDescriptions[nextWorkout] || 'Treino personalizado'}
+              {nextWorkout?(workoutDescriptions[nextWorkout] || 'Treino personalizado'):'Recupere-se para o proximo treino.'}
             </p>
           </div>
         </div>
 
-        <Link to={`/workout/${profileId}/${nextWorkout}`} className="mt-5 block">
+        {nextWorkout&&<Link to={`/workout/${profileId}/${nextWorkout}`} className="mt-5 block">
           <Button className="w-full" icon={Play}>
             Iniciar treino
           </Button>
-        </Link>
+        </Link>}
       </Card>
 
       <Card className="mb-5">

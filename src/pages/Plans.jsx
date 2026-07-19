@@ -4,6 +4,7 @@ import PageHeader from '../components/ui/PageHeader'
 import { getFamilyContext, listProfileAssociations } from '../services/familyService'
 import { listPlansForAdmin, savePlan } from '../services/planService'
 import { friendlyError } from '../utils/validation'
+import { applyRequestedPlan } from '../services/scheduleService'
 
 const emptyExercise = () => ({ id: crypto.randomUUID(), name: '', muscleGroup: '', sets: 3, reps: '8-12', rest: 60, goal: '', alternatives: [], active: true })
 
@@ -39,6 +40,7 @@ export default function Plans() {
     try { const saved=await savePlan(profile.id, plan); setPlans((items)=>items.map((item)=>item.workout_type===selectedType?saved:item)); setMessage('Plano salvo. A mudanca vale para os proximos treinos.') }
     catch(error){ setMessage(friendlyError(error)) } finally { setSaving(false) }
   }
+  async function applyPreset(){setSaving(true);setMessage('');try{await applyRequestedPlan(profile);setPlans(await listPlansForAdmin(profile));setMessage('Cronograma semanal aplicado.')}catch(error){setMessage(friendlyError(error))}finally{setSaving(false)}}
 
   return <div>
     <PageHeader eyebrow="Administracao" title="Planos de treino" subtitle="Edite os proximos treinos sem alterar o historico concluido." />
@@ -50,6 +52,7 @@ export default function Plans() {
     </section>
     {plan && <>
       <section className="card mb-4 space-y-3">
+        {['Karol','Rudney'].includes(profile?.name)&&<button className="btn-secondary w-full" type="button" onClick={applyPreset}>Aplicar cronograma semanal de {profile.name}</button>}
         <label className="text-sm text-slate-300">Titulo<input value={plan.title} onChange={(event)=>patchPlan({title:event.target.value})}/></label>
         <label className="text-sm text-slate-300">Descricao<textarea value={plan.description || ''} onChange={(event)=>patchPlan({description:event.target.value})}/></label>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={plan.active!==false} onChange={(event)=>patchPlan({active:event.target.checked})}/> Plano ativo</label>
