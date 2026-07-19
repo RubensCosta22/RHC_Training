@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parsePositiveNumber, sanitizeText, validateWorkoutInput } from './validation'
+import { parsePositiveNumber, sanitizeText, validateNewPassword, validateWorkoutInput } from './validation'
 
 describe('validation', () => {
   it('rejeita numeros negativos', () => {
@@ -13,5 +13,11 @@ describe('validation', () => {
   it('mantem academia obrigatoria', () => {
     expect(() => validateWorkoutInput({ gymName: '', durationMinutes: 60, notes: '' }))
       .toThrow('Informe a academia')
+  })
+
+  it('valida uma nova senha forte e confirmada', () => {
+    expect(validateNewPassword('Treino2026', 'Treino2026')).toBe('Treino2026')
+    expect(() => validateNewPassword('fraca', 'fraca')).toThrow('8 caracteres')
+    expect(() => validateNewPassword('Treino2026', 'Outra2026')).toThrow('nao coincidem')
   })
 })

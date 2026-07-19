@@ -57,3 +57,19 @@ export function friendlyError(error) {
   }
   return 'Não foi possível concluir a ação com segurança. Tente novamente.'
 }
+
+export function validateNewPassword(password, confirmation) {
+  const value = String(password || '')
+
+  if (value.length < 8) {
+    throw new Error('A nova senha precisa ter pelo menos 8 caracteres.')
+  }
+  if (!/[A-Z]/.test(value) || !/[a-z]/.test(value) || !/\d/.test(value)) {
+    throw new Error('Use ao menos uma letra maiuscula, uma minuscula e um numero.')
+  }
+  if (value !== confirmation) {
+    throw new Error('As senhas nao coincidem.')
+  }
+
+  return value
+}

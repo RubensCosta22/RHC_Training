@@ -95,6 +95,12 @@ Site URL: https://sua-url.vercel.app
 Redirect URLs: https://sua-url.vercel.app/**
 ```
 
+Para recuperacao de senha no Render, inclua tambem:
+
+```text
+https://rhc-training.onrender.com/reset-password
+```
+
 Use apenas a URL final do Vercel em produção.
 
 ## 3. Variáveis de ambiente
