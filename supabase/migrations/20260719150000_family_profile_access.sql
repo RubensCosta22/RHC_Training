@@ -196,13 +196,20 @@ begin
     where n.nspname='public' and p.proname in ('save_workout_session_atomic','import_profile_backup_atomic')
   loop
     definition:=pg_get_functiondef(fn.oid);
-    definition:=replace(definition,
-      'where id = p_profile_id and user_id = v_user_id',
-      'where id = p_profile_id and public.can_access_profile(id)');
-    definition:=replace(definition,
-      'raise exception ''profile not found or access denied'';' || chr(10) || '  end if;',
-      'raise exception ''profile not found or access denied'';' || chr(10) || '  end if;' || chr(10) || chr(10) ||
-      '  select user_id into v_user_id from public.profiles where id = p_profile_id;');
+    definition:=regexp_replace(definition,
+      'where id = p_profile_id[[:space:]]+and user_id = v_user_id',
+      'where id = p_profile_id and public.can_access_profile(id)', 'g');
+    if position('import_profile_backup_atomic' in definition)>0 then
+      definition:=replace(definition,
+        '  if coalesce((p_backup->>''version'')::integer, 0) not in (1, 2) then',
+        '  select user_id into v_user_id from public.profiles where id = p_profile_id;' || chr(10) || chr(10) ||
+        '  if coalesce((p_backup->>''version'')::integer, 0) not in (1, 2) then');
+    else
+      definition:=replace(definition,
+        '  if jsonb_typeof(p_exercises) is distinct from ''array'' then',
+        '  select user_id into v_user_id from public.profiles where id = p_profile_id;' || chr(10) || chr(10) ||
+        '  if jsonb_typeof(p_exercises) is distinct from ''array'' then');
+    end if;
     if position('select user_id into v_user_id from public.profiles where id = p_profile_id' in definition)=0
        or position('public.can_access_profile(id)' in definition)=0 then
       raise exception 'Nao foi possivel atualizar com seguranca a funcao atomica %', fn.oid;
