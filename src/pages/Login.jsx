@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { friendlyError } from '../utils/validation'
+import { getPostLoginPath } from '../services/familyService'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -19,8 +20,8 @@ export default function Login() {
       navigate('/login', { replace: true, state: null })
     }
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate('/profiles', { replace: true })
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (data.session) navigate(await getPostLoginPath(), { replace: true })
     })
   }, [location.state, navigate])
 
@@ -54,7 +55,7 @@ export default function Login() {
       if (error) throw error
 
       if (mode === 'login') {
-        navigate('/profiles')
+        navigate(await getPostLoginPath())
       } else {
         setMessage('Cadastro criado. Confirme seu e-mail se o Supabase solicitar.')
       }

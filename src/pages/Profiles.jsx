@@ -6,6 +6,7 @@ import PageHeader from '../components/ui/PageHeader'
 import ProfileCard from '../components/ProfileCard'
 import { supabase } from '../lib/supabaseClient'
 import { getProfilesWithLastWorkout } from '../services/profileService'
+import { getFamilyContext } from '../services/familyService'
 import { logEvent } from '../services/telemetryService'
 import { friendlyError } from '../utils/validation'
 
@@ -16,11 +17,14 @@ export default function Profiles() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    getProfilesWithLastWorkout()
-      .then(setProfiles)
+    getFamilyContext().then((context) => {
+      if (context?.role === 'admin') { navigate('/admin', { replace: true }); return null }
+      return getProfilesWithLastWorkout()
+    })
+      .then((items) => { if (items) setProfiles(items) })
       .catch((err) => setError(friendlyError(err)))
       .finally(() => setLoading(false))
-  }, [])
+  }, [navigate])
 
   async function logout() {
     await supabase.auth.signOut()

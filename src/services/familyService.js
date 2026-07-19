@@ -22,6 +22,11 @@ export async function getFamilyContext() {
   return data || null
 }
 
+export async function getPostLoginPath() {
+  const context = await getFamilyContext()
+  return context?.role === 'admin' ? '/admin' : '/profiles'
+}
+
 export async function createFamilyGroup(name, adminEmail) {
   const { data, error } = await supabase.rpc('create_family_group', {
     p_name: name || 'Familia RHC',
