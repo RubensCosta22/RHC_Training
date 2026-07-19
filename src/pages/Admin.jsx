@@ -51,12 +51,13 @@ export default function Admin() {
     <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
       <div className="card"><UsersRound className="mb-3 text-emerald-300"/><p className="text-3xl font-black">{profiles.length}</p><p className="text-xs text-slate-400">Perfis supervisionados</p></div>
       <div className="card"><Dumbbell className="mb-3 text-lime-300"/><p className="text-3xl font-black">{trainedProfiles}</p><p className="text-xs text-slate-400">Com historico de treino</p></div>
-      <div className="card col-span-2 sm:col-span-1"><CalendarDays className="mb-3 text-sky-300"/><p className="text-lg font-black">Agenda semanal</p><p className="text-xs text-slate-400">Treinos e descansos organizados</p></div>
+      <Link to="/schedule" className="card group col-span-2 transition hover:border-sky-400/40 sm:col-span-1"><CalendarDays className="mb-3 text-sky-300"/><p className="text-lg font-black">Agenda semanal</p><p className="text-xs text-slate-400">Treinos e descansos organizados</p></Link>
     </div>
 
-    <div className="mb-6 grid gap-3 sm:grid-cols-2">
+    <div className="mb-6 grid gap-3 sm:grid-cols-3">
       <Link to="/family" className="group card flex items-center gap-4 transition hover:border-emerald-400/40"><span className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-400/10 text-emerald-300"><UsersRound/></span><div className="flex-1"><strong>Grupo familiar</strong><p className="text-sm text-slate-400">Titulares, convites e acessos</p></div><ArrowRight className="text-slate-500 transition group-hover:translate-x-1 group-hover:text-emerald-300"/></Link>
       <Link to="/plans" className="group card flex items-center gap-4 transition hover:border-emerald-400/40"><span className="grid h-12 w-12 place-items-center rounded-2xl bg-lime-400/10 text-lime-300"><Settings2/></span><div className="flex-1"><strong>Planos de treino</strong><p className="text-sm text-slate-400">Exercicios e cronogramas</p></div><ArrowRight className="text-slate-500 transition group-hover:translate-x-1 group-hover:text-emerald-300"/></Link>
+      <Link to="/schedule" className="group card flex items-center gap-4 transition hover:border-sky-400/40"><span className="grid h-12 w-12 place-items-center rounded-2xl bg-sky-400/10 text-sky-300"><CalendarDays/></span><div className="flex-1"><strong>Agenda semanal</strong><p className="text-sm text-slate-400">Treinos por dia</p></div><ArrowRight className="text-slate-500 transition group-hover:translate-x-1 group-hover:text-sky-300"/></Link>
     </div>
 
     <div className="mb-4 flex items-center justify-between gap-3"><div><h2 className="text-xl font-black">Perfis supervisionados</h2><p className="text-sm text-slate-400">Consulte rapidamente a atividade de cada pessoa.</p></div><button className="btn-secondary flex items-center gap-2 px-4" onClick={()=>setShowCreate((value)=>!value)}>{showCreate?<X size={18}/>:<Plus size={18}/>}<span className="hidden sm:inline">{showCreate?'Cancelar':'Novo perfil'}</span></button></div>
