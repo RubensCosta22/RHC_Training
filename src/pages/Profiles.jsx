@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import LoadingCard from '../components/ui/LoadingCard'
 import PageHeader from '../components/ui/PageHeader'
 import ProfileCard from '../components/ProfileCard'
-import { supabase } from '../lib/supabaseClient'
+import { secureSignOut } from '../services/authService'
 import { getProfilesWithLastWorkout } from '../services/profileService'
 import { getFamilyContext } from '../services/familyService'
 import { logEvent } from '../services/telemetryService'
@@ -27,7 +27,7 @@ export default function Profiles() {
   }, [navigate])
 
   async function logout() {
-    await supabase.auth.signOut()
+    await secureSignOut()
     navigate('/login', { replace: true })
   }
 

@@ -31,3 +31,8 @@ export function saveFavoriteGym(gymName) {
   const next = [clean, ...gyms.filter((gym) => gym !== clean)].slice(0, 5)
   localStorage.setItem(GYMS_KEY, JSON.stringify(next))
 }
+
+export function clearPreferenceStorage() {
+  localStorage.removeItem(FAVORITES_KEY)
+  localStorage.removeItem(GYMS_KEY)
+}

@@ -40,3 +40,8 @@ export function replacePendingWorkouts(items) {
 export function clearPendingWorkouts() {
   localStorage.removeItem(PENDING_KEY)
 }
+
+export function clearWorkoutStorage() {
+  localStorage.removeItem(PENDING_KEY)
+  localStorage.removeItem(SELECTED_PROFILE_KEY)
+}

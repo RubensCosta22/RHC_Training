@@ -2,6 +2,7 @@ import { KeyRound } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
+import { secureSignOut } from '../services/authService'
 import { friendlyError, validateNewPassword } from '../utils/validation'
 
 export default function ResetPassword() {
@@ -37,7 +38,7 @@ export default function ResetPassword() {
       const { error } = await supabase.auth.updateUser({ password: cleanPassword })
       if (error) throw error
 
-      await supabase.auth.signOut()
+      await secureSignOut()
       navigate('/login', {
         replace: true,
         state: { passwordUpdated: true }
