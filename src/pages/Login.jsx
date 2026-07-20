@@ -89,16 +89,18 @@ export default function Login() {
   }
 
   return (
-    <main className="mx-auto grid min-h-screen max-w-6xl items-center gap-14 px-6 py-12 lg:grid-cols-[1.2fr_.8fr] lg:px-10">
-      <section className="max-w-2xl">
-        <div className="mb-16 flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-full bg-[#c8ff3d] text-[#111400]"><Activity size={19} strokeWidth={2.8}/></span><span className="text-sm font-extrabold tracking-[-.03em]">RHC / TRAINING</span></div>
-        <p className="rhc-kicker mb-5">Consistencia muda tudo</p>
-        <h1 className="text-[clamp(3.5rem,9vw,7.5rem)] font-[780] leading-[.86] tracking-[-.075em]">Treine.<br/><span className="text-[#62676f]">Evolua.</span><br/>Repita.</h1>
-        <p className="mt-8 max-w-md text-lg leading-relaxed text-[#92979f]">Uma experiencia de treino pessoal, precisa e sempre sincronizada.</p>
+    <main className="grid min-h-screen bg-[#08090a] lg:grid-cols-[minmax(0,1.45fr)_minmax(420px,.55fr)]">
+      <section className="relative min-h-[46vh] overflow-hidden lg:min-h-screen">
+        <img src="/assets/rhc-login-training.webp" alt="Atleta treinando com cordas em uma academia" className="absolute inset-0 h-full w-full object-cover object-[62%_center]" fetchPriority="high"/>
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/15 to-black/25 lg:bg-gradient-to-r lg:from-black/50 lg:via-transparent lg:to-black/25"/>
+        <div className="relative flex min-h-[46vh] flex-col justify-between p-6 sm:p-10 lg:min-h-screen lg:p-12 xl:p-16">
+          <div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-full bg-[#c8ff3d] text-[#111400]"><Activity size={19} strokeWidth={2.8}/></span><span className="text-sm font-extrabold tracking-[-.03em] text-white">RHC / TRAINING</span></div>
+          <div className="max-w-2xl"><p className="mb-4 text-[11px] font-bold uppercase tracking-[.16em] text-[#c8ff3d]">Consistencia muda tudo</p><h1 className="text-[clamp(3rem,6vw,6.5rem)] font-[780] leading-[.88] tracking-[-.075em] text-white">Treine.<br/>Evolua.<br/>Repita.</h1><p className="mt-5 hidden max-w-md text-base text-white/65 sm:block">Sua rotina, seu historico e sua evolucao em um unico lugar.</p></div>
+        </div>
       </section>
 
-      <section className="border-t border-[#272a2f] pt-8 lg:border-l lg:border-t-0 lg:pl-12 lg:pt-0">
-        <div className="mb-8"><p className="rhc-kicker mb-3">Sua conta</p><h2 className="text-3xl font-[720] tracking-[-.04em]">{mode==='login'?'Bem-vindo de volta.':'Comece sua jornada.'}</h2></div>
+      <section className="flex items-center px-6 py-10 sm:px-10 lg:px-12 xl:px-16"><div className="mx-auto w-full max-w-md">
+        <div className="mb-8"><p className="rhc-kicker mb-3">Sua conta</p><h2 className="text-3xl font-[720] tracking-[-.04em]">{mode==='login'?'Bem-vindo de volta.':'Comece sua jornada.'}</h2><p className="mt-2 text-sm text-[#92979f]">Entre para continuar seu proximo treino.</p></div>
         <button
           onClick={handleGoogle}
           className="btn-primary flex w-full items-center justify-center gap-2"
@@ -163,7 +165,7 @@ export default function Login() {
             {message}
           </p>
         )}
-      </section>
+      </div></section>
     </main>
   )
 }
