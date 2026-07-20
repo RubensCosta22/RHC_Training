@@ -4,17 +4,17 @@ const variants = {
   primary: cn(
     tokens.surface.active,
     tokens.text.activeDark,
-    'font-black hover:bg-emerald-300'
+    'font-bold hover:bg-[#d4ff68]'
   ),
   secondary: cn(
     tokens.border.subtle,
     tokens.surface.cardStrong,
     tokens.text.body,
-    'hover:border-emerald-400/50 hover:text-white'
+    'hover:border-[#4b5058] hover:bg-[#1a1d21] hover:text-white'
   ),
   ghost: cn(
     tokens.text.body,
-    'hover:bg-slate-900 hover:text-white'
+    'hover:bg-[#1a1d21] hover:text-white'
   ),
   danger: cn(
     tokens.border.danger,

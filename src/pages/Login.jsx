@@ -1,4 +1,4 @@
-import { Dumbbell, KeyRound, Mail } from 'lucide-react'
+import { Activity, ArrowRight, KeyRound, Mail } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
@@ -89,20 +89,16 @@ export default function Login() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-5 py-10">
-      <div className="mb-8 text-center">
-        <div className="mx-auto mb-4 grid h-20 w-20 place-items-center rounded-[2rem] bg-emerald-400 text-slate-950 shadow-glow">
-          <Dumbbell size={38} />
-        </div>
+    <main className="mx-auto grid min-h-screen max-w-6xl items-center gap-14 px-6 py-12 lg:grid-cols-[1.2fr_.8fr] lg:px-10">
+      <section className="max-w-2xl">
+        <div className="mb-16 flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-full bg-[#c8ff3d] text-[#111400]"><Activity size={19} strokeWidth={2.8}/></span><span className="text-sm font-extrabold tracking-[-.03em]">RHC / TRAINING</span></div>
+        <p className="rhc-kicker mb-5">Consistencia muda tudo</p>
+        <h1 className="text-[clamp(3.5rem,9vw,7.5rem)] font-[780] leading-[.86] tracking-[-.075em]">Treine.<br/><span className="text-[#62676f]">Evolua.</span><br/>Repita.</h1>
+        <p className="mt-8 max-w-md text-lg leading-relaxed text-[#92979f]">Uma experiencia de treino pessoal, precisa e sempre sincronizada.</p>
+      </section>
 
-        <h1 className="text-3xl font-black">RHC Training</h1>
-
-        <p className="mx-auto mt-2 max-w-xs text-slate-400">
-          Seu treino, histórico e evolução sempre sincronizados.
-        </p>
-      </div>
-
-      <section className="card">
+      <section className="border-t border-[#272a2f] pt-8 lg:border-l lg:border-t-0 lg:pl-12 lg:pt-0">
+        <div className="mb-8"><p className="rhc-kicker mb-3">Sua conta</p><h2 className="text-3xl font-[720] tracking-[-.04em]">{mode==='login'?'Bem-vindo de volta.':'Comece sua jornada.'}</h2></div>
         <button
           onClick={handleGoogle}
           className="btn-primary flex w-full items-center justify-center gap-2"
@@ -112,40 +108,40 @@ export default function Login() {
           Entrar com Google
         </button>
 
-        <div className="my-5 flex items-center gap-3 text-xs uppercase tracking-widest text-slate-500">
-          <span className="h-px flex-1 bg-slate-800" />
+        <div className="my-6 flex items-center gap-3 text-[10px] uppercase tracking-[.16em] text-[#62676f]">
+          <span className="h-px flex-1 bg-[#272a2f]" />
           ou
-          <span className="h-px flex-1 bg-slate-800" />
+          <span className="h-px flex-1 bg-[#272a2f]" />
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          <input
+          <label className="block text-xs font-semibold text-[#92979f]">E-mail<input
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             required
-            placeholder="E-mail"
+            placeholder="voce@exemplo.com"
             autoComplete="email"
-          />
+          /></label>
 
-          <input
+          <label className="block text-xs font-semibold text-[#92979f]">Senha<input
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             required
             minLength={6}
-            placeholder="Senha"
+            placeholder="Sua senha"
             autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-          />
+          /></label>
 
-          <button disabled={loading} className="btn-secondary w-full" type="submit">
-            {loading ? 'Aguarde...' : mode === 'login' ? 'Entrar com e-mail' : 'Criar conta'}
+          <button disabled={loading} className="btn-secondary flex w-full items-center justify-center gap-2" type="submit">
+            {loading ? 'Aguarde...' : mode === 'login' ? 'Entrar com e-mail' : 'Criar conta'} {!loading&&<ArrowRight size={17}/>}
           </button>
         </form>
 
         {mode === 'login' && (
           <button
-            className="mt-4 flex w-full items-center justify-center gap-2 text-sm font-semibold text-slate-300 hover:text-emerald-300"
+            className="mt-5 flex w-full items-center justify-center gap-2 text-sm font-semibold text-[#92979f] hover:text-[#f5f7f2]"
             onClick={handlePasswordReset}
             disabled={loading}
             type="button"
@@ -155,7 +151,7 @@ export default function Login() {
         )}
 
         <button
-          className="mt-4 w-full text-sm font-semibold text-emerald-300"
+          className="mt-5 w-full text-sm font-semibold text-[#c8ff3d]"
           onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
           type="button"
         >
@@ -163,7 +159,7 @@ export default function Login() {
         </button>
 
         {message && (
-          <p className="mt-4 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-100">
+          <p className="mt-5 border-l-2 border-[#ffb55e] bg-[#ffb55e]/5 p-3 text-sm text-[#ffd2a0]">
             {message}
           </p>
         )}

@@ -8,13 +8,13 @@ export default function ProgressBar({ value = 0, className = '', showLabel = fal
       {showLabel && (
         <div className="mb-2 flex items-center justify-between text-sm">
           <span className="font-semibold text-slate-300">Progresso</span>
-          <span className="font-bold text-emerald-300">{safeValue}%</span>
+          <span className="font-bold text-[#c8ff3d]">{safeValue}%</span>
         </div>
       )}
 
-      <div className="h-3 overflow-hidden rounded-full bg-slate-800">
+      <div className="h-1.5 overflow-hidden rounded-full bg-[#272a2f]">
         <div
-          className={cn('h-full rounded-full bg-emerald-400 transition-all duration-500')}
+          className={cn('h-full rounded-full bg-[#c8ff3d] transition-all duration-500')}
           style={{ width: `${safeValue}%` }}
         />
       </div>

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import BottomNav from './components/BottomNav'
 import ProtectedRoute from './components/ProtectedRoute'
 import TopBar from './components/TopBar'
@@ -30,10 +30,12 @@ function PageFallback() {
 }
 
 function AppShell({ children }) {
+  const { pathname } = useLocation()
+  const wide = ['/admin', '/family', '/plans', '/schedule'].includes(pathname)
   return (
-    <main className="mx-auto min-h-screen max-w-xl px-4 pb-28">
+    <main className={`mx-auto min-h-screen px-5 pb-32 sm:px-8 ${wide ? 'max-w-5xl' : 'max-w-3xl'}`}>
       <TopBar />
-      {children}
+      <div className="page-enter">{children}</div>
       <BottomNav />
     </main>
   )

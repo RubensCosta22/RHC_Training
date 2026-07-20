@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { archiveWorkoutSession, getWorkoutSessions } from '../services/workoutService'
 import { friendlyError } from '../utils/validation'
+import PageHeader from '../components/ui/PageHeader'
 
 export default function History() {
   const { profileId } = useParams()
@@ -38,10 +39,7 @@ export default function History() {
 
   return (
     <div>
-      <header className="mb-5">
-        <p className="text-sm font-bold text-emerald-300">Histórico</p>
-        <h1 className="text-3xl font-black">Treinos feitos</h1>
-      </header>
+      <PageHeader eyebrow="Historico" title="Treinos feitos" subtitle="Sua trajetoria, sessao por sessao." />
 
       <section className="card mb-4 grid gap-3 md:grid-cols-4">
         <label>

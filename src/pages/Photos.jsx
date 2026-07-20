@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom'
 import { archivePhoto, listPhotos, uploadProgressPhoto } from '../services/photoService'
 import { friendlyError } from '../utils/validation'
 import { toLocalDateKey } from '../utils/date'
+import PageHeader from '../components/ui/PageHeader'
 
 export default function Photos() {
   const { profileId } = useParams()
@@ -53,10 +54,7 @@ export default function Photos() {
 
   return (
     <div>
-      <header className="mb-5">
-        <p className="text-sm font-bold text-emerald-300">Fotos</p>
-        <h1 className="text-3xl font-black">Evolução visual</h1>
-      </header>
+      <PageHeader eyebrow="Registro visual" title="Evolucao visual" subtitle="Compare sua jornada com privacidade e perspectiva." />
 
       <form onSubmit={submit} className="card mb-5 grid gap-3 md:grid-cols-3">
         <label><span className="mb-1 block text-sm text-slate-400">Data</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>

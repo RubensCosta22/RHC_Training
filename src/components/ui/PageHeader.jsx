@@ -6,16 +6,16 @@ export default function PageHeader({
   className = ''
 }) {
   return (
-    <header className={`mb-6 flex items-start justify-between gap-4 ${className}`}>
+    <header className={`mb-10 flex items-start justify-between gap-5 ${className}`}>
       <div className="min-w-0">
         {eyebrow && (
-          <p className="text-sm font-bold text-emerald-300">{eyebrow}</p>
+          <p className="rhc-kicker mb-3">{eyebrow}</p>
         )}
 
-        <h1 className="truncate text-3xl font-black text-white">{title}</h1>
+        <h1 className="text-4xl font-[760] leading-[1.02] tracking-[-.045em] text-[#f5f7f2] sm:text-5xl">{title}</h1>
 
         {subtitle && (
-          <p className="mt-1 text-slate-400">{subtitle}</p>
+          <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-[#92979f]">{subtitle}</p>
         )}
       </div>
 

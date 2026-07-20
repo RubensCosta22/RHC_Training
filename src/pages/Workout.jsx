@@ -180,15 +180,13 @@ export default function Workout() {
       />
 
       {workout.description && (
-        <Card className="mb-4">
-          <p className="text-sm text-slate-400">{workout.description}</p>
-        </Card>
+        <p className="mb-8 max-w-xl border-l border-[#272a2f] pl-4 text-sm leading-relaxed text-[#92979f]">{workout.description}</p>
       )}
 
-      <Card className="mb-4">
+      <section className="mb-8 border-y border-[#272a2f] py-5">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
-            <p className="font-bold text-white">Progresso do treino</p>
+            <p className="rhc-kicker mb-1">Progresso do treino</p>
             <p className="text-sm text-slate-400">
               {done} de {total} exercícios concluídos
             </p>
@@ -200,9 +198,9 @@ export default function Workout() {
         </div>
 
         <ProgressBar value={progress} />
-      </Card>
+      </section>
 
-      <Card className="mb-4">
+      <Card className="mb-8 bg-[#0d0f11]">
         <button
           type="button"
           onClick={() => setShowDetails((current) => !current)}
@@ -275,7 +273,7 @@ export default function Workout() {
         )}
       </Card>
 
-      <div className="grid gap-4">
+      <div className="grid gap-5">
         {workout.exercises.map((exercise) => (
           <ExerciseCard
             key={exercise.id}
@@ -296,7 +294,7 @@ export default function Workout() {
       <Button
         onClick={finalizeWorkout}
         disabled={saving}
-        className="mt-5 w-full"
+        className="sticky bottom-24 z-20 mt-8 w-full shadow-[0_12px_40px_rgba(0,0,0,.5)]"
         icon={online ? Save : CloudOff}
       >
         {saving ? 'Salvando...' : 'Finalizar treino'}
