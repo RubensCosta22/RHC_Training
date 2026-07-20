@@ -110,8 +110,10 @@ Deno.serve(async (request) => {
     if (uploadError) throw operationError('storage upload', uploadError)
 
     if (isAvatar) {
-      const { error: updateError } = await adminClient.from('profiles')
-        .update({ avatar_url: path }).eq('id', profileId)
+      const { error: updateError } = await userClient.rpc('update_profile_avatar', {
+        p_profile_id: profileId,
+        p_avatar_path: path
+      })
       if (updateError) {
         await adminClient.storage.from(BUCKET).remove([path])
         throw operationError('avatar update', updateError)
@@ -125,7 +127,7 @@ Deno.serve(async (request) => {
     }
 
     const notes = String(form.get('notes') || '').slice(0, 500)
-    const { data: photo, error: insertError } = await adminClient.from('progress_photos').insert({
+    const { data: photo, error: insertError } = await userClient.from('progress_photos').insert({
       user_id: profile.user_id, profile_id: profileId, date,
       photo_type: photoType, photo_url: path, notes: notes || null
     }).select('*').single()
