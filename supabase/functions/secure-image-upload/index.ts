@@ -15,6 +15,14 @@ function json(body: Record<string, unknown>, status = 200) {
   })
 }
 
+function operationError(stage: string, error: unknown) {
+  const detail = error && typeof error === 'object' && 'message' in error
+    ? String(error.message)
+    : String(error)
+  console.error(`secure-image-upload ${stage} failed`, detail)
+  return new Error(`${stage} failed`)
+}
+
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (request.method !== 'POST') return json({ error: 'method not allowed' }, 405)
@@ -99,14 +107,14 @@ Deno.serve(async (request) => {
     const { error: uploadError } = await adminClient.storage.from(BUCKET).upload(path, bytes, {
       contentType: image.contentType, cacheControl: '3600', upsert: false
     })
-    if (uploadError) throw uploadError
+    if (uploadError) throw operationError('storage upload', uploadError)
 
     if (isAvatar) {
       const { error: updateError } = await adminClient.from('profiles')
         .update({ avatar_url: path }).eq('id', profileId)
       if (updateError) {
         await adminClient.storage.from(BUCKET).remove([path])
-        throw updateError
+        throw operationError('avatar update', updateError)
       }
       const oldPath = profile.avatar_url
       if (oldPath?.startsWith(`${profile.user_id}/${profileId}/avatars/`)) {
@@ -123,7 +131,7 @@ Deno.serve(async (request) => {
     }).select('*').single()
     if (insertError) {
       await adminClient.storage.from(BUCKET).remove([path])
-      throw insertError
+      throw operationError('photo insert', insertError)
     }
     const { data: signed } = await adminClient.storage.from(BUCKET).createSignedUrl(path, 900)
     return json({ photo: { ...photo, signedUrl: signed?.signedUrl || null }, width: image.width, height: image.height })
