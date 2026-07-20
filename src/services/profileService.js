@@ -101,19 +101,13 @@ export async function uploadProfileAvatar(profileId, file) {
   if (!file.type.startsWith('image/')) throw new Error('O arquivo precisa ser uma imagem.')
   if (file.size > 3 * 1024 * 1024) throw new Error('Use uma imagem de ate 3 MB.')
 
-  const { data: profile, error: profileError } = await supabase.from('profiles').select('user_id,avatar_url').eq('id', profileId).single()
-  if (profileError) throw profileError
-  const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-  const path = `${profile.user_id}/${profileId}/avatars/avatar-${crypto.randomUUID()}.${extension}`
+  const body = new FormData()
+  body.append('kind', 'avatar')
+  body.append('profileId', profileId)
+  body.append('file', file)
 
-  const { error: uploadError } = await supabase.storage.from(AVATAR_BUCKET).upload(path, file, { cacheControl:'3600', upsert:false, contentType:file.type })
-  if (uploadError) throw uploadError
-
-  const { error: updateError } = await supabase.rpc('update_profile_avatar', { p_profile_id:profileId, p_avatar_path:path })
-  if (updateError) { await supabase.storage.from(AVATAR_BUCKET).remove([path]); throw updateError }
-
-  const oldPath = profile.avatar_url
-  if (oldPath?.includes(`/${profileId}/avatars/`)) await supabase.storage.from(AVATAR_BUCKET).remove([oldPath])
-  const { data: signed } = await supabase.storage.from(AVATAR_BUCKET).createSignedUrl(path, 60 * 60)
-  return { path, signedUrl:signed?.signedUrl || null }
+  const { data, error } = await supabase.functions.invoke('secure-image-upload', { body })
+  if (error) throw error
+  if (!data?.path) throw new Error(data?.error || 'Falha no envio seguro da imagem.')
+  return { path: data.path, signedUrl: data.signedUrl || null }
 }

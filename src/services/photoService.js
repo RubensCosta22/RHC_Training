@@ -1,5 +1,4 @@
 import { supabase } from '../lib/supabaseClient'
-import { sanitizeText } from '../utils/validation'
 import { toLocalDateKey } from '../utils/date'
 
 const BUCKET = 'progress-photos'
@@ -29,43 +28,19 @@ export async function uploadProgressPhoto({ profileId, date, photoType, file, no
   if (!file.type.startsWith('image/')) throw new Error('Arquivo precisa ser uma imagem.')
   if (file.size > 6 * 1024 * 1024) throw new Error('Imagem muito grande. Use até 6 MB.')
 
-  const { data: userData, error: userError } = await supabase.auth.getUser()
-  if (userError) throw userError
-  if (!userData.user?.id) throw new Error('Faça login novamente para enviar foto.')
-  const { data: profile, error: profileError } = await supabase.from('profiles').select('user_id').eq('id', profileId).single()
-  if (profileError) throw profileError
-  const ownerUserId = profile.user_id
-
-  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
   const safeDate = date || toLocalDateKey()
-  const path = `${ownerUserId}/${profileId}/${safeDate}/${photoType}-${crypto.randomUUID()}.${ext}`
+  const body = new FormData()
+  body.append('kind', 'progress')
+  body.append('profileId', profileId)
+  body.append('date', safeDate)
+  body.append('photoType', photoType)
+  body.append('notes', String(notes || ''))
+  body.append('file', file)
 
-  const { error: uploadError } = await supabase.storage
-    .from(BUCKET)
-    .upload(path, file, {
-      cacheControl: '3600',
-      upsert: false,
-      contentType: file.type
-    })
-  if (uploadError) throw uploadError
-
-  const { data, error } = await supabase
-    .from('progress_photos')
-    .insert({
-      user_id: ownerUserId,
-      profile_id: profileId,
-      date: safeDate,
-      photo_type: photoType,
-      photo_url: path,
-      notes: sanitizeText(notes, 500)
-    })
-    .select('*')
-    .single()
-  if (error) {
-    await supabase.storage.from(BUCKET).remove([path])
-    throw error
-  }
-  return data
+  const { data, error } = await supabase.functions.invoke('secure-image-upload', { body })
+  if (error) throw error
+  if (!data?.photo) throw new Error(data?.error || 'Falha no envio seguro da imagem.')
+  return data.photo
 }
 
 export async function archivePhoto(photoId) {
