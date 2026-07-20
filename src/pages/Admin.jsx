@@ -2,7 +2,7 @@ import { ArrowUpRight, CalendarDays, Dumbbell, LogOut, Plus, Settings2, UsersRou
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import PageHeader from '../components/ui/PageHeader'
-import { supabase } from '../lib/supabaseClient'
+import { secureSignOut } from '../services/authService'
 import { getFamilyContext } from '../services/familyService'
 import { getProfilesWithLastWorkout } from '../services/profileService'
 import { createFamilyProfile } from '../services/scheduleService'
@@ -31,7 +31,7 @@ export default function Admin() {
 
   const trainedProfiles = useMemo(() => profiles.filter((profile) => profile.lastWorkout).length, [profiles])
 
-  async function logout() { await supabase.auth.signOut(); navigate('/login', { replace: true }) }
+  async function logout() { await secureSignOut(); navigate('/login', { replace: true }) }
   async function createProfile(event) {
     event.preventDefault(); setMessage(''); setCreating(true)
     try { await createFamilyProfile(newProfile); await loadProfiles(); setNewProfile(initialProfile); setShowCreate(false); setMessage('Perfil criado e convite associado com sucesso.') }

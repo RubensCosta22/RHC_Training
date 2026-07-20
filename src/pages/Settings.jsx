@@ -1,7 +1,7 @@
 import { Archive, Camera, Download, FileJson, LogOut, ShieldCheck, Upload, UsersRound } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { supabase } from '../lib/supabaseClient'
+import { secureSignOut } from '../services/authService'
 import { exportHistoryCsv, exportHistoryJson, importBackupJson } from '../services/backupService'
 import { getPendingWorkouts } from '../utils/storage'
 import { friendlyError } from '../utils/validation'
@@ -37,7 +37,7 @@ export default function Settings() {
   }
 
   async function logout() {
-    await supabase.auth.signOut()
+    await secureSignOut()
     navigate('/login', { replace: true })
   }
 
