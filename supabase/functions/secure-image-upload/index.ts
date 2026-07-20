@@ -71,9 +71,15 @@ Deno.serve(async (request) => {
 
     const bytes = new Uint8Array(await file.arrayBuffer())
     const image = inspectImage(bytes)
-    const { data: profile, error: profileError } = await adminClient
+    // The permission RPC above already authorizes this profile for the current
+    // session. Read it through the same RLS-scoped client so authorization and
+    // row visibility cannot diverge from the service-role lookup.
+    const { data: profile, error: profileError } = await userClient
       .from('profiles').select('user_id,avatar_url').eq('id', profileId).single()
-    if (profileError || !profile) return json({ error: 'profile not found' }, 404)
+    if (profileError || !profile) {
+      console.error('secure-image-upload profile lookup failed', profileError?.message || 'profile not found')
+      return json({ error: 'profile not found' }, 404)
+    }
 
     const id = crypto.randomUUID()
     let path: string
