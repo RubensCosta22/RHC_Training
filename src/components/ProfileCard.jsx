@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { saveSelectedProfile } from '../utils/storage'
 
 function Avatar({ profile }) {
-  const avatar=profile.avatar_url||profile.name?.[0]
+  const avatar=profile.avatarSignedUrl||profile.avatar_url||profile.name?.[0]
   if(avatar?.startsWith?.('http'))return <img src={avatar} alt={profile.name} className="h-14 w-14 rounded-full object-cover"/>
   return <div className="grid h-14 w-14 place-items-center rounded-full bg-[#1a1d21] text-xl font-black text-[#c8ff3d]">{avatar||profile.name?.[0]}</div>
 }
