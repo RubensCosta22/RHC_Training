@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom'
 import { archiveMeasurement, listMeasurements, saveMeasurement } from '../services/measurementService'
 import { friendlyError } from '../utils/validation'
 import { toLocalDateKey } from '../utils/date'
+import PageHeader from '../components/ui/PageHeader'
 
 const blank = {
   date: toLocalDateKey(),
@@ -54,10 +55,7 @@ export default function Measurements() {
 
   return (
     <div>
-      <header className="mb-5">
-        <p className="text-sm font-bold text-emerald-300">Medidas</p>
-        <h1 className="text-3xl font-black">Corpo e peso</h1>
-      </header>
+      <PageHeader eyebrow="Medidas" title="Corpo e peso" subtitle="Registre mudancas. Observe tendencias, nao dias isolados." />
 
       <form onSubmit={submit} className="card mb-5 grid gap-3 md:grid-cols-3">
         <label><span className="mb-1 block text-sm text-slate-400">Data</span><input type="date" value={form.date} onChange={(e) => change('date', e.target.value)} /></label>

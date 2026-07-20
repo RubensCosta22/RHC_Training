@@ -31,13 +31,13 @@ import { friendlyError } from '../utils/validation'
 
 function ChartCard({ title, subtitle, children }) {
   return (
-    <Card>
+    <section className="border-t border-[#272a2f] pt-6">
       <div className="mb-4">
         <h2 className="text-lg font-black text-white">{title}</h2>
         {subtitle && <p className="text-sm text-slate-400">{subtitle}</p>}
       </div>
       <div className="h-64">{children}</div>
-    </Card>
+    </section>
   )
 }
 
@@ -171,11 +171,11 @@ export default function Progress() {
         >
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={raw.sessions}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-              <XAxis dataKey="date" stroke="#94a3b8" />
-              <YAxis stroke="#94a3b8" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#272a2f" />
+              <XAxis dataKey="date" stroke="#62676f" />
+              <YAxis stroke="#62676f" />
               <Tooltip />
-              <Area type="monotone" dataKey="total_volume" name="Volume" />
+              <Area type="monotone" dataKey="total_volume" name="Volume" stroke="#c8ff3d" fill="#c8ff3d" fillOpacity={0.12} />
             </AreaChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -186,11 +186,11 @@ export default function Progress() {
         >
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={charts.weeklyVolumeChart}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-              <XAxis dataKey="week" stroke="#94a3b8" />
-              <YAxis stroke="#94a3b8" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#272a2f" />
+              <XAxis dataKey="week" stroke="#62676f" />
+              <YAxis stroke="#62676f" />
               <Tooltip />
-              <Bar dataKey="volume" name="Volume" />
+              <Bar dataKey="volume" name="Volume" fill="#c8ff3d" radius={[4,4,0,0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -201,11 +201,11 @@ export default function Progress() {
         >
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={charts.monthlyVolumeChart}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-              <XAxis dataKey="month" stroke="#94a3b8" />
-              <YAxis stroke="#94a3b8" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#272a2f" />
+              <XAxis dataKey="month" stroke="#62676f" />
+              <YAxis stroke="#62676f" />
               <Tooltip />
-              <Bar dataKey="volume" name="Volume" />
+              <Bar dataKey="volume" name="Volume" fill="#74c7ff" radius={[4,4,0,0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -238,11 +238,11 @@ export default function Progress() {
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={exerciseWeights}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="date" stroke="#94a3b8" />
-                <YAxis stroke="#94a3b8" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#272a2f" />
+                <XAxis dataKey="date" stroke="#62676f" />
+                <YAxis stroke="#62676f" />
                 <Tooltip />
-                <Line type="monotone" dataKey="weight" name="Carga" />
+                <Line type="monotone" dataKey="weight" name="Carga" stroke="#c8ff3d" strokeWidth={3} dot={{fill:'#c8ff3d'}} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -254,11 +254,11 @@ export default function Progress() {
         >
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={charts.weekdayFrequency}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-              <XAxis dataKey="day" stroke="#94a3b8" />
-              <YAxis allowDecimals={false} stroke="#94a3b8" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#272a2f" />
+              <XAxis dataKey="day" stroke="#62676f" />
+              <YAxis allowDecimals={false} stroke="#62676f" />
               <Tooltip />
-              <Bar dataKey="total" name="Treinos" />
+              <Bar dataKey="total" name="Treinos" fill="#c8ff3d" radius={[4,4,0,0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -324,11 +324,11 @@ export default function Progress() {
         <ChartCard title="Peso corporal">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={raw.measurements}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-              <XAxis dataKey="date" stroke="#94a3b8" />
-              <YAxis stroke="#94a3b8" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#272a2f" />
+              <XAxis dataKey="date" stroke="#62676f" />
+              <YAxis stroke="#62676f" />
               <Tooltip />
-              <Line type="monotone" dataKey="weight" name="Peso" />
+              <Line type="monotone" dataKey="weight" name="Peso" stroke="#c8ff3d" strokeWidth={3} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -336,15 +336,15 @@ export default function Progress() {
         <ChartCard title="Medidas corporais">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={raw.measurements}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-              <XAxis dataKey="date" stroke="#94a3b8" />
-              <YAxis stroke="#94a3b8" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#272a2f" />
+              <XAxis dataKey="date" stroke="#62676f" />
+              <YAxis stroke="#62676f" />
               <Tooltip />
-              <Line type="monotone" dataKey="waist" name="Cintura" />
-              <Line type="monotone" dataKey="chest" name="Peito" />
-              <Line type="monotone" dataKey="arm" name="Braço" />
-              <Line type="monotone" dataKey="thigh" name="Coxa" />
-              <Line type="monotone" dataKey="hip" name="Quadril" />
+              <Line type="monotone" dataKey="waist" name="Cintura" stroke="#c8ff3d" dot={false} />
+              <Line type="monotone" dataKey="chest" name="Peito" stroke="#74c7ff" dot={false} />
+              <Line type="monotone" dataKey="arm" name="Braco" stroke="#a78bfa" dot={false} />
+              <Line type="monotone" dataKey="thigh" name="Coxa" stroke="#ffb55e" dot={false} />
+              <Line type="monotone" dataKey="hip" name="Quadril" stroke="#ff6b70" dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </ChartCard>

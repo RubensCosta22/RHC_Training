@@ -12,9 +12,9 @@ export default function Card({
       className={cn(
         tokens.radius.card,
         active ? tokens.border.active : tokens.border.subtle,
-        glow ? 'bg-gradient-to-br from-slate-900 to-slate-950' : tokens.surface.card,
+        glow ? 'bg-[#141619]' : tokens.surface.card,
         tokens.shadow.card,
-        'p-4',
+        'p-5',
         className
       )}
     >

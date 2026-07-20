@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabaseClient'
 import { exportHistoryCsv, exportHistoryJson, importBackupJson } from '../services/backupService'
 import { getPendingWorkouts } from '../utils/storage'
 import { friendlyError } from '../utils/validation'
+import PageHeader from '../components/ui/PageHeader'
 
 export default function Settings() {
   const { profileId } = useParams()
@@ -35,10 +36,7 @@ export default function Settings() {
 
   return (
     <div>
-      <header className="mb-5">
-        <p className="text-sm font-bold text-emerald-300">Configurações</p>
-        <h1 className="text-3xl font-black">Backup e segurança</h1>
-      </header>
+      <PageHeader eyebrow="Configuracoes" title="Dados e seguranca" subtitle="Controle, protecao e portabilidade do seu historico." />
 
       <section className="card mb-4 space-y-3">
         <Link to="/family" className="btn-secondary flex w-full items-center justify-center gap-2">

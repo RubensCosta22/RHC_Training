@@ -1,4 +1,4 @@
-import { ArrowRight, CalendarDays, Dumbbell, LogOut, Plus, Settings2, ShieldCheck, Sparkles, UsersRound, X } from 'lucide-react'
+import { ArrowUpRight, CalendarDays, Dumbbell, LogOut, Plus, Settings2, UsersRound, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import PageHeader from '../components/ui/PageHeader'
@@ -39,30 +39,20 @@ export default function Admin() {
   }
 
   return <div>
-    <PageHeader eyebrow="Painel administrativo" title="Visao da familia" subtitle="Acompanhe os perfis e gerencie os treinos em um unico lugar." action={<button onClick={logout} type="button" aria-label="Sair" className="rounded-2xl border border-slate-700 bg-slate-900 p-3 text-slate-300 hover:border-red-400/50 hover:text-red-300"><LogOut size={20}/></button>} />
+    <PageHeader eyebrow="Administracao familiar" title="Central RHC" subtitle="Pessoas, rotinas e acesso. Sem interferir no historico de treino." action={<button onClick={logout} type="button" aria-label="Sair" className="grid h-11 w-11 place-items-center rounded-full border border-[#272a2f] text-[#92979f] transition hover:border-[#ff6b70]/40 hover:text-[#ff6b70]"><LogOut size={18}/></button>} />
 
-    <section className="card-glow mb-5 overflow-hidden p-5 sm:p-6">
-      <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div><span className="badge-success inline-flex items-center gap-2"><ShieldCheck size={14}/> Acesso administrativo</span><h2 className="mt-3 text-2xl font-black">Tudo pronto para cuidar da rotina</h2><p className="mt-1 max-w-xl text-sm text-slate-400">As alteracoes de planos afetam somente os proximos treinos. O historico permanece protegido.</p></div>
-        <Link to="/plans" className="btn-primary flex shrink-0 items-center justify-center gap-2"><Sparkles size={18}/> Gerenciar planos</Link>
-      </div>
+    <section className="mb-14 grid gap-8 border-y border-[#272a2f] py-8 sm:grid-cols-[1fr_auto] sm:items-end">
+      <div><p className="rhc-kicker mb-3">Visao geral</p><div className="flex items-baseline gap-4"><span className="tabular-nums text-7xl font-[760] tracking-[-.065em]">{profiles.length}</span><span className="max-w-32 text-sm leading-snug text-[#62676f]">perfis sob sua supervisao</span></div></div>
+      <div className="flex gap-8 sm:text-right"><div><p className="tabular-nums text-2xl font-bold">{trainedProfiles}</p><p className="text-xs text-[#62676f]">com atividade</p></div><div><p className="tabular-nums text-2xl font-bold">{Math.max(0,profiles.length-trainedProfiles)}</p><p className="text-xs text-[#62676f]">sem atividade</p></div></div>
     </section>
 
-    <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
-      <div className="card"><UsersRound className="mb-3 text-emerald-300"/><p className="text-3xl font-black">{profiles.length}</p><p className="text-xs text-slate-400">Perfis supervisionados</p></div>
-      <div className="card"><Dumbbell className="mb-3 text-lime-300"/><p className="text-3xl font-black">{trainedProfiles}</p><p className="text-xs text-slate-400">Com historico de treino</p></div>
-      <Link to="/schedule" className="card group col-span-2 transition hover:border-sky-400/40 sm:col-span-1"><CalendarDays className="mb-3 text-sky-300"/><p className="text-lg font-black">Agenda semanal</p><p className="text-xs text-slate-400">Treinos e descansos organizados</p></Link>
-    </div>
+    <section className="mb-14 grid gap-px overflow-hidden rounded-[18px] bg-[#272a2f] sm:grid-cols-3">
+      {[{to:'/family',icon:UsersRound,title:'Pessoas e acesso',text:'Titulares, convites e permissoes'},{to:'/plans',icon:Settings2,title:'Planos de treino',text:'Exercicios e configuracoes'},{to:'/schedule',icon:CalendarDays,title:'Agenda semanal',text:'Treinos e descansos por dia'}].map(({to,icon:Icon,title,text})=><Link to={to} key={to} className="group bg-[#0d0f11] p-5 transition hover:bg-[#141619]"><div className="mb-8 flex items-start justify-between"><Icon size={20} className="text-[#92979f]"/><ArrowUpRight size={17} className="text-[#62676f] transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-[#c8ff3d]"/></div><strong className="block text-lg">{title}</strong><p className="mt-1 text-sm text-[#62676f]">{text}</p></Link>)}
+    </section>
 
-    <div className="mb-6 grid gap-3 sm:grid-cols-3">
-      <Link to="/family" className="group card flex items-center gap-4 transition hover:border-emerald-400/40"><span className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-400/10 text-emerald-300"><UsersRound/></span><div className="flex-1"><strong>Grupo familiar</strong><p className="text-sm text-slate-400">Titulares, convites e acessos</p></div><ArrowRight className="text-slate-500 transition group-hover:translate-x-1 group-hover:text-emerald-300"/></Link>
-      <Link to="/plans" className="group card flex items-center gap-4 transition hover:border-emerald-400/40"><span className="grid h-12 w-12 place-items-center rounded-2xl bg-lime-400/10 text-lime-300"><Settings2/></span><div className="flex-1"><strong>Planos de treino</strong><p className="text-sm text-slate-400">Exercicios e cronogramas</p></div><ArrowRight className="text-slate-500 transition group-hover:translate-x-1 group-hover:text-emerald-300"/></Link>
-      <Link to="/schedule" className="group card flex items-center gap-4 transition hover:border-sky-400/40"><span className="grid h-12 w-12 place-items-center rounded-2xl bg-sky-400/10 text-sky-300"><CalendarDays/></span><div className="flex-1"><strong>Agenda semanal</strong><p className="text-sm text-slate-400">Treinos por dia</p></div><ArrowRight className="text-slate-500 transition group-hover:translate-x-1 group-hover:text-sky-300"/></Link>
-    </div>
+    <div className="mb-5 flex items-end justify-between gap-3 border-b border-[#272a2f] pb-4"><div><p className="rhc-kicker mb-2">Equipe</p><h2 className="text-2xl font-[700] tracking-[-.04em]">Perfis supervisionados</h2></div><button className="btn-secondary flex items-center gap-2 px-4" onClick={()=>setShowCreate((value)=>!value)}>{showCreate?<X size={17}/>:<Plus size={17}/>}<span className="hidden sm:inline">{showCreate?'Cancelar':'Novo perfil'}</span></button></div>
 
-    <div className="mb-4 flex items-center justify-between gap-3"><div><h2 className="text-xl font-black">Perfis supervisionados</h2><p className="text-sm text-slate-400">Consulte rapidamente a atividade de cada pessoa.</p></div><button className="btn-secondary flex items-center gap-2 px-4" onClick={()=>setShowCreate((value)=>!value)}>{showCreate?<X size={18}/>:<Plus size={18}/>}<span className="hidden sm:inline">{showCreate?'Cancelar':'Novo perfil'}</span></button></div>
-
-    {showCreate && <form className="card-glow mb-5 grid gap-3 sm:grid-cols-2" onSubmit={createProfile}>
+    {showCreate && <form className="mb-8 grid gap-4 border-b border-[#272a2f] bg-[#0d0f11] p-5 sm:grid-cols-2" onSubmit={createProfile}>
       <div className="sm:col-span-2"><h3 className="text-lg font-black">Adicionar perfil familiar</h3><p className="text-sm text-slate-400">O titular recebera acesso ao entrar com o e-mail associado.</p></div>
       <label className="text-sm text-slate-300">Nome<input required value={newProfile.name} onChange={(e)=>setNewProfile({...newProfile,name:e.target.value})}/></label>
       <label className="text-sm text-slate-300">Idade<input required min="1" max="120" type="number" value={newProfile.age} onChange={(e)=>setNewProfile({...newProfile,age:e.target.value})}/></label>
@@ -75,7 +65,7 @@ export default function Admin() {
     {message&&<p className="mb-4 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-sm text-emerald-100">{message}</p>}
     {loading&&<section className="card">Carregando perfis...</section>}
     {error&&<p className="rounded-2xl border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-100">{error}</p>}
-    <div className="grid gap-3 sm:grid-cols-2">{profiles.map((profile)=><Link to={`/dashboard/${profile.id}`} className="group card flex items-center gap-4 transition hover:border-emerald-400/40" key={profile.id}><span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-emerald-300 to-lime-300 text-2xl font-black text-slate-950">{profile.avatar_url||profile.name?.[0]}</span><div className="min-w-0 flex-1"><h3 className="truncate text-lg font-black">{profile.name}</h3><p className="truncate text-sm text-slate-400">{profile.goal}</p><p className="mt-1 text-xs text-slate-500">{profile.lastWorkout?`Ultimo treino ${profile.lastWorkout.workout_type} em ${profile.lastWorkout.date}`:'Sem treino registrado'}</p></div><ArrowRight className="shrink-0 text-slate-500 transition group-hover:translate-x-1 group-hover:text-emerald-300"/></Link>)}</div>
+    <div className="overflow-hidden border-y border-[#272a2f]">{profiles.map((profile)=><Link to={`/dashboard/${profile.id}`} className="rhc-row group flex items-center gap-4 py-4" key={profile.id}><span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#1a1d21] text-sm font-black text-[#c8ff3d]">{profile.avatar_url||profile.name?.[0]}</span><div className="min-w-0 flex-1"><h3 className="truncate font-semibold">{profile.name}</h3><p className="truncate text-sm text-[#62676f]">{profile.goal}</p></div><p className="hidden text-xs text-[#62676f] sm:block">{profile.lastWorkout?`Treino ${profile.lastWorkout.workout_type} · ${profile.lastWorkout.date}`:'Sem atividade'}</p><ArrowUpRight size={17} className="shrink-0 text-[#62676f] transition group-hover:text-[#c8ff3d]"/></Link>)}</div>
     {!loading&&!error&&!profiles.length&&<section className="card text-center"><Dumbbell className="mx-auto mb-2 text-slate-400"/><p>Nenhum perfil associado.</p></section>}
   </div>
 }
