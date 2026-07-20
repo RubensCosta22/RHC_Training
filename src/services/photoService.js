@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabaseClient'
 import { toLocalDateKey } from '../utils/date'
+import { invokeSecureImageUpload } from './secureUploadService'
 
 const BUCKET = 'progress-photos'
 const PHOTO_TYPES = ['frente', 'lado', 'costas']
@@ -37,8 +38,7 @@ export async function uploadProgressPhoto({ profileId, date, photoType, file, no
   body.append('notes', String(notes || ''))
   body.append('file', file)
 
-  const { data, error } = await supabase.functions.invoke('secure-image-upload', { body })
-  if (error) throw error
+  const data = await invokeSecureImageUpload(body)
   if (!data?.photo) throw new Error(data?.error || 'Falha no envio seguro da imagem.')
   return data.photo
 }

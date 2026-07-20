@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabaseClient'
 import { profilesSeed } from '../data/workouts'
 import { claimFamilyProfile, getFamilyContext } from './familyService'
+import { invokeSecureImageUpload } from './secureUploadService'
 
 const AVATAR_BUCKET = 'progress-photos'
 
@@ -106,8 +107,7 @@ export async function uploadProfileAvatar(profileId, file) {
   body.append('profileId', profileId)
   body.append('file', file)
 
-  const { data, error } = await supabase.functions.invoke('secure-image-upload', { body })
-  if (error) throw error
+  const data = await invokeSecureImageUpload(body)
   if (!data?.path) throw new Error(data?.error || 'Falha no envio seguro da imagem.')
   return { path: data.path, signedUrl: data.signedUrl || null }
 }
