@@ -100,3 +100,12 @@ O `signal` ocupa no máximo 10% da tela. Verde não é cor de superfície genér
 - **Administração:** lista e comandos; sem aparência de dashboard corporativo.
 - **Histórico:** timeline, filtros recolhíveis e metadados silenciosos.
 - **Autenticação:** marca e promessa à esquerda/alto; formulário simples e isolado.
+
+## 10. Arquitetura responsiva
+
+- **Mobile (`< 1024px`):** fluxo vertical, dock inferior, uma decisão dominante por viewport.
+- **Desktop (`>= 1024px`):** navegação lateral fixa, canvas fluido de até 1440px e grade de 12 colunas.
+- Desktop nunca é uma coluna mobile centralizada ou apenas ampliada.
+- O início distribui treino, ritmo, métricas e atalhos em áreas simultâneas; o mobile reordena as mesmas áreas por prioridade.
+- Módulos principais podem ocupar 7–8 colunas; contexto e métricas usam 4–5 colunas.
+- Em telas ultrawide, margens preservam leitura, mas o conteúdo útil deve ocupar entre 70% e 85% do viewport.
