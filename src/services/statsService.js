@@ -17,6 +17,46 @@ function average(numbers) {
   return numbers.reduce((acc, value) => acc + Number(value || 0), 0) / numbers.length
 }
 
+function addDays(date, amount) {
+  const next = new Date(date)
+  next.setDate(next.getDate() + amount)
+  return next
+}
+
+function percentageChange(current, previous) {
+  if (!previous) return current > 0 ? 100 : 0
+  return Math.round(((current - previous) / previous) * 100)
+}
+
+function getTrainingStreak(sessions) {
+  const weeks = [...new Set(sessions.map((item) => getWeekKey(item.date)))].sort()
+  let best = 0
+  let run = 0
+  let previous = null
+
+  weeks.forEach((week) => {
+    const current = parseLocalDate(week)
+    const consecutive = previous && Math.round((current - previous) / 86400000) === 7
+    run = consecutive ? run + 1 : 1
+    best = Math.max(best, run)
+    previous = current
+  })
+
+  let current = 0
+  const thisWeek = parseLocalDate(getWeekKey(new Date()))
+  const latestWeek = weeks.length ? parseLocalDate(weeks[weeks.length - 1]) : null
+  const latestDistance = latestWeek ? Math.round((thisWeek - latestWeek) / 86400000) : null
+  const referenceWeek = latestDistance === 0 || latestDistance === 7 ? latestWeek : null
+  for (let index = weeks.length - 1; index >= 0; index -= 1) {
+    const week = parseLocalDate(weeks[index])
+    const expected = referenceWeek && addDays(referenceWeek, -7 * current)
+    if (expected && Math.round((expected - week) / 86400000) === 0) current += 1
+    else break
+  }
+
+  return { current, best }
+}
+
 export async function getStatsCenter(profileId) {
   const data = await getProgressData(profileId)
 
@@ -33,7 +73,10 @@ export async function getStatsCenter(profileId) {
 
   const now = new Date()
   const weekKey = getWeekKey(now)
+  const previousWeekKey = getWeekKey(addDays(now, -7))
   const monthKey = toLocalDateKey(now).slice(0, 7)
+  const previousMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  const previousMonthKey = toLocalDateKey(previousMonthDate).slice(0, 7)
 
   const weeklyVolume = sessions
     .filter((item) => getWeekKey(item.date) === weekKey)
@@ -42,6 +85,18 @@ export async function getStatsCenter(profileId) {
   const monthlyVolume = sessions
     .filter((item) => item.date?.slice(0, 7) === monthKey)
     .reduce((acc, item) => acc + Number(item.total_volume || 0), 0)
+
+  const previousWeeklyVolume = sessions
+    .filter((item) => getWeekKey(item.date) === previousWeekKey)
+    .reduce((acc, item) => acc + Number(item.total_volume || 0), 0)
+
+  const previousMonthlyVolume = sessions
+    .filter((item) => item.date?.slice(0, 7) === previousMonthKey)
+    .reduce((acc, item) => acc + Number(item.total_volume || 0), 0)
+
+  const weeklyWorkouts = sessions.filter((item) => getWeekKey(item.date) === weekKey).length
+  const previousWeeklyWorkouts = sessions.filter((item) => getWeekKey(item.date) === previousWeekKey).length
+  const streak = getTrainingStreak(sessions)
 
   const byExercise = {}
   exercises.forEach((item) => {
@@ -108,6 +163,21 @@ export async function getStatsCenter(profileId) {
     }, {})
   )
 
+  const milestones = [1, 10, 25, 50, 100, 250]
+  const workoutMilestone = [...milestones].reverse().find((value) => totalWorkouts >= value) || 0
+  const nextWorkoutMilestone = milestones.find((value) => totalWorkouts < value) || Math.ceil((totalWorkouts + 1) / 100) * 100
+  const volumeMilestones = [1000, 5000, 10000, 25000, 50000, 100000, 250000]
+  const volumeMilestone = [...volumeMilestones].reverse().find((value) => totalVolume >= value) || 0
+  const nextVolumeMilestone = volumeMilestones.find((value) => totalVolume < value) || Math.ceil((totalVolume + 1) / 100000) * 100000
+
+  const achievements = [
+    { id: 'first', title: 'Primeiro passo', description: 'Primeiro treino concluído', unlocked: totalWorkouts >= 1, value: '1' },
+    { id: 'workouts', title: `${workoutMilestone || nextWorkoutMilestone} treinos`, description: workoutMilestone ? 'Marco de consistência' : `Faltam ${nextWorkoutMilestone - totalWorkouts}`, unlocked: Boolean(workoutMilestone), value: workoutMilestone || nextWorkoutMilestone },
+    { id: 'volume', title: volumeMilestone ? `${Math.round(volumeMilestone / 1000)} mil kg` : `${Math.round(nextVolumeMilestone / 1000)} mil kg`, description: volumeMilestone ? 'Volume acumulado' : 'Próximo marco de volume', unlocked: Boolean(volumeMilestone), value: volumeMilestone || nextVolumeMilestone },
+    { id: 'streak', title: `${streak.best} semanas`, description: 'Melhor sequência registrada', unlocked: streak.best >= 2, value: streak.best },
+    { id: 'records', title: `${personalRecords.length} recordes`, description: 'Exercícios com carga máxima', unlocked: personalRecords.length >= 3, value: personalRecords.length }
+  ]
+
   return {
     raw: data,
     summary: {
@@ -115,9 +185,16 @@ export async function getStatsCenter(profileId) {
       totalVolume,
       weeklyVolume,
       monthlyVolume,
+      weeklyWorkouts,
       averageDuration,
       biggestWorkout,
-      mostTrainedExercise
+      mostTrainedExercise,
+      streak,
+      comparisons: {
+        weeklyVolume: percentageChange(weeklyVolume, previousWeeklyVolume),
+        monthlyVolume: percentageChange(monthlyVolume, previousMonthlyVolume),
+        weeklyWorkouts: percentageChange(weeklyWorkouts, previousWeeklyWorkouts)
+      }
     },
     charts: {
       weeklyVolumeChart,
@@ -128,6 +205,7 @@ export async function getStatsCenter(profileId) {
       exerciseRanking,
       personalRecords
     },
+    achievements,
     measurements
   }
 }

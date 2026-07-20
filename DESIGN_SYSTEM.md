@@ -96,7 +96,10 @@ O `signal` ocupa no máximo 10% da tela. Verde não é cor de superfície genér
 ## 9. Composição por contexto
 
 - **Treino:** uma ação dominante, progresso próximo, detalhes recolhidos.
-- **Evolução:** números primeiro, gráfico depois, ranking por último.
+- **Evolução:** momento atual primeiro, tendência comparável depois, conquistas e detalhes por último.
+- Comparações temporais devem sempre explicitar o período de referência.
+- Conquistas são derivadas de dados reais, incluem estados bloqueado/desbloqueado e nunca substituem a leitura de desempenho.
+- Em gráficos, apenas uma série recebe `signal`; séries secundárias usam cores funcionais e grades silenciosas.
 - **Administração:** lista e comandos; sem aparência de dashboard corporativo.
 - **Histórico:** timeline, filtros recolhíveis e metadados silenciosos.
 - **Autenticação:** marca e promessa à esquerda/alto; formulário simples e isolado.
