@@ -32,8 +32,9 @@ function PageFallback() {
 function AppShell({ children }) {
   const { pathname } = useLocation()
   const wide = ['/admin', '/family', '/plans', '/schedule'].includes(pathname)
+  const profileArea = /^\/(dashboard|workout|history|progress|measurements|photos|settings|archived)\//.test(pathname)
   return (
-    <main className={`mx-auto min-h-screen px-5 pb-32 sm:px-8 ${wide ? 'max-w-5xl' : 'max-w-3xl'}`}>
+    <main className={`mx-auto min-h-screen max-w-[1440px] px-5 pb-32 sm:px-8 ${profileArea?'lg:pl-[244px] lg:pr-10':'lg:px-12'} ${wide?'2xl:max-w-[1560px]':''}`}>
       <TopBar />
       <div className="page-enter">{children}</div>
       <BottomNav />
