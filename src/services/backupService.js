@@ -47,7 +47,7 @@ export async function importBackupJson(profileId, file) {
     throw new Error('Backup excede o limite seguro de registros.')
   }
 
-  const { data, error } = await supabase.rpc('import_profile_backup_atomic', {
+  const { data, error } = await supabase.rpc('import_profile_backup_secure', {
     p_profile_id: profileId,
     p_backup: backup
   })
