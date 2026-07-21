@@ -10,7 +10,9 @@ import {
 } from 'lucide-react'
 import EmptyState from '../components/ui/EmptyState'
 import PageHeader from '../components/ui/PageHeader'
+import ProgramPerformancePanel from '../components/ProgramPerformancePanel'
 import { getStatsCenter } from '../services/statsService'
+import { getProgramStats } from '../services/programStatsService'
 import { friendlyError } from '../utils/validation'
 
 const formatNumber = (value) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(Number(value || 0))
@@ -59,15 +61,19 @@ function Achievement({ item, index }) {
 export default function Progress() {
   const { profileId } = useParams()
   const [stats, setStats] = useState(null)
+  const [programStats, setProgramStats] = useState(null)
   const [selectedExercise, setSelectedExercise] = useState('')
   const [period, setPeriod] = useState('semanal')
   const [error, setError] = useState('')
 
   useEffect(() => {
-    getStatsCenter(profileId).then((result) => {
-      setStats(result)
-      setSelectedExercise(result.raw.exercises[0]?.exercise_name || '')
-    }).catch((err) => setError(friendlyError(err)))
+    Promise.all([getStatsCenter(profileId), getProgramStats(profileId)])
+      .then(([result, programResult]) => {
+        setStats(result)
+        setProgramStats(programResult)
+        setSelectedExercise(result.raw.exercises[0]?.exercise_name || '')
+      })
+      .catch((err) => setError(friendlyError(err)))
   }, [profileId])
 
   const exerciseNames = useMemo(() => stats ? [...new Set(stats.raw.exercises.map((item) => item.exercise_name))] : [], [stats])
@@ -85,6 +91,8 @@ export default function Progress() {
   return (
     <div className="page-enter pb-10">
       <PageHeader eyebrow="Performance" title="Seu ritmo, em números." subtitle="Entenda o momento atual, reconheça sua consistência e descubra onde evoluir." />
+
+      <ProgramPerformancePanel stats={programStats} />
 
       <section className="mb-12 grid gap-8 border-y border-[#272a2f] py-8 lg:grid-cols-12 lg:items-center lg:gap-12">
         <div className="lg:col-span-5">

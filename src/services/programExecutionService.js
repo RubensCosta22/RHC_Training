@@ -5,6 +5,27 @@ function repsLabel(min, max) {
   return Number(min) === Number(max) ? String(min) : `${min}-${max}`
 }
 
+function phaseReps(exercise, phase) {
+  const usePhase = ['principal', 'secundario'].includes(exercise.exercise_role)
+    && phase?.reps_min != null
+    && phase?.reps_max != null
+
+  if (!usePhase) {
+    return { min: exercise.reps_min, max: exercise.reps_max }
+  }
+
+  return {
+    min: Number(phase.reps_min),
+    max: Number(phase.reps_max)
+  }
+}
+
+function phaseSets(exercise, phase) {
+  const baseSets = Number(exercise.sets || 1)
+  const modifier = Number(phase?.volume_modifier || 1)
+  return Math.max(1, Math.round(baseSets * modifier))
+}
+
 export async function getActiveProgramWorkout(profileId, sessionCode) {
   const { data: enrollment, error: enrollmentError } = await supabase
     .from('profile_program_enrollments')
@@ -45,36 +66,41 @@ export async function getActiveProgramWorkout(profileId, sessionCode) {
 
   const exercises = (session.program_exercises || [])
     .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0))
-    .map((exercise) => ({
-      id: exercise.id,
-      programExerciseId: exercise.id,
-      programEnrollmentId: enrollment.id,
-      name: exercise.exercise_name,
-      muscleGroup: exercise.movement_pattern,
-      movementPattern: exercise.movement_pattern,
-      role: exercise.exercise_role,
-      sets: exercise.sets,
-      reps: repsLabel(exercise.reps_min, exercise.reps_max),
-      repsMin: exercise.reps_min,
-      repsMax: exercise.reps_max,
-      targetRpeMin: exercise.target_rpe_min ?? phase?.target_rpe_min ?? null,
-      targetRpeMax: exercise.target_rpe_max ?? phase?.target_rpe_max ?? null,
-      rest: exercise.rest_seconds_min || 60,
-      restMax: exercise.rest_seconds_max,
-      progressionType: exercise.progression_type,
-      loadIncrement: exercise.default_load_increment,
-      regressionPercent: exercise.regression_percent,
-      failuresBeforeRegression: exercise.failures_before_regression,
-      alternatives: (exercise.program_exercise_substitutions || [])
-        .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0))
-        .map((item) => item.exercise_name)
-    }))
+    .map((exercise) => {
+      const prescribedReps = phaseReps(exercise, phase)
+      const prescribedSets = phaseSets(exercise, phase)
+
+      return {
+        id: exercise.id,
+        programExerciseId: exercise.id,
+        programEnrollmentId: enrollment.id,
+        name: exercise.exercise_name,
+        muscleGroup: exercise.movement_pattern,
+        movementPattern: exercise.movement_pattern,
+        role: exercise.exercise_role,
+        sets: prescribedSets,
+        reps: repsLabel(prescribedReps.min, prescribedReps.max),
+        repsMin: prescribedReps.min,
+        repsMax: prescribedReps.max,
+        targetRpeMin: exercise.target_rpe_min ?? phase?.target_rpe_min ?? null,
+        targetRpeMax: exercise.target_rpe_max ?? phase?.target_rpe_max ?? null,
+        rest: exercise.rest_seconds_min || 60,
+        restMax: exercise.rest_seconds_max,
+        progressionType: exercise.progression_type,
+        loadIncrement: exercise.default_load_increment,
+        regressionPercent: exercise.regression_percent,
+        failuresBeforeRegression: exercise.failures_before_regression,
+        alternatives: (exercise.program_exercise_substitutions || [])
+          .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0))
+          .map((item) => item.exercise_name)
+      }
+    })
 
   return {
     title: session.name,
     description: `${enrollment.training_programs?.name || 'Programa'} • Semana ${currentWeek}${phase?.name ? ` • ${phase.name}` : ''}`,
     program: enrollment.training_programs,
-    enrollment,
+    enrollment: { ...enrollment, current_week: currentWeek },
     phase,
     session,
     exercises
