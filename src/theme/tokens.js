@@ -1,38 +1,47 @@
 export const tokens = {
   radius: {
-    card: 'rounded-[18px]',
-    button: 'rounded-xl',
+    input: 'rounded-[4px]',
+    card: 'rounded-[8px]',
+    modal: 'rounded-[12px]',
+    button: 'rounded-[8px]',
     pill: 'rounded-full'
   },
   border: {
-    subtle: 'border border-[#272a2f]',
-    active: 'border border-[#c8ff3d]/50',
-    danger: 'border border-red-400/40',
-    warning: 'border border-amber-400/40'
+    subtle: 'border border-[#2A2A2E]',
+    active: 'border border-[#C8FF3D]/50',
+    danger: 'border border-[#F87171]/40',
+    warning: 'border border-[#FBBF24]/40'
   },
   surface: {
-    base: 'bg-[#08090a]',
-    card: 'bg-[#141619]',
-    cardStrong: 'bg-[#181a1e]',
-    soft: 'bg-[#0d0f11]',
-    active: 'bg-[#c8ff3d]',
-    activeSoft: 'bg-[#c8ff3d]/10',
-    dangerSoft: 'bg-red-400/10',
-    warningSoft: 'bg-amber-400/10'
+    base: 'bg-[#0A0A0B]',
+    raised: 'bg-[#141416]',
+    card: 'bg-[#1C1C1F]',
+    hover: 'bg-[#232327]',
+    active: 'bg-[#C8FF3D]',
+    activeSoft: 'bg-[#C8FF3D]/10',
+    dangerSoft: 'bg-[#F87171]/10',
+    warningSoft: 'bg-[#FBBF24]/10',
+    infoSoft: 'bg-[#60A5FA]/10'
   },
   text: {
-    title: 'text-[#f5f7f2]',
-    body: 'text-[#c8cbd0]',
-    muted: 'text-[#92979f]',
-    subtle: 'text-[#62676f]',
-    active: 'text-[#c8ff3d]',
+    title: 'text-[#F5F5F7]',
+    body: 'text-[#F5F5F7]',
+    muted: 'text-[#8E8E93]',
+    active: 'text-[#C8FF3D]',
     activeDark: 'text-[#111400]',
-    danger: 'text-red-200',
-    warning: 'text-amber-200'
+    danger: 'text-[#F87171]',
+    warning: 'text-[#FBBF24]',
+    info: 'text-[#60A5FA]'
+  },
+  state: {
+    success: '#34D399',
+    warning: '#FBBF24',
+    error: '#F87171',
+    info: '#60A5FA'
   },
   shadow: {
     card: 'shadow-none',
-    active: 'shadow-[0_10px_40px_rgba(200,255,61,.12)]'
+    active: 'shadow-none'
   },
   transition: 'transition duration-200 ease-[cubic-bezier(.2,.8,.2,1)]'
 }
