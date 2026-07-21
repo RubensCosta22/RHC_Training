@@ -4,24 +4,25 @@ import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { secureSignOut } from '../services/authService'
 import { friendlyError, validateNewPassword } from '../utils/validation'
+import { clearPasswordRecovery, hasPasswordRecovery } from '../utils/authRecovery'
 
 export default function ResetPassword() {
   const navigate = useNavigate()
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [checking, setChecking] = useState(true)
-  const [hasSession, setHasSession] = useState(false)
+  const [hasRecoverySession, setHasRecoverySession] = useState(false)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      setHasSession(Boolean(data.session))
+      setHasRecoverySession(Boolean(data.session) && hasPasswordRecovery(data.session))
       setChecking(false)
     })
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setHasSession(Boolean(session))
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      setHasRecoverySession(Boolean(session) && (event === 'PASSWORD_RECOVERY' || hasPasswordRecovery(session)))
       setChecking(false)
     })
 
@@ -38,6 +39,7 @@ export default function ResetPassword() {
       const { error } = await supabase.auth.updateUser({ password: cleanPassword })
       if (error) throw error
 
+      clearPasswordRecovery()
       await secureSignOut()
       navigate('/login', {
         replace: true,
@@ -65,7 +67,7 @@ export default function ResetPassword() {
           <p className="mt-2 text-sm text-slate-400">Use pelo menos 8 caracteres, com letra maiuscula, minuscula e numero.</p>
         </div>
 
-        {!hasSession ? (
+        {!hasRecoverySession ? (
           <div className="text-center">
             <p className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-100">
               Este link e invalido ou expirou. Solicite um novo link de recuperacao.
