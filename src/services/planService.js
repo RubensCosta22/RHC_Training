@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabaseClient'
 import { getWorkout, getWorkoutTypes } from '../data/workouts'
 import { sanitizeText } from '../utils/validation'
+import { getActiveProgramWorkout } from './programExecutionService'
 
 function normalizeExercise(exercise, index) {
   const name = sanitizeText(exercise.name, 120)
@@ -19,6 +20,11 @@ function normalizeExercise(exercise, index) {
 }
 
 export async function getWorkoutPlan(profile, type) {
+  // Um programa ativo tem precedencia sobre o plano tradicional apenas para a
+  // sessao/codigo solicitado. Sem programa ativo, o comportamento legado e mantido.
+  const programWorkout = await getActiveProgramWorkout(profile.id, type)
+  if (programWorkout) return programWorkout
+
   const { data, error } = await supabase.from('workout_plans').select('*').eq('profile_id', profile.id).eq('workout_type', type).maybeSingle()
   if (error) throw error
   if (data && !data.active) return null
@@ -27,6 +33,26 @@ export async function getWorkoutPlan(profile, type) {
 }
 
 export async function getAvailablePlanTypes(profile) {
+  const { data: activeEnrollment, error: enrollmentError } = await supabase
+    .from('profile_program_enrollments')
+    .select('program_id')
+    .eq('profile_id', profile.id)
+    .eq('status', 'active')
+    .maybeSingle()
+
+  if (enrollmentError) throw enrollmentError
+
+  if (activeEnrollment) {
+    const { data: sessions, error: sessionsError } = await supabase
+      .from('program_sessions')
+      .select('code')
+      .eq('program_id', activeEnrollment.program_id)
+      .order('day_order')
+
+    if (sessionsError) throw sessionsError
+    return (sessions || []).map((item) => item.code)
+  }
+
   const { data, error } = await supabase.from('workout_plans').select('workout_type,active').eq('profile_id', profile.id).order('workout_type')
   if (error) throw error
   const types = new Set(getWorkoutTypes(profile.name))
