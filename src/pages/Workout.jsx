@@ -13,9 +13,15 @@ import Card from '../components/ui/Card'
 import PageHeader from '../components/ui/PageHeader'
 import ProgressBar from '../components/ui/ProgressBar'
 import ExerciseCard from '../components/ExerciseCard'
+import SmartExecutionPanel from '../components/SmartExecutionPanel'
 import { supabase } from '../lib/supabaseClient'
 import { getProfile } from '../services/profileService'
 import { getWorkoutPlan } from '../services/planService'
+import {
+  calculateProgramSuggestion,
+  getRecentProgramExposures,
+  saveProgramExposure
+} from '../services/programExecutionService'
 import { getExerciseRecords, saveWorkoutSession } from '../services/workoutService'
 import { addPendingWorkout, isOnline } from '../utils/storage'
 import { friendlyError, sanitizeText } from '../utils/validation'
@@ -60,7 +66,7 @@ export default function Workout() {
         setWorkout(await getWorkoutPlan(value, type))
       })
       .catch((error) => setMessage(friendlyError(error)))
-  }, [profileId])
+  }, [profileId, type])
 
   useEffect(() => {
     if (!workout) return
@@ -71,6 +77,9 @@ export default function Workout() {
       initial[exercise.id] = {
         weight: '',
         actualReps: '',
+        setReps: Array(Number(exercise.sets || 0)).fill(''),
+        rpe: '',
+        progressionAccepted: null,
         notes: '',
         completed: false,
         completedSets: Array(Number(exercise.sets || 0)).fill(false),
@@ -99,6 +108,34 @@ export default function Workout() {
       ...current,
       [id]: value
     }))
+  }
+
+  async function buildProgramExposure(exercise, values, workoutSessionId) {
+    if (!exercise.programExerciseId || !exercise.programEnrollmentId) return
+
+    const variation = values.selectedName || exercise.name
+    const recent = await getRecentProgramExposures(
+      exercise.programEnrollmentId,
+      exercise.programExerciseId,
+      variation,
+      3
+    )
+
+    let previousFailures = 0
+    for (const item of recent) {
+      if (item.progression_action === 'increase') break
+      previousFailures += 1
+    }
+
+    const suggestion = calculateProgramSuggestion(exercise, values, previousFailures)
+
+    await saveProgramExposure({
+      profileId,
+      workoutSessionId,
+      exercise,
+      value: values,
+      suggestion
+    })
   }
 
   async function finalizeWorkout() {
@@ -139,7 +176,17 @@ export default function Workout() {
         return
       }
 
-      await saveWorkoutSession(payload)
+      const savedSession = await saveWorkoutSession(payload)
+
+      if (workout.enrollment || workout.exercises.some((exercise) => exercise.programExerciseId)) {
+        await Promise.all(
+          workout.exercises.map((exercise) => {
+            const values = exerciseValues[exercise.id] || {}
+            return buildProgramExposure(exercise, values, savedSession?.id || null)
+          })
+        )
+      }
+
       setMessage('Treino salvo com sucesso.')
       setTimeout(() => navigate(`/dashboard/${profileId}`), 700)
     } catch (error) {
@@ -181,6 +228,18 @@ export default function Workout() {
 
       {workout.description && (
         <p className="mb-8 max-w-xl border-l border-[#272a2f] pl-4 text-sm leading-relaxed text-[#92979f]">{workout.description}</p>
+      )}
+
+      {workout.enrollment && (
+        <section className="mb-6 rounded-3xl border border-emerald-400/20 bg-emerald-400/[0.04] p-4">
+          <p className="rhc-kicker">Programa ativo</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="font-black text-white">{workout.program?.name}</span>
+            <Badge variant="green">Semana {workout.enrollment?.current_week || workout.phase?.week_start || 1}</Badge>
+            {workout.phase?.name && <Badge variant="slate">{workout.phase.name}</Badge>}
+          </div>
+          <p className="mt-2 text-sm text-slate-400">Carga, RPE e repetições serão usados para sugerir a próxima exposição. Nenhuma carga é alterada automaticamente.</p>
+        </section>
       )}
 
       <section className="mb-8 border-y border-[#272a2f] py-5">
@@ -275,13 +334,21 @@ export default function Workout() {
 
       <div className="grid gap-5">
         {workout.exercises.map((exercise) => (
-          <ExerciseCard
-            key={exercise.id}
-            exercise={exercise}
-            value={exerciseValues[exercise.id] || {}}
-            record={records[(exerciseValues[exercise.id] || {}).selectedName || exercise.name]}
-            onChange={(value) => updateExercise(exercise.id, value)}
-          />
+          <div key={exercise.id}>
+            <ExerciseCard
+              exercise={exercise}
+              value={exerciseValues[exercise.id] || {}}
+              record={records[(exerciseValues[exercise.id] || {}).selectedName || exercise.name]}
+              onChange={(value) => updateExercise(exercise.id, value)}
+            />
+            {exercise.programExerciseId && (
+              <SmartExecutionPanel
+                exercise={exercise}
+                value={exerciseValues[exercise.id] || {}}
+                onChange={(value) => updateExercise(exercise.id, value)}
+              />
+            )}
+          </div>
         ))}
       </div>
 
