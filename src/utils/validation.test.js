@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parsePositiveNumber, sanitizeText, validateNewPassword, validateWorkoutInput } from './validation'
+import { friendlyError, parsePositiveNumber, sanitizeText, validateNewPassword, validateWorkoutInput } from './validation'
 
 describe('validation', () => {
   it('rejeita numeros negativos', () => {
@@ -19,5 +19,9 @@ describe('validation', () => {
     expect(validateNewPassword('Treino2026', 'Treino2026')).toBe('Treino2026')
     expect(() => validateNewPassword('fraca', 'fraca')).toThrow('8 caracteres')
     expect(() => validateNewPassword('Treino2026', 'Outra2026')).toThrow('nao coincidem')
+  })
+
+  it('traduz bloqueio por excesso de tentativas', () => {
+    expect(friendlyError(new Error('rate limit exceeded'))).toContain('Muitas tentativas')
   })
 })
