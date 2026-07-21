@@ -43,6 +43,7 @@ export default function Plans() {
   const plan = plans.find((item) => item.workout_type === selectedType)
   const strengthProgram = programs.find((item) => item.slug === 'rhc-strength-12w')
   const isStrengthActive = programState?.training_programs?.slug === 'rhc-strength-12w'
+  const isHenrique = String(profile?.name || '').trim().toLowerCase() === 'henrique'
 
   function patchPlan(patch) { setPlans((items) => items.map((item) => item.workout_type === selectedType ? { ...item, ...patch } : item)) }
   function patchExercise(index, patch) { patchPlan({ exercises: plan.exercises.map((item, position) => position === index ? { ...item, ...patch } : item) }) }
@@ -84,7 +85,7 @@ export default function Plans() {
       <div className="mt-3 grid grid-cols-5 gap-2">{['A','B','C','D','E'].map((type)=><button type="button" key={type} onClick={()=>setSelectedType(type)} className={type===selectedType?'btn-primary':'btn-secondary'}>{type}</button>)}</div>
     </section>
 
-    {profile?.name === 'Henrique' && strengthProgram && <section className="card mb-4 border border-[#c8ff3d]/20">
+    {isHenrique && strengthProgram && <section className="card mb-4 border border-[#c8ff3d]/20">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="rhc-kicker mb-2">Programa estruturado</p>
@@ -102,6 +103,7 @@ export default function Plans() {
     {plan && <>
       <section className="card mb-4 space-y-3">
         {['Karol','Rudney'].includes(profile?.name)&&<button className="btn-secondary w-full" type="button" onClick={applyPreset}>Aplicar cronograma semanal de {profile.name}</button>}
+        {isHenrique && strengthProgram && <button className="btn-secondary w-full" type="button" disabled={publishing} onClick={publishStrengthProgram}>{publishing?'Aplicando RHC Strength 12W...':`${isStrengthActive?'Reaplicar':'Aplicar'} RHC Strength 12W ao Henrique`}</button>}
         <label className="text-sm text-slate-300">Titulo<input value={plan.title} onChange={(event)=>patchPlan({title:event.target.value})}/></label>
         <label className="text-sm text-slate-300">Descricao<textarea value={plan.description || ''} onChange={(event)=>patchPlan({description:event.target.value})}/></label>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={plan.active!==false} onChange={(event)=>patchPlan({active:event.target.checked})}/> Plano ativo</label>
