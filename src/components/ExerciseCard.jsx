@@ -4,9 +4,6 @@ import {
   ChevronDown,
   ChevronUp,
   ExternalLink,
-  ImageIcon,
-  Minus,
-  Plus,
   Repeat2,
   RotateCcw
 } from 'lucide-react'
@@ -19,7 +16,8 @@ import { youtubeSearchUrl } from '../utils/youtube'
 
 function getInitialReps(exercise, value) {
   if (value.actualReps !== undefined && value.actualReps !== null && value.actualReps !== '') {
-    const parsed = Number(String(value.actualReps).replace(/\D/g, ''))
+    const firstValue = String(value.actualReps).split('/')[0]
+    const parsed = Number(firstValue.replace(/\D/g, ''))
     return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
   }
 
@@ -31,7 +29,8 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
   const [showSwapOptions, setShowSwapOptions] = useState(false)
 
   const selectedName = value.selectedName || exercise.name
-  const options = [exercise.name, ...(exercise.alternatives || [])]
+  const alternatives = exercise.alternatives || []
+  const options = [exercise.name, ...alternatives]
   const isAlternative = selectedName !== exercise.name
   const completedSets = value.completedSets || Array(Number(exercise.sets || 0)).fill(false)
   const completedSetCount = completedSets.filter(Boolean).length
@@ -274,41 +273,43 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
           <p className="mt-1 text-slate-400">{suggestion}</p>
         </div>
 
-        <div className="mt-4 rounded-3xl border border-slate-800 bg-slate-950/50">
-          <button
-            type="button"
-            onClick={() => setShowSwapOptions((current) => !current)}
-            className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-bold text-slate-300"
-          >
-            <span className="inline-flex items-center gap-2">
-              <RotateCcw size={16} />
-              Trocar exercício ({options.length - 1})
-            </span>
+        {alternatives.length > 0 && (
+          <div className="mt-4 rounded-3xl border border-slate-800 bg-slate-950/50">
+            <button
+              type="button"
+              onClick={() => setShowSwapOptions((current) => !current)}
+              className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-bold text-slate-300"
+            >
+              <span className="inline-flex items-center gap-2">
+                <RotateCcw size={16} />
+                Trocar exercício ({alternatives.length})
+              </span>
 
-            {showSwapOptions ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-          </button>
+              {showSwapOptions ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+            </button>
 
-          {showSwapOptions && (
-            <div className="border-t border-slate-800 p-3">
-              <div className="flex flex-wrap gap-2">
-                {options.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => selectExercise(option)}
-                    className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-bold transition ${
-                      selectedName === option
-                        ? 'border-emerald-400 bg-emerald-400 text-slate-950'
-                        : 'border-slate-700 bg-slate-800 text-slate-200 hover:border-emerald-400'
-                    }`}
-                  >
-                    {option}
-                  </button>
-                ))}
+            {showSwapOptions && (
+              <div className="border-t border-slate-800 p-3">
+                <div className="flex flex-wrap gap-2">
+                  {options.map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => selectExercise(option)}
+                      className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-bold transition ${
+                        selectedName === option
+                          ? 'border-emerald-400 bg-emerald-400 text-slate-950'
+                          : 'border-slate-700 bg-slate-800 text-slate-200 hover:border-emerald-400'
+                      }`}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         <button
           type="button"
