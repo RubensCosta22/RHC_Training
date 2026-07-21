@@ -19,11 +19,24 @@ function normalizeExercise(exercise, index) {
   }
 }
 
+function isProgramFeatureUnavailable(error) {
+  const code = String(error?.code || '')
+  const message = String(error?.message || '').toLowerCase()
+  return code === '42501'
+    || code === '42P01'
+    || message.includes('permission denied')
+    || message.includes('does not exist')
+}
+
 export async function getWorkoutPlan(profile, type) {
-  // Um programa ativo tem precedencia sobre o plano tradicional apenas para a
-  // sessao/codigo solicitado. Sem programa ativo, o comportamento legado e mantido.
-  const programWorkout = await getActiveProgramWorkout(profile.id, type)
-  if (programWorkout) return programWorkout
+  // Programa ativo tem precedencia, mas falhas de infraestrutura do modulo novo
+  // nunca podem bloquear o treino tradicional.
+  try {
+    const programWorkout = await getActiveProgramWorkout(profile.id, type)
+    if (programWorkout) return programWorkout
+  } catch (error) {
+    if (!isProgramFeatureUnavailable(error)) throw error
+  }
 
   const { data, error } = await supabase.from('workout_plans').select('*').eq('profile_id', profile.id).eq('workout_type', type).maybeSingle()
   if (error) throw error
@@ -33,14 +46,17 @@ export async function getWorkoutPlan(profile, type) {
 }
 
 export async function getAvailablePlanTypes(profile) {
-  const { data: activeEnrollment, error: enrollmentError } = await supabase
+  let activeEnrollment = null
+
+  const { data, error: enrollmentError } = await supabase
     .from('profile_program_enrollments')
     .select('program_id')
     .eq('profile_id', profile.id)
     .eq('status', 'active')
     .maybeSingle()
 
-  if (enrollmentError) throw enrollmentError
+  if (enrollmentError && !isProgramFeatureUnavailable(enrollmentError)) throw enrollmentError
+  if (!enrollmentError) activeEnrollment = data
 
   if (activeEnrollment) {
     const { data: sessions, error: sessionsError } = await supabase
@@ -49,14 +65,14 @@ export async function getAvailablePlanTypes(profile) {
       .eq('program_id', activeEnrollment.program_id)
       .order('day_order')
 
-    if (sessionsError) throw sessionsError
-    return (sessions || []).map((item) => item.code)
+    if (sessionsError && !isProgramFeatureUnavailable(sessionsError)) throw sessionsError
+    if (!sessionsError) return (sessions || []).map((item) => item.code)
   }
 
-  const { data, error } = await supabase.from('workout_plans').select('workout_type,active').eq('profile_id', profile.id).order('workout_type')
+  const { data: plans, error } = await supabase.from('workout_plans').select('workout_type,active').eq('profile_id', profile.id).order('workout_type')
   if (error) throw error
   const types = new Set(getWorkoutTypes(profile.name))
-  ;(data || []).forEach((item) => item.active ? types.add(item.workout_type) : types.delete(item.workout_type))
+  ;(plans || []).forEach((item) => item.active ? types.add(item.workout_type) : types.delete(item.workout_type))
   return [...types].sort()
 }
 
