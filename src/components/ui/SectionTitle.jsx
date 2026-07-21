@@ -14,10 +14,10 @@ export default function SectionTitle({
           </p>
         )}
 
-        <h2 className="text-xl font-[680] tracking-[-.03em] text-[#f5f7f2]">{title}</h2>
+        <h2 className="text-2xl font-[700] tracking-[-.035em] text-[#F5F5F7]">{title}</h2>
 
         {subtitle && (
-          <p className="mt-1 text-sm text-[#92979f]">{subtitle}</p>
+          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-[#8E8E93]">{subtitle}</p>
         )}
       </div>
 
