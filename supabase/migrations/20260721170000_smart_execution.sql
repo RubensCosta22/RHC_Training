@@ -50,11 +50,15 @@ create policy "program_exposures_insert_editor"
       where pe.id = program_exercise_id
         and ps.program_id = e.program_id
     )
+    and (
+      workout_session_id is null
+      or exists (
+        select 1
+        from public.workout_sessions ws
+        where ws.id = workout_session_id
+          and ws.profile_id = profile_id
+      )
+    )
   );
 
-create policy "program_exposures_update_editor"
-  on public.program_exercise_exposures for update to authenticated
-  using (public.can_edit_profile(profile_id))
-  with check (public.can_edit_profile(profile_id));
-
--- Nao ha DELETE direto. Exposicoes fazem parte do historico do programa.
+-- Nao ha UPDATE ou DELETE direto. Exposicoes sao historico append-only do programa.
