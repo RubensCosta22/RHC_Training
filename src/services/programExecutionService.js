@@ -56,7 +56,7 @@ export async function getActiveProgramWorkout(profileId, sessionCode) {
 
   const { data: session, error: sessionError } = await supabase
     .from('program_sessions')
-    .select('*, program_exercises(*, program_exercise_substitutions(*))')
+    .select('*, program_exercises(*)')
     .eq('program_id', enrollment.program_id)
     .eq('code', sessionCode)
     .maybeSingle()
@@ -64,7 +64,28 @@ export async function getActiveProgramWorkout(profileId, sessionCode) {
   if (sessionError) throw sessionError
   if (!session) return null
 
-  const exercises = (session.program_exercises || [])
+  const rawExercises = session.program_exercises || []
+  const exerciseIds = rawExercises.map((exercise) => exercise.id).filter(Boolean)
+  let substitutionsByExercise = new Map()
+
+  if (exerciseIds.length) {
+    const { data: substitutions, error: substitutionsError } = await supabase
+      .from('program_exercise_substitutions')
+      .select('program_exercise_id, exercise_name, sort_order')
+      .in('program_exercise_id', exerciseIds)
+      .order('sort_order')
+
+    if (substitutionsError) throw substitutionsError
+
+    substitutionsByExercise = (substitutions || []).reduce((map, item) => {
+      const current = map.get(item.program_exercise_id) || []
+      current.push(item)
+      map.set(item.program_exercise_id, current)
+      return map
+    }, new Map())
+  }
+
+  const exercises = rawExercises
     .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0))
     .map((exercise) => {
       const prescribedReps = phaseReps(exercise, phase)
@@ -90,7 +111,7 @@ export async function getActiveProgramWorkout(profileId, sessionCode) {
         loadIncrement: exercise.default_load_increment,
         regressionPercent: exercise.regression_percent,
         failuresBeforeRegression: exercise.failures_before_regression,
-        alternatives: (exercise.program_exercise_substitutions || [])
+        alternatives: (substitutionsByExercise.get(exercise.id) || [])
           .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0))
           .map((item) => item.exercise_name)
       }
