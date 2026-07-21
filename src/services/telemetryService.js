@@ -1,23 +1,16 @@
-import { supabase } from "../lib/supabaseClient";
+import { supabase } from '../lib/supabaseClient'
 
 export async function logEvent(eventName, eventData = {}, profileId = null) {
   try {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { error } = await supabase.rpc('log_app_event', {
+      p_event_name: eventName,
+      p_event_data: eventData,
+      p_profile_id: profileId,
+      p_page: window.location.pathname
+    })
 
-    if (!user) return;
-
-    const { error } = await supabase.from("event_logs").insert({
-      user_id: user.id,
-      profile_id: profileId,
-      event_name: eventName,
-      event_data: eventData,
-      page: window.location.pathname,
-    });
-
-    if (error) throw error;
+    if (error) throw error
   } catch (error) {
-    console.warn("Erro ao registrar telemetria:", error);
+    console.warn('Erro ao registrar telemetria:', error)
   }
 }
