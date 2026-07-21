@@ -14,12 +14,19 @@ function actionMeta(action) {
 
 export default function SmartExecutionPanel({ exercise, value = {}, onChange }) {
   const [recent, setRecent] = useState([])
+  const [historyLoaded, setHistoryLoaded] = useState(false)
 
   useEffect(() => {
     let active = true
     const variation = value.selectedName || exercise.name
 
-    if (!exercise.programEnrollmentId || !exercise.programExerciseId || !variation) return undefined
+    setHistoryLoaded(false)
+
+    if (!exercise.programEnrollmentId || !exercise.programExerciseId || !variation) {
+      setRecent([])
+      setHistoryLoaded(true)
+      return undefined
+    }
 
     getRecentProgramExposures(
       exercise.programEnrollmentId,
@@ -28,10 +35,16 @@ export default function SmartExecutionPanel({ exercise, value = {}, onChange }) 
       3
     )
       .then((items) => {
-        if (active) setRecent(items)
+        if (active) {
+          setRecent(items)
+          setHistoryLoaded(true)
+        }
       })
       .catch(() => {
-        if (active) setRecent([])
+        if (active) {
+          setRecent([])
+          setHistoryLoaded(true)
+        }
       })
 
     return () => {
@@ -43,17 +56,28 @@ export default function SmartExecutionPanel({ exercise, value = {}, onChange }) 
     let count = 0
     for (const item of recent) {
       if (item.progression_action === 'increase') break
+      if (item.progression_action === 'manual') continue
       count += 1
     }
     return count
   }, [recent])
 
-  const suggestion = calculateProgramSuggestion(exercise, value, previousFailures)
-  const meta = actionMeta(suggestion.action)
-  const ActionIcon = meta.icon
   const setReps = Array.isArray(value.setReps)
     ? value.setReps
     : Array(Number(exercise.sets || 0)).fill('')
+
+  const completedSetCount = (value.completedSets || []).filter(Boolean).length
+  const allSetsCompleted = completedSetCount === Number(exercise.sets || 0)
+  const allRepsFilled = setReps.length === Number(exercise.sets || 0)
+    && setReps.every((rep) => rep !== '' && rep != null && Number(rep) >= 0)
+  const hasRpe = value.rpe !== '' && value.rpe != null
+  const canEvaluate = historyLoaded && recent.length > 0 && allSetsCompleted && allRepsFilled && hasRpe
+
+  const suggestion = canEvaluate
+    ? calculateProgramSuggestion(exercise, value, previousFailures)
+    : null
+  const meta = actionMeta(suggestion?.action)
+  const ActionIcon = meta.icon
 
   function update(patch) {
     onChange({ ...value, ...patch })
@@ -124,44 +148,60 @@ export default function SmartExecutionPanel({ exercise, value = {}, onChange }) 
       </div>
 
       <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-800 text-emerald-300">
-            <ActionIcon size={18} />
+        {!historyLoaded ? (
+          <p className="text-sm text-slate-400">Carregando histórico deste exercício...</p>
+        ) : recent.length === 0 ? (
+          <div>
+            <p className="text-sm font-black text-white">Primeira execução</p>
+            <p className="mt-1 text-sm text-slate-400">Conclua e salve este treino para criar o baseline. A sugestão de carga começa na próxima exposição.</p>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-black text-white">
-              {meta.label}
-              {suggestion.suggestedLoad != null ? ` • ${suggestion.suggestedLoad} kg` : ''}
-            </p>
-            <p className="mt-1 text-sm text-slate-400">{suggestion.reason}</p>
+        ) : !canEvaluate ? (
+          <div>
+            <p className="text-sm font-black text-white">Sugestão após a execução</p>
+            <p className="mt-1 text-sm text-slate-400">Conclua todas as séries, informe as repetições e registre o RPE para liberar a recomendação.</p>
           </div>
-        </div>
+        ) : (
+          <>
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-800 text-emerald-300">
+                <ActionIcon size={18} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-black text-white">
+                  {meta.label}
+                  {suggestion.suggestedLoad != null ? ` • ${suggestion.suggestedLoad} kg` : ''}
+                </p>
+                <p className="mt-1 text-sm text-slate-400">{suggestion.reason}</p>
+              </div>
+            </div>
 
-        {suggestion.action !== 'manual' && (
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => update({ progressionAccepted: true })}
-              className={`rounded-2xl px-3 py-2 text-sm font-bold transition ${
-                value.progressionAccepted === true
-                  ? 'bg-emerald-400 text-slate-950'
-                  : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
-              }`}
-            >
-              Aceitar sugestão
-            </button>
-            <button
-              type="button"
-              onClick={() => update({ progressionAccepted: false })}
-              className={`rounded-2xl px-3 py-2 text-sm font-bold transition ${
-                value.progressionAccepted === false
-                  ? 'bg-white text-slate-950'
-                  : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
-              }`}
-            >
-              Manter minha decisão
-            </button>
-          </div>
+            {suggestion.action !== 'manual' && (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => update({ progressionAccepted: true })}
+                  className={`rounded-2xl px-3 py-2 text-sm font-bold transition ${
+                    value.progressionAccepted === true
+                      ? 'bg-emerald-400 text-slate-950'
+                      : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                  }`}
+                >
+                  Aceitar sugestão
+                </button>
+                <button
+                  type="button"
+                  onClick={() => update({ progressionAccepted: false })}
+                  className={`rounded-2xl px-3 py-2 text-sm font-bold transition ${
+                    value.progressionAccepted === false
+                      ? 'bg-white text-slate-950'
+                      : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                  }`}
+                >
+                  Manter minha decisão
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
