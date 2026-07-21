@@ -1,4 +1,4 @@
-import { Activity, ArrowUpRight, BarChart3, Camera, Dumbbell, Flame, History, Play, Scale, Trophy, UserRound } from 'lucide-react'
+import { Activity, ArrowLeft, ArrowUpRight, BarChart3, Camera, Dumbbell, Flame, History, Play, Scale, Trophy, UserRound } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import Card from '../components/ui/Card'
@@ -6,6 +6,7 @@ import PageHeader from '../components/ui/PageHeader'
 import ProgressBar from '../components/ui/ProgressBar'
 import SectionTitle from '../components/ui/SectionTitle'
 import StatCard from '../components/ui/StatCard'
+import { getFamilyContext } from '../services/familyService'
 import { getProfile } from '../services/profileService'
 import { getAvailablePlanTypes } from '../services/planService'
 import { getDashboardSummary } from '../services/workoutService'
@@ -25,14 +26,16 @@ export default function Dashboard() {
   const { profileId } = useParams()
   const [profile,setProfile]=useState(null); const [summary,setSummary]=useState(null)
   const [types,setTypes]=useState(['A','B','C']); const [schedule,setSchedule]=useState({configured:false,workoutType:null}); const [error,setError]=useState('')
-  useEffect(()=>{getProfile(profileId).then(async p=>{const [s,t,a]=await Promise.all([getDashboardSummary(profileId),getAvailablePlanTypes(p),getTodaySchedule(profileId)]);setProfile(p);setSummary(s);setTypes(t);setSchedule(a)}).catch(e=>setError(friendlyError(e)))},[profileId])
+  const [isAdmin,setIsAdmin]=useState(false)
+  useEffect(()=>{getProfile(profileId).then(async p=>{const [s,t,a,context]=await Promise.all([getDashboardSummary(profileId),getAvailablePlanTypes(p),getTodaySchedule(profileId),getFamilyContext()]);setProfile(p);setSummary(s);setTypes(t);setSchedule(a);setIsAdmin(context?.role==='admin')}).catch(e=>setError(friendlyError(e)))},[profileId])
   const next=useMemo(()=>schedule.configured?schedule.workoutType:getNextWorkoutType(summary?.lastWorkout?.workout_type,types),[summary,types,schedule])
   if(error)return <Card className="border-[#ff6b70]/30 bg-[#ff6b70]/5 text-[#ffb0b3]">{error}</Card>
   if(!profile||!summary)return <p className="animate-pulse text-[#62676f]">Preparando seu treino...</p>
   const target=profile.name==='Nicole'?3:5; const percent=Math.min(100,Math.round(summary.weekCount/target*100))
 
   return <div className="pb-6">
-    <PageHeader eyebrow="Hoje" title={`Ola, ${profile.name}.`} subtitle={next?'Seu proximo treino esta pronto.':'Hoje o progresso acontece na recuperacao.'} action={<Link to="/profiles" className="grid h-11 w-11 overflow-hidden place-items-center rounded-full border border-[#272a2f] text-[#92979f] transition hover:bg-[#141619] hover:text-white" aria-label="Trocar perfil">{profile.avatarSignedUrl?<img src={profile.avatarSignedUrl} alt={profile.name} className="h-full w-full object-cover"/>:<UserRound size={19}/>}</Link>}/>
+    {isAdmin&&<Link to="/admin" className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-[#92979f] transition hover:text-white"><ArrowLeft size={17}/> Voltar para perfis</Link>}
+    <PageHeader eyebrow="Hoje" title={`Ola, ${profile.name}.`} subtitle={next?'Seu proximo treino esta pronto.':'Hoje o progresso acontece na recuperacao.'} action={<Link to={isAdmin?'/admin':'/profiles'} className="grid h-11 w-11 overflow-hidden place-items-center rounded-full border border-[#272a2f] text-[#92979f] transition hover:bg-[#141619] hover:text-white" aria-label={isAdmin?'Voltar para perfis':'Trocar perfil'}>{profile.avatarSignedUrl?<img src={profile.avatarSignedUrl} alt={profile.name} className="h-full w-full object-cover"/>:<UserRound size={19}/>}</Link>}/>
 
     <div className="lg:grid lg:grid-cols-12 lg:gap-6">
       <section className="relative mb-10 overflow-hidden border-y border-[#272a2f] py-9 lg:col-span-8 lg:mb-0 lg:min-h-[410px] lg:rounded-[28px] lg:border lg:bg-[#101214] lg:p-10 xl:p-12">
