@@ -52,6 +52,9 @@ export function friendlyError(error) {
   if (message.includes('network') || message.includes('fetch')) {
     return 'Falha de conexão. Verifique sua internet.'
   }
+  if (message.includes('rate limit exceeded')) {
+    return 'Muitas tentativas em pouco tempo. Aguarde e tente novamente.'
+  }
   if (message.length < 140 && !message.toLowerCase().includes('select') && !message.toLowerCase().includes('insert')) {
     return message
   }
