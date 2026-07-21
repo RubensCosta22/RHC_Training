@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { friendlyUploadError } from './secureUploadService'
+import { friendlyUploadError } from './uploadErrors'
 
 describe('friendlyUploadError', () => {
   it('traduz erros seguros retornados pela função', () => {
