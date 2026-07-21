@@ -93,6 +93,8 @@ export default function SmartExecutionPanel({ exercise, value = {}, onChange }) 
     update({ setReps: next })
   }
 
+  if (value.expanded === false) return null
+
   return (
     <div className="mt-2 border border-emerald-400/20 bg-emerald-400/[0.035] p-3 sm:rounded-xl sm:p-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
