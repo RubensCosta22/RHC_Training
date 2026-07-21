@@ -20,6 +20,12 @@ function phaseReps(exercise, phase) {
   }
 }
 
+function phaseSets(exercise, phase) {
+  const baseSets = Number(exercise.sets || 1)
+  const modifier = Number(phase?.volume_modifier || 1)
+  return Math.max(1, Math.round(baseSets * modifier))
+}
+
 export async function getActiveProgramWorkout(profileId, sessionCode) {
   const { data: enrollment, error: enrollmentError } = await supabase
     .from('profile_program_enrollments')
@@ -62,6 +68,7 @@ export async function getActiveProgramWorkout(profileId, sessionCode) {
     .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0))
     .map((exercise) => {
       const prescribedReps = phaseReps(exercise, phase)
+      const prescribedSets = phaseSets(exercise, phase)
 
       return {
         id: exercise.id,
@@ -71,7 +78,7 @@ export async function getActiveProgramWorkout(profileId, sessionCode) {
         muscleGroup: exercise.movement_pattern,
         movementPattern: exercise.movement_pattern,
         role: exercise.exercise_role,
-        sets: exercise.sets,
+        sets: prescribedSets,
         reps: repsLabel(prescribedReps.min, prescribedReps.max),
         repsMin: prescribedReps.min,
         repsMax: prescribedReps.max,
