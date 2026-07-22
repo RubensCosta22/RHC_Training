@@ -34,7 +34,7 @@ export default function Dashboard() {
 
   return <div className="pb-8">
     {isAdmin&&<Link to="/admin" className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-[#8E8E93] transition hover:text-[#F5F5F7]"><ArrowLeft size={17}/> Voltar para perfis</Link>}
-    <PageHeader eyebrow="Hoje" title={`Ola, ${profile.name}.`} subtitle={next?'Seu proximo treino esta pronto.':'Hoje o progresso acontece na recuperacao.'} action={<Link to={isAdmin?'/admin':'/profiles'} className="grid h-11 w-11 overflow-hidden place-items-center rounded-full border border-[#2A2A2E] bg-[#141416] text-[#8E8E93] transition hover:border-[#C8FF3D]/40 hover:text-[#F5F5F7]" aria-label={isAdmin?'Voltar para perfis':'Trocar perfil'}>{profile.avatarSignedUrl?<img src={profile.avatarSignedUrl} alt={profile.name} className="h-full w-full object-cover"/>:<UserRound size={19}/>}</Link>}/>
+    <PageHeader eyebrow="Hoje" title={`Ola, ${profile.name}.`} subtitle={next?'Seu proximo treino esta pronto.':'Hoje o progresso acontece na recuperacao.'} action={<Link to={isAdmin?'/admin':`/settings/${profileId}`} className="grid h-11 w-11 overflow-hidden place-items-center rounded-full border border-[#2A2A2E] bg-[#141416] text-[#8E8E93] transition hover:border-[#C8FF3D]/40 hover:text-[#F5F5F7]" aria-label={isAdmin?'Voltar para perfis':'Abrir configuracoes do perfil'}>{profile.avatarSignedUrl?<img src={profile.avatarSignedUrl} alt={profile.name} className="h-full w-full object-cover"/>:<UserRound size={19}/>}</Link>}/>
 
     <div className="lg:grid lg:grid-cols-12 lg:gap-6">
       <section className="mb-10 border-y border-[#2A2A2E] py-9 lg:col-span-8 lg:mb-0 lg:min-h-[390px] lg:border lg:bg-[#141416] lg:p-10 xl:p-12">
