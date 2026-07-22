@@ -29,7 +29,7 @@ export default function Login() {
     setMessage('')
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/profiles` }
+      options: { redirectTo: `${window.location.origin}/login` }
     })
 
     if (error) setMessage(friendlyError(error))
@@ -47,7 +47,7 @@ export default function Login() {
           : supabase.auth.signUp({
               email,
               password,
-              options: { emailRedirectTo: `${window.location.origin}/profiles` }
+              options: { emailRedirectTo: `${window.location.origin}/login` }
             })
 
       const { error } = await action
@@ -55,7 +55,7 @@ export default function Login() {
       if (error) throw error
 
       if (mode === 'login') {
-        navigate(await getPostLoginPath())
+        navigate(await getPostLoginPath(), { replace: true })
       } else {
         setMessage('Cadastro criado. Confirme seu e-mail se o Supabase solicitar.')
       }
@@ -101,70 +101,21 @@ export default function Login() {
 
       <section className="flex items-center px-6 py-10 sm:px-10 lg:px-12 xl:px-16"><div className="mx-auto w-full max-w-md">
         <div className="mb-8"><p className="rhc-kicker mb-3">Sua conta</p><h2 className="text-3xl font-[720] tracking-[-.04em]">{mode==='login'?'Bem-vindo de volta.':'Comece sua jornada.'}</h2><p className="mt-2 text-sm text-[#92979f]">Entre para continuar seu proximo treino.</p></div>
-        <button
-          onClick={handleGoogle}
-          className="btn-primary flex w-full items-center justify-center gap-2"
-          type="button"
-        >
-          <Mail size={18} />
-          Entrar com Google
-        </button>
+        <button onClick={handleGoogle} className="btn-primary flex w-full items-center justify-center gap-2" type="button"><Mail size={18} />Entrar com Google</button>
 
-        <div className="my-6 flex items-center gap-3 text-[10px] uppercase tracking-[.16em] text-[#62676f]">
-          <span className="h-px flex-1 bg-[#272a2f]" />
-          ou
-          <span className="h-px flex-1 bg-[#272a2f]" />
-        </div>
+        <div className="my-6 flex items-center gap-3 text-[10px] uppercase tracking-[.16em] text-[#62676f]"><span className="h-px flex-1 bg-[#272a2f]" />ou<span className="h-px flex-1 bg-[#272a2f]" /></div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          <label className="block text-xs font-semibold text-[#92979f]">E-mail<input
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-            placeholder="voce@exemplo.com"
-            autoComplete="email"
-          /></label>
-
-          <label className="block text-xs font-semibold text-[#92979f]">Senha<input
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-            minLength={6}
-            placeholder="Sua senha"
-            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-          /></label>
-
-          <button disabled={loading} className="btn-secondary flex w-full items-center justify-center gap-2" type="submit">
-            {loading ? 'Aguarde...' : mode === 'login' ? 'Entrar com e-mail' : 'Criar conta'} {!loading&&<ArrowRight size={17}/>}
-          </button>
+          <label className="block text-xs font-semibold text-[#92979f]">E-mail<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required placeholder="voce@exemplo.com" autoComplete="email" /></label>
+          <label className="block text-xs font-semibold text-[#92979f]">Senha<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={6} placeholder="Sua senha" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} /></label>
+          <button disabled={loading} className="btn-secondary flex w-full items-center justify-center gap-2" type="submit">{loading ? 'Aguarde...' : mode === 'login' ? 'Entrar com e-mail' : 'Criar conta'} {!loading&&<ArrowRight size={17}/>}</button>
         </form>
 
-        {mode === 'login' && (
-          <button
-            className="mt-5 flex w-full items-center justify-center gap-2 text-sm font-semibold text-[#92979f] hover:text-[#f5f7f2]"
-            onClick={handlePasswordReset}
-            disabled={loading}
-            type="button"
-          >
-            <KeyRound size={16} /> Esqueci minha senha
-          </button>
-        )}
+        {mode === 'login' && <button className="mt-5 flex w-full items-center justify-center gap-2 text-sm font-semibold text-[#92979f] hover:text-[#f5f7f2]" onClick={handlePasswordReset} disabled={loading} type="button"><KeyRound size={16} /> Esqueci minha senha</button>}
 
-        <button
-          className="mt-5 w-full text-sm font-semibold text-[#c8ff3d]"
-          onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
-          type="button"
-        >
-          {mode === 'login' ? 'Ainda não tem conta? Criar conta' : 'Já tenho conta'}
-        </button>
+        <button className="mt-5 w-full text-sm font-semibold text-[#c8ff3d]" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} type="button">{mode === 'login' ? 'Ainda não tem conta? Criar conta' : 'Já tenho conta'}</button>
 
-        {message && (
-          <p className="mt-5 border-l-2 border-[#ffb55e] bg-[#ffb55e]/5 p-3 text-sm text-[#ffd2a0]">
-            {message}
-          </p>
-        )}
+        {message && <p className="mt-5 border-l-2 border-[#ffb55e] bg-[#ffb55e]/5 p-3 text-sm text-[#ffd2a0]">{message}</p>}
       </div></section>
     </main>
   )
