@@ -1,6 +1,7 @@
-import { Check, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, RotateCcw } from 'lucide-react'
+import { Check, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, ExternalLink, RotateCcw } from 'lucide-react'
 import { useState } from 'react'
 import RestTimer from './RestTimer'
+import { youtubeSearchUrl } from '../utils/youtube'
 
 function getInitialReps(exercise, value) {
   if (value.actualReps !== undefined && value.actualReps !== null && value.actualReps !== '') {
@@ -79,17 +80,41 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
         </button>
         <button type="button" onClick={() => update({ detailsOpen: !showDetails })} className="min-w-0 flex-1 text-left">
           <h3 className="truncate text-lg font-semibold text-[#F5F5F7]">{selectedName}</h3>
-          <p className="mt-1 text-sm text-[#8E8E93]">{exercise.sets} × {exercise.reps}{value.weight ? ` · ${value.weight} kg` : ''}</p>
+          <p className="mt-1 text-sm text-[#8E8E93]">{exercise.sets} × {exercise.reps}{value.weight ? ` · ${value.weight} kg` : record?.last_weight ? ` · última ${record.last_weight} kg` : ''}</p>
         </button>
         {showDetails ? <ChevronUp size={20} className="text-[#8E8E93]" /> : <ChevronDown size={20} className="text-[#8E8E93]" />}
       </div>
 
       {showDetails && (
         <div className="mt-4 pl-0 sm:pl-14">
+          <div className="mb-3 flex items-center justify-between gap-3 border-y border-[#2A2A2E] py-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#8E8E93]">Referência</p>
+              <p className="mt-1 text-sm text-[#F5F5F7]">
+                {record?.last_weight != null ? `Última carga ${record.last_weight} kg` : 'Sem carga anterior registrada'}
+                {record?.best_weight != null ? ` · melhor ${record.best_weight} kg` : ''}
+              </p>
+              {record && record.exact_match === false && (
+                <p className="mt-1 text-xs text-[#8E8E93]">Histórico equivalente: {record.matched_name}</p>
+              )}
+            </div>
+            <a
+              href={youtubeSearchUrl(selectedName)}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-11 shrink-0 items-center gap-2 rounded-lg border border-[#2A2A2E] px-3 text-sm font-semibold text-[#F5F5F7] transition hover:border-[#C8FF3D]/60 hover:text-[#C8FF3D]"
+              aria-label={`Ver execução de ${selectedName}`}
+              title="Ver execução"
+            >
+              <ExternalLink size={17} />
+              <span className="hidden sm:inline">Ver execução</span>
+            </a>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <label className="rounded-lg bg-[#141416] p-3">
               <span className="text-xs font-semibold uppercase tracking-wide text-[#8E8E93]">Carga (kg)</span>
-              <input type="number" min="0" step="0.5" value={value.weight || ''} onChange={(event) => update({ weight: event.target.value })} placeholder="0" className="mt-1 w-full border-0 bg-transparent p-0 text-2xl font-semibold text-[#F5F5F7] outline-none" />
+              <input type="number" min="0" step="0.5" value={value.weight || ''} onChange={(event) => update({ weight: event.target.value })} placeholder={record?.last_weight != null ? String(record.last_weight) : '0'} className="mt-1 w-full border-0 bg-transparent p-0 text-2xl font-semibold text-[#F5F5F7] outline-none" />
             </label>
             {exercise.programExerciseId ? (
               <div className="rounded-lg bg-[#141416] p-3">
