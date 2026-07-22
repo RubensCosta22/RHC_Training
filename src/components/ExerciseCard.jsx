@@ -14,13 +14,13 @@ function getInitialReps(exercise, value) {
 
 export default function ExerciseCard({ exercise, value = {}, record, onChange }) {
   const [showSwapOptions, setShowSwapOptions] = useState(false)
-  const [showDetails, setShowDetails] = useState(false)
   const selectedName = value.selectedName || exercise.name
   const alternatives = exercise.alternatives || []
   const options = [exercise.name, ...alternatives]
   const completedSets = value.completedSets || Array(Number(exercise.sets || 0)).fill(false)
   const completedSetCount = completedSets.filter(Boolean).length
   const isExpanded = value.expanded !== false
+  const showDetails = value.detailsOpen === true
   const repsValue = getInitialReps(exercise, value)
 
   function update(patch) {
@@ -39,6 +39,7 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
       completedSets: nextSets,
       completed,
       expanded: !completed,
+      detailsOpen: completed ? false : showDetails,
       restTimerKey: nextSets[index] ? `${exercise.id}-${index}-${Date.now()}` : value.restTimerKey
     })
   }
@@ -48,6 +49,7 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
     update({
       completed,
       expanded: !completed,
+      detailsOpen: false,
       completedSets: completed ? Array(Number(exercise.sets || 0)).fill(true) : Array(Number(exercise.sets || 0)).fill(false)
     })
   }
@@ -59,7 +61,7 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
           <button type="button" onClick={toggleCompleted} className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#F5F5F7] text-[#0A0A0B]" aria-label="Reabrir exercício">
             <Check size={21} />
           </button>
-          <button type="button" onClick={() => update({ expanded: true })} className="min-w-0 flex-1 text-left">
+          <button type="button" onClick={() => update({ expanded: true, detailsOpen: true })} className="min-w-0 flex-1 text-left">
             <h3 className="truncate text-base font-semibold text-[#F5F5F7]">{selectedName}</h3>
             <p className="mt-1 text-sm text-[#8E8E93]">{exercise.sets} × {repsValue || exercise.reps}{value.weight ? ` · ${value.weight} kg` : ''}{value.rpe ? ` · RPE ${value.rpe}` : ''}</p>
           </button>
@@ -75,7 +77,7 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
         <button type="button" onClick={toggleCompleted} className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-[#2A2A2E] text-[#8E8E93]" aria-label="Concluir exercício">
           <CheckCircle2 size={22} />
         </button>
-        <button type="button" onClick={() => setShowDetails((current) => !current)} className="min-w-0 flex-1 text-left">
+        <button type="button" onClick={() => update({ detailsOpen: !showDetails })} className="min-w-0 flex-1 text-left">
           <h3 className="truncate text-lg font-semibold text-[#F5F5F7]">{selectedName}</h3>
           <p className="mt-1 text-sm text-[#8E8E93]">{exercise.sets} × {exercise.reps}{value.weight ? ` · ${value.weight} kg` : ''}</p>
         </button>
@@ -89,13 +91,23 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
               <span className="text-xs font-semibold uppercase tracking-wide text-[#8E8E93]">Carga (kg)</span>
               <input type="number" min="0" step="0.5" value={value.weight || ''} onChange={(event) => update({ weight: event.target.value })} placeholder="0" className="mt-1 w-full border-0 bg-transparent p-0 text-2xl font-semibold text-[#F5F5F7] outline-none" />
             </label>
-            <div className="rounded-lg bg-[#141416] p-3">
-              <span className="text-xs font-semibold uppercase tracking-wide text-[#8E8E93]">Séries</span>
-              <p className="mt-1 text-2xl font-semibold text-[#F5F5F7]">{completedSetCount}/{exercise.sets}</p>
-            </div>
+            {exercise.programExerciseId ? (
+              <div className="rounded-lg bg-[#141416] p-3">
+                <span className="text-xs font-semibold uppercase tracking-wide text-[#8E8E93]">Séries</span>
+                <p className="mt-1 text-2xl font-semibold text-[#F5F5F7]">{completedSetCount}/{exercise.sets}</p>
+              </div>
+            ) : (
+              <label className="rounded-lg bg-[#141416] p-3">
+                <span className="text-xs font-semibold uppercase tracking-wide text-[#8E8E93]">Repetições</span>
+                <input type="number" min="0" value={value.actualReps || ''} onChange={(event) => update({ actualReps: String(Math.max(0, Number(event.target.value) || 0)) })} placeholder={String(repsValue || '')} className="mt-1 w-full border-0 bg-transparent p-0 text-2xl font-semibold text-[#F5F5F7] outline-none" />
+              </label>
+            )}
           </div>
 
-          <div className="mt-3 flex gap-2">
+          <div className="mt-3 flex items-center justify-between text-xs text-[#8E8E93]">
+            <span>Séries</span><span>{completedSetCount} de {exercise.sets}</span>
+          </div>
+          <div className="mt-2 flex gap-2">
             {completedSets.map((done, index) => (
               <button key={index} type="button" onClick={() => toggleSet(index)} className={`grid h-11 flex-1 place-items-center rounded-lg border text-sm font-semibold transition ${done ? 'border-[#C8FF3D] bg-[#C8FF3D] text-[#0A0A0B]' : 'border-[#2A2A2E] bg-[#141416] text-[#F5F5F7]'}`} aria-label={`Marcar série ${index + 1}`}>
                 {done ? <Check size={18} /> : index + 1}
