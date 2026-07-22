@@ -1,4 +1,4 @@
-import { Check, Minus, TrendingDown, TrendingUp } from 'lucide-react'
+import { Check, ChevronRight, Minus, TrendingDown, TrendingUp, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import {
   calculateProgramSuggestion,
@@ -15,6 +15,7 @@ function actionMeta(action) {
 export default function SmartExecutionPanel({ exercise, value = {}, onChange }) {
   const [recent, setRecent] = useState([])
   const [historyLoaded, setHistoryLoaded] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -52,6 +53,10 @@ export default function SmartExecutionPanel({ exercise, value = {}, onChange }) 
     }
   }, [exercise.programEnrollmentId, exercise.programExerciseId, exercise.name, value.selectedName])
 
+  useEffect(() => {
+    if (value.expanded === false) setMobileOpen(false)
+  }, [value.expanded])
+
   const previousFailures = useMemo(() => {
     let count = 0
     for (const item of recent) {
@@ -78,6 +83,8 @@ export default function SmartExecutionPanel({ exercise, value = {}, onChange }) 
     : null
   const meta = actionMeta(suggestion?.action)
   const ActionIcon = meta.icon
+  const hasSmartData = setReps.some((rep) => rep !== '' && rep != null) || hasRpe
+  const repsSummary = setReps.filter((rep) => rep !== '' && rep != null).join('/')
 
   function update(patch) {
     onChange({ ...value, ...patch })
@@ -87,128 +94,187 @@ export default function SmartExecutionPanel({ exercise, value = {}, onChange }) 
     const next = [...setReps]
     const clean = rawValue === '' ? '' : String(Math.max(0, Math.min(100, Number(rawValue) || 0)))
     next[index] = clean
-
-    // Repetições por série pertencem somente ao motor do programa.
-    // Não escrevemos em actualReps para evitar 10/10/10 virar 101010 no contador legado.
     update({ setReps: next })
+  }
+
+  function renderEditor({ mobile = false } = {}) {
+    return (
+      <div className={mobile ? 'space-y-4' : ''}>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+          <div className="min-w-0">
+            <p className="rhc-kicker">Execução inteligente</p>
+            <p className="mt-1 text-sm text-slate-300">
+              {exercise.role || 'exercício'} • alvo {exercise.reps}
+              {exercise.targetRpeMax ? ` • RPE ${exercise.targetRpeMin || '—'}–${exercise.targetRpeMax}` : ''}
+            </p>
+          </div>
+
+          <div className="w-fit max-w-full rounded-full border border-emerald-400/30 px-3 py-1 text-xs font-bold text-emerald-300">
+            {exercise.progressionType === 'double_progression' ? 'Double progression' : 'Progressão de carga'}
+          </div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+          {setReps.map((rep, index) => (
+            <label key={index} className="min-w-0 rounded-lg border border-slate-800 bg-slate-950/60 p-2.5">
+              <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                Série {index + 1}
+              </span>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={rep}
+                onChange={(event) => updateSetRep(index, event.target.value)}
+                placeholder={String(exercise.repsMin || '')}
+                className="mt-1 w-full border-0 bg-transparent p-0 text-xl font-black text-white outline-none"
+              />
+              <span className="text-[11px] text-slate-500">reps</span>
+            </label>
+          ))}
+        </div>
+
+        <div className="mt-3">
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-slate-500">RPE da execução</p>
+          <div className="grid grid-cols-5 gap-1.5">
+            {[6, 7, 8, 9, 10].map((rpe) => (
+              <button
+                key={rpe}
+                type="button"
+                onClick={() => update({ rpe })}
+                className={`rounded-lg border px-1.5 py-2 text-sm font-black transition ${
+                  Number(value.rpe) === rpe
+                    ? 'border-emerald-400 bg-emerald-400 text-slate-950'
+                    : 'border-slate-700 bg-slate-900 text-slate-300 hover:border-emerald-400'
+                }`}
+              >
+                {rpe}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-slate-500">6 = confortável • 8 ≈ 2 reps em reserva • 10 = esforço máximo</p>
+        </div>
+
+        <div className="mt-3 border-t border-slate-800 pt-3">
+          {!historyLoaded ? (
+            <p className="text-sm text-slate-400">Carregando histórico deste exercício...</p>
+          ) : recent.length === 0 ? (
+            <div>
+              <p className="text-sm font-black text-white">Primeira execução</p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-400">Conclua e salve este treino para criar o baseline. A sugestão de carga começa na próxima exposição.</p>
+            </div>
+          ) : !canEvaluate ? (
+            <div>
+              <p className="text-sm font-black text-white">Sugestão após a execução</p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-400">Conclua todas as séries, informe as repetições e registre o RPE para liberar a recomendação.</p>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-800 text-emerald-300">
+                  <ActionIcon size={16} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-black text-white">
+                    {meta.label}
+                    {suggestion.suggestedLoad != null ? ` • ${suggestion.suggestedLoad} kg` : ''}
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-400">{suggestion.reason}</p>
+                </div>
+              </div>
+
+              {suggestion.action !== 'manual' && (
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => update({ progressionAccepted: true })}
+                    className={`rounded-lg px-3 py-2 text-xs font-bold transition ${
+                      value.progressionAccepted === true
+                        ? 'bg-emerald-400 text-slate-950'
+                        : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                    }`}
+                  >
+                    Aceitar sugestão
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => update({ progressionAccepted: false })}
+                    className={`rounded-lg px-3 py-2 text-xs font-bold transition ${
+                      value.progressionAccepted === false
+                        ? 'bg-white text-slate-950'
+                        : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                    }`}
+                  >
+                    Manter decisão
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    )
   }
 
   if (value.expanded === false) return null
 
   return (
-    <div className="mt-2 border border-emerald-400/20 bg-emerald-400/[0.035] p-3 sm:rounded-xl sm:p-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-        <div className="min-w-0">
-          <p className="rhc-kicker">Execução inteligente</p>
-          <p className="mt-1 text-sm text-slate-300">
-            {exercise.role || 'exercício'} • alvo {exercise.reps}
-            {exercise.targetRpeMax ? ` • RPE ${exercise.targetRpeMin || '—'}–${exercise.targetRpeMax}` : ''}
-          </p>
-        </div>
+    <>
+      <button
+        type="button"
+        onClick={() => setMobileOpen(true)}
+        className="mt-2 flex w-full items-center justify-between border border-emerald-400/20 bg-emerald-400/[0.035] px-3 py-3 text-left sm:hidden"
+      >
+        <span className="min-w-0">
+          <span className="block text-[10px] font-bold uppercase tracking-[.14em] text-emerald-300">Execução inteligente</span>
+          <span className="mt-1 block truncate text-sm text-slate-300">
+            {hasSmartData ? `${repsSummary || 'reps pendentes'}${hasRpe ? ` · RPE ${value.rpe}` : ''}` : 'Registrar reps por série e RPE'}
+          </span>
+        </span>
+        <ChevronRight size={18} className="shrink-0 text-emerald-300" />
+      </button>
 
-        <div className="w-fit max-w-full rounded-full border border-emerald-400/30 px-3 py-1 text-xs font-bold text-emerald-300">
-          {exercise.progressionType === 'double_progression' ? 'Double progression' : 'Progressão de carga'}
-        </div>
+      <div className="mt-2 hidden border border-emerald-400/20 bg-emerald-400/[0.035] p-4 sm:block sm:rounded-xl">
+        {renderEditor()}
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
-        {setReps.map((rep, index) => (
-          <label key={index} className="min-w-0 rounded-lg border border-slate-800 bg-slate-950/60 p-2.5">
-            <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-500">
-              Série {index + 1}
-            </span>
-            <input
-              type="number"
-              min="0"
-              max="100"
-              value={rep}
-              onChange={(event) => updateSetRep(index, event.target.value)}
-              placeholder={String(exercise.repsMin || '')}
-              className="mt-1 w-full border-0 bg-transparent p-0 text-xl font-black text-white outline-none"
-            />
-            <span className="text-[11px] text-slate-500">reps</span>
-          </label>
-        ))}
-      </div>
-
-      <div className="mt-3">
-        <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-slate-500">RPE da execução</p>
-        <div className="grid grid-cols-5 gap-1.5">
-          {[6, 7, 8, 9, 10].map((rpe) => (
-            <button
-              key={rpe}
-              type="button"
-              onClick={() => update({ rpe })}
-              className={`rounded-lg border px-1.5 py-2 text-sm font-black transition ${
-                Number(value.rpe) === rpe
-                  ? 'border-emerald-400 bg-emerald-400 text-slate-950'
-                  : 'border-slate-700 bg-slate-900 text-slate-300 hover:border-emerald-400'
-              }`}
-            >
-              {rpe}
-            </button>
-          ))}
-        </div>
-        <p className="mt-2 text-[11px] text-slate-500">6 = confortável • 8 ≈ 2 reps em reserva • 10 = esforço máximo</p>
-      </div>
-
-      <div className="mt-3 border-t border-slate-800 pt-3">
-        {!historyLoaded ? (
-          <p className="text-sm text-slate-400">Carregando histórico deste exercício...</p>
-        ) : recent.length === 0 ? (
-          <div>
-            <p className="text-sm font-black text-white">Primeira execução</p>
-            <p className="mt-1 text-xs leading-relaxed text-slate-400">Conclua e salve este treino para criar o baseline. A sugestão de carga começa na próxima exposição.</p>
-          </div>
-        ) : !canEvaluate ? (
-          <div>
-            <p className="text-sm font-black text-white">Sugestão após a execução</p>
-            <p className="mt-1 text-xs leading-relaxed text-slate-400">Conclua todas as séries, informe as repetições e registre o RPE para liberar a recomendação.</p>
-          </div>
-        ) : (
-          <>
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-800 text-emerald-300">
-                <ActionIcon size={16} />
+      {mobileOpen && (
+        <div className="fixed inset-0 z-[80] sm:hidden" role="dialog" aria-modal="true" aria-label="Execução inteligente">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/70"
+            onClick={() => setMobileOpen(false)}
+            aria-label="Fechar execução inteligente"
+          />
+          <section className="absolute inset-x-0 bottom-0 max-h-[82dvh] overflow-y-auto rounded-t-[24px] border-t border-[#2A2A2E] bg-[#141416] px-4 pb-[max(24px,env(safe-area-inset-bottom))] pt-3 shadow-2xl">
+            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-[#3A3A3E]" />
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-[.14em] text-[#8E8E93]">{exercise.name}</p>
+                <h3 className="truncate text-lg font-bold text-[#F5F5F7]">Execução inteligente</h3>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-black text-white">
-                  {meta.label}
-                  {suggestion.suggestedLoad != null ? ` • ${suggestion.suggestedLoad} kg` : ''}
-                </p>
-                <p className="mt-1 text-xs leading-relaxed text-slate-400">{suggestion.reason}</p>
-              </div>
+              <button
+                type="button"
+                onClick={() => setMobileOpen(false)}
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[#2A2A2E] text-[#8E8E93]"
+                aria-label="Fechar"
+              >
+                <X size={18} />
+              </button>
             </div>
 
-            {suggestion.action !== 'manual' && (
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => update({ progressionAccepted: true })}
-                  className={`rounded-lg px-3 py-2 text-xs font-bold transition ${
-                    value.progressionAccepted === true
-                      ? 'bg-emerald-400 text-slate-950'
-                      : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
-                  }`}
-                >
-                  Aceitar sugestão
-                </button>
-                <button
-                  type="button"
-                  onClick={() => update({ progressionAccepted: false })}
-                  className={`rounded-lg px-3 py-2 text-xs font-bold transition ${
-                    value.progressionAccepted === false
-                      ? 'bg-white text-slate-950'
-                      : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
-                  }`}
-                >
-                  Manter decisão
-                </button>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </div>
+            {renderEditor({ mobile: true })}
+
+            <button
+              type="button"
+              onClick={() => setMobileOpen(false)}
+              className="mt-5 w-full rounded-lg bg-[#C8FF3D] px-4 py-3 text-sm font-black text-[#0A0A0B]"
+            >
+              Confirmar execução
+            </button>
+          </section>
+        </div>
+      )}
+    </>
   )
 }
