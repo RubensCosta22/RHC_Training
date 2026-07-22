@@ -46,7 +46,7 @@ export default function Workout() {
     if (!workout) return
     const initial = {}
     workout.exercises.forEach((exercise) => {
-      initial[exercise.id] = { weight: '', actualReps: '', setReps: Array(Number(exercise.sets || 0)).fill(''), rpe: '', progressionAccepted: null, notes: '', completed: false, completedSets: Array(Number(exercise.sets || 0)).fill(false), difficulty: 'normal', selectedName: exercise.name, expanded: true, restTimerKey: null }
+      initial[exercise.id] = { weight: '', actualReps: '', setReps: Array(Number(exercise.sets || 0)).fill(''), rpe: '', progressionAccepted: null, notes: '', completed: false, completedSets: Array(Number(exercise.sets || 0)).fill(false), difficulty: 'normal', selectedName: exercise.name, expanded: true, detailsOpen: false, restTimerKey: null }
     })
     setExerciseValues(initial)
     getExerciseRecords(profileId, workout.exercises.flatMap((exercise) => [exercise.name, ...(exercise.alternatives || [])])).then(setRecords).catch(() => undefined)
@@ -88,12 +88,17 @@ export default function Workout() {
   const pendingExercises = workout.exercises.filter((exercise) => !exerciseValues[exercise.id]?.completed)
   const completedExercises = workout.exercises.filter((exercise) => exerciseValues[exercise.id]?.completed)
 
-  const renderExercise = (exercise) => (
-    <div key={exercise.id}>
-      <ExerciseCard exercise={exercise} value={exerciseValues[exercise.id] || {}} record={records[(exerciseValues[exercise.id] || {}).selectedName || exercise.name]} onChange={(value) => updateExercise(exercise.id, value)} />
-      {exercise.programExerciseId && <SmartExecutionPanel exercise={exercise} value={exerciseValues[exercise.id] || {}} onChange={(value) => updateExercise(exercise.id, value)} />}
-    </div>
-  )
+  const renderExercise = (exercise) => {
+    const value = exerciseValues[exercise.id] || {}
+    return (
+      <div key={exercise.id}>
+        <ExerciseCard exercise={exercise} value={value} record={records[value.selectedName || exercise.name]} onChange={(nextValue) => updateExercise(exercise.id, nextValue)} />
+        {exercise.programExerciseId && value.detailsOpen === true && (
+          <SmartExecutionPanel exercise={exercise} value={value} onChange={(nextValue) => updateExercise(exercise.id, nextValue)} />
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="mx-auto max-w-3xl pb-28">
