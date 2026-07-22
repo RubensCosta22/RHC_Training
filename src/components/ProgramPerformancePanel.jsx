@@ -1,64 +1,73 @@
-import { Activity, Gauge, Target, TrendingDown, TrendingUp } from 'lucide-react'
-
-function Stat({ label, value, detail, icon: Icon }) {
-  return (
-    <div className="border-t border-[#272a2f] py-4">
-      <div className="mb-2 flex items-center justify-between text-[#62676f]">
-        <span className="text-[10px] font-bold uppercase tracking-[.14em]">{label}</span>
-        <Icon className="h-4 w-4" />
-      </div>
-      <p className="text-2xl font-[760] tracking-[-.04em] text-[#f5f7f2]">{value}</p>
-      <p className="mt-1 text-xs text-[#62676f]">{detail}</p>
-    </div>
-  )
-}
+import { ChevronDown, ChevronUp, Gauge, Target, TrendingUp } from 'lucide-react'
+import { useState } from 'react'
 
 export default function ProgramPerformancePanel({ stats }) {
+  const [open, setOpen] = useState(false)
   if (!stats) return null
 
   const { program, phase, week, durationWeeks, summary, baseline, progression } = stats
+  const progress = Math.min(100, Math.round((week / durationWeeks) * 100))
 
   return (
-    <section className="mb-16 overflow-hidden rounded-[28px] border border-[#30362a] bg-[linear-gradient(145deg,#151a12,#0c0f0d)] p-5 sm:p-7">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="rhc-kicker mb-2">Programa ativo</p>
-          <h2 className="text-3xl font-[780] tracking-[-.05em] text-[#f5f7f2]">{program?.name}</h2>
-          <p className="mt-2 text-sm text-[#92979f]">Semana {week} de {durationWeeks} · {phase?.name || 'Fase atual'}</p>
+    <section className="mb-10 border-y border-[#2A2A2E] py-5">
+      <div className="flex items-start justify-between gap-5">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[.14em] text-[#C8FF3D]">Programa ativo</p>
+          <h2 className="mt-1 truncate text-xl font-semibold text-[#F5F5F7]">{program?.name}</h2>
+          <p className="mt-1 text-sm text-[#8E8E93]">Semana {week} de {durationWeeks} · {phase?.name || 'Fase atual'}</p>
         </div>
-        <div className="min-w-[220px]">
-          <div className="mb-2 flex items-center justify-between text-xs font-bold text-[#92979f]"><span>Progresso do ciclo</span><span>{Math.round((week / durationWeeks) * 100)}%</span></div>
-          <div className="h-2 overflow-hidden rounded-full bg-[#252a22]"><div className="h-full rounded-full bg-[#c8ff3d]" style={{ width: `${Math.min(100, (week / durationWeeks) * 100)}%` }} /></div>
+        <div className="shrink-0 text-right">
+          <p className="text-2xl font-semibold tabular-nums text-[#F5F5F7]">{progress}%</p>
+          <p className="text-xs text-[#8E8E93]">do ciclo</p>
         </div>
       </div>
 
-      <div className="mt-7 grid grid-cols-2 gap-x-5 lg:grid-cols-4">
-        <Stat label="Aderência" value={`${summary.adherence}%`} detail={`${summary.completedStrengthSessions}/${summary.expectedStrengthSessions} sessões de força`} icon={Target} />
-        <Stat label="RPE médio" value={summary.averageRpe || '—'} detail="esforço registrado" icon={Gauge} />
-        <Stat label="Progressões" value={summary.increases} detail={`${summary.accepted} sugestões aceitas`} icon={TrendingUp} />
-        <Stat label="Regressões" value={summary.regressions} detail={`${summary.holds} exposições mantidas`} icon={TrendingDown} />
+      <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[#1C1C1F]">
+        <div className="h-full rounded-full bg-[#C8FF3D]" style={{ width: `${progress}%` }} />
       </div>
 
-      <div className="mt-4 grid gap-6 border-t border-[#272a2f] pt-6 lg:grid-cols-12">
-        <div className="lg:col-span-4">
-          <div className="mb-3 flex items-center gap-2"><Activity className="h-4 w-4 text-[#74c7ff]"/><p className="text-sm font-bold">Baseline de corrida</p></div>
-          <p className="text-3xl font-[760]">{baseline.distance_km || 10} km</p>
-          <p className="mt-1 text-sm text-[#92979f]">{baseline.time_minutes || 50} min · {baseline.pace_min_km || 5}:00 min/km</p>
+      <div className="mt-5 grid grid-cols-3 divide-x divide-[#2A2A2E]">
+        <div className="pr-3">
+          <p className="text-xs text-[#8E8E93]">Aderência</p>
+          <p className="mt-1 text-xl font-semibold text-[#F5F5F7]">{summary.adherence}%</p>
         </div>
+        <div className="px-3">
+          <p className="text-xs text-[#8E8E93]">RPE médio</p>
+          <p className="mt-1 text-xl font-semibold text-[#F5F5F7]">{summary.averageRpe || '—'}</p>
+        </div>
+        <div className="pl-3">
+          <p className="text-xs text-[#8E8E93]">Progressões</p>
+          <p className="mt-1 text-xl font-semibold text-[#F5F5F7]">{summary.increases}</p>
+        </div>
+      </div>
 
-        <div className="lg:col-span-8 lg:border-l lg:border-[#272a2f] lg:pl-7">
-          <p className="mb-3 text-sm font-bold">Variações mais acompanhadas</p>
-          <div className="grid gap-x-5 sm:grid-cols-2">
-            {progression.slice(0, 4).map((item) => (
-              <div key={item.name} className="flex items-center justify-between border-t border-[#272a2f] py-3">
-                <div className="min-w-0 pr-3"><p className="truncate text-sm font-bold">{item.name}</p><p className="text-xs text-[#62676f]">{item.exposures} exposições · RPE {item.averageRpe || '—'}</p></div>
-                <span className={`text-sm font-bold ${item.progressPercent >= 0 ? 'text-[#c8ff3d]' : 'text-[#ffb55e]'}`}>{item.progressPercent > 0 ? '+' : ''}{item.progressPercent}%</span>
-              </div>
-            ))}
-            {!progression.length && <p className="text-sm text-[#62676f]">As métricas aparecem após as primeiras exposições do programa.</p>}
+      <button type="button" onClick={() => setOpen((current) => !current)} className="mt-5 flex w-full items-center justify-between border-t border-[#2A2A2E] pt-4 text-left text-sm font-semibold text-[#F5F5F7]">
+        Detalhes do programa
+        {open ? <ChevronUp size={18} /> : <ChevronDown size={18} className="text-[#8E8E93]" />}
+      </button>
+
+      {open && (
+        <div className="mt-4 grid gap-6 md:grid-cols-2">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-semibold text-[#F5F5F7]"><Target size={16} className="text-[#C8FF3D]" /> Sessões de força</div>
+            <p className="mt-2 text-sm text-[#8E8E93]">{summary.completedStrengthSessions}/{summary.expectedStrengthSessions} concluídas · {summary.accepted} sugestões aceitas</p>
+            <div className="mt-4 flex items-center gap-2 text-sm font-semibold text-[#F5F5F7]"><Gauge size={16} className="text-[#8E8E93]" /> Baseline de corrida</div>
+            <p className="mt-2 text-sm text-[#8E8E93]">{baseline.distance_km || 10} km · {baseline.time_minutes || 50} min · {baseline.pace_min_km || 5}:00 min/km</p>
+          </div>
+          <div>
+            <div className="flex items-center gap-2 text-sm font-semibold text-[#F5F5F7]"><TrendingUp size={16} className="text-[#C8FF3D]" /> Variações acompanhadas</div>
+            <div className="mt-2 divide-y divide-[#2A2A2E]">
+              {progression.slice(0, 4).map((item) => (
+                <div key={item.name} className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                  <span className="truncate text-[#F5F5F7]">{item.name}</span>
+                  <span className={item.progressPercent >= 0 ? 'text-[#C8FF3D]' : 'text-amber-300'}>{item.progressPercent > 0 ? '+' : ''}{item.progressPercent}%</span>
+                </div>
+              ))}
+              {!progression.length && <p className="py-3 text-sm text-[#8E8E93]">As métricas aparecem após as primeiras exposições.</p>}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </section>
   )
 }
