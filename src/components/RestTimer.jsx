@@ -1,6 +1,25 @@
 import { Pause, Play } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
+let sharedAudioContext = null
+
+function getAudioContext() {
+  if (typeof window === 'undefined') return null
+  const AudioContext = window.AudioContext || window.webkitAudioContext
+  if (!AudioContext) return null
+  if (!sharedAudioContext || sharedAudioContext.state === 'closed') sharedAudioContext = new AudioContext()
+  return sharedAudioContext
+}
+
+function primeAudio() {
+  try {
+    const context = getAudioContext()
+    if (context?.state === 'suspended') context.resume().catch(() => undefined)
+  } catch {
+    // O cronômetro continua funcional mesmo quando o navegador bloqueia áudio programático.
+  }
+}
+
 export default function RestTimer({ seconds = 60, autoStartKey = null }) {
   const safeSeconds = Math.max(0, Number(seconds) || 0)
   const [remaining, setRemaining] = useState(safeSeconds)
@@ -23,9 +42,8 @@ export default function RestTimer({ seconds = 60, autoStartKey = null }) {
 
   function playFinishTone() {
     try {
-      const AudioContext = window.AudioContext || window.webkitAudioContext
-      if (!AudioContext) return
-      const context = new AudioContext()
+      const context = getAudioContext()
+      if (!context || context.state !== 'running') return
       const oscillator = context.createOscillator()
       const gain = context.createGain()
       oscillator.connect(gain)
@@ -35,7 +53,6 @@ export default function RestTimer({ seconds = 60, autoStartKey = null }) {
       gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.45)
       oscillator.start()
       oscillator.stop(context.currentTime + 0.45)
-      oscillator.addEventListener('ended', () => context.close())
     } catch {
       // Vibração continua sendo o fallback quando áudio programático não está disponível.
     }
@@ -48,6 +65,7 @@ export default function RestTimer({ seconds = 60, autoStartKey = null }) {
 
   function startTimer(duration = remaining || safeSeconds) {
     if (!duration) return
+    primeAudio()
     endAtRef.current = Date.now() + duration * 1000
     setRemaining(duration)
     setRunning(true)
@@ -61,6 +79,12 @@ export default function RestTimer({ seconds = 60, autoStartKey = null }) {
     setRemaining(currentRemaining)
     setRunning(false)
   }
+
+  useEffect(() => {
+    const unlockAudio = () => primeAudio()
+    document.addEventListener('pointerdown', unlockAudio, { once: true })
+    return () => document.removeEventListener('pointerdown', unlockAudio)
+  }, [])
 
   useEffect(() => {
     setRemaining(safeSeconds)
