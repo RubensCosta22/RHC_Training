@@ -24,7 +24,19 @@ export async function getFamilyContext() {
 
 export async function getPostLoginPath() {
   const context = await getFamilyContext()
-  return context?.role === 'admin' ? '/admin' : '/profiles'
+  if (context?.role === 'admin') return '/admin'
+
+  // RLS limita esta consulta aos perfis associados ao usuário autenticado.
+  // Usuários comuns não escolhem perfil: entram diretamente no próprio dashboard.
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id')
+    .order('name')
+    .limit(1)
+
+  if (error) throw error
+  const profileId = data?.[0]?.id
+  return profileId ? `/dashboard/${profileId}` : '/profiles'
 }
 
 export async function createFamilyGroup(name, adminEmail) {
