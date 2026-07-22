@@ -1,4 +1,4 @@
-import { Pause, Play, RotateCcw, SkipForward, Plus } from 'lucide-react'
+import { Pause, Play } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 export default function RestTimer({ seconds = 60, autoStartKey = null }) {
@@ -21,15 +21,33 @@ export default function RestTimer({ seconds = 60, autoStartKey = null }) {
     }
   }
 
-  function notifyFinished() {
-    if ('vibrate' in navigator) {
-      navigator.vibrate([250, 100, 250])
+  function playFinishTone() {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext
+      if (!AudioContext) return
+      const context = new AudioContext()
+      const oscillator = context.createOscillator()
+      const gain = context.createGain()
+      oscillator.connect(gain)
+      gain.connect(context.destination)
+      oscillator.frequency.value = 880
+      gain.gain.setValueAtTime(0.12, context.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.45)
+      oscillator.start()
+      oscillator.stop(context.currentTime + 0.45)
+      oscillator.addEventListener('ended', () => context.close())
+    } catch {
+      // Vibração continua sendo o fallback quando áudio programático não está disponível.
     }
+  }
+
+  function notifyFinished() {
+    if ('vibrate' in navigator) navigator.vibrate([250, 100, 250])
+    playFinishTone()
   }
 
   function startTimer(duration = remaining || safeSeconds) {
     if (!duration) return
-
     endAtRef.current = Date.now() + duration * 1000
     setRemaining(duration)
     setRunning(true)
@@ -38,33 +56,10 @@ export default function RestTimer({ seconds = 60, autoStartKey = null }) {
 
   function pauseTimer() {
     const currentRemaining = calculateRemaining()
-
     clearTimer()
     endAtRef.current = null
     setRemaining(currentRemaining)
     setRunning(false)
-  }
-
-  function resetTimer() {
-    clearTimer()
-    endAtRef.current = null
-    setRemaining(safeSeconds)
-    setRunning(false)
-    setFinished(false)
-  }
-
-  function skipTimer() {
-    clearTimer()
-    endAtRef.current = null
-    setRemaining(0)
-    setRunning(false)
-    setFinished(true)
-    notifyFinished()
-  }
-
-  function addSeconds(extraSeconds) {
-    const currentRemaining = running ? calculateRemaining() : remaining
-    startTimer(currentRemaining + extraSeconds)
   }
 
   useEffect(() => {
@@ -85,14 +80,10 @@ export default function RestTimer({ seconds = 60, autoStartKey = null }) {
       clearTimer()
       return undefined
     }
-
     clearTimer()
-
     intervalRef.current = setInterval(() => {
       const nextRemaining = calculateRemaining()
-
       setRemaining(nextRemaining)
-
       if (nextRemaining <= 0) {
         clearTimer()
         endAtRef.current = null
@@ -101,17 +92,14 @@ export default function RestTimer({ seconds = 60, autoStartKey = null }) {
         notifyFinished()
       }
     }, 250)
-
     return clearTimer
   }, [running])
 
   useEffect(() => {
     function handleVisibilityChange() {
       if (!running) return
-
       const nextRemaining = calculateRemaining()
       setRemaining(nextRemaining)
-
       if (nextRemaining <= 0) {
         clearTimer()
         endAtRef.current = null
@@ -120,10 +108,8 @@ export default function RestTimer({ seconds = 60, autoStartKey = null }) {
         notifyFinished()
       }
     }
-
     document.addEventListener('visibilitychange', handleVisibilityChange)
     window.addEventListener('focus', handleVisibilityChange)
-
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.removeEventListener('focus', handleVisibilityChange)
@@ -136,72 +122,24 @@ export default function RestTimer({ seconds = 60, autoStartKey = null }) {
     return `${min}:${sec}`
   }, [remaining])
 
-  const progress = safeSeconds
-    ? Math.max(0, Math.min(100, ((safeSeconds - remaining) / safeSeconds) * 100))
-    : 100
-
   return (
-    <div className="rounded-3xl border border-slate-800 bg-slate-950/70 p-4">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-sm text-slate-400">
-            {finished
-              ? 'Descanso finalizado'
-              : running
-                ? 'Descansando...'
-                : 'Descanso'}
-          </p>
-
-          <p className={`font-mono text-4xl font-black ${finished ? 'text-emerald-300' : 'text-white'}`}>
-            {label}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className="rounded-2xl bg-slate-800 p-3 text-slate-100 transition hover:bg-slate-700"
-            onClick={() => (running ? pauseTimer() : startTimer())}
-            aria-label={running ? 'Pausar descanso' : 'Iniciar descanso'}
-          >
-            {running ? <Pause size={18} /> : <Play size={18} />}
-          </button>
-
-          <button
-            type="button"
-            className="rounded-2xl bg-slate-800 p-3 text-slate-100 transition hover:bg-slate-700"
-            onClick={() => addSeconds(15)}
-            aria-label="Adicionar quinze segundos"
-          >
-            <Plus size={18} />
-          </button>
-
-          <button
-            type="button"
-            className="rounded-2xl bg-slate-800 p-3 text-slate-100 transition hover:bg-slate-700"
-            onClick={resetTimer}
-            aria-label="Reiniciar descanso"
-          >
-            <RotateCcw size={18} />
-          </button>
-
-          <button
-            type="button"
-            className="rounded-2xl bg-slate-800 p-3 text-slate-100 transition hover:bg-slate-700"
-            onClick={skipTimer}
-            aria-label="Pular descanso"
-          >
-            <SkipForward size={18} />
-          </button>
-        </div>
+    <div className="flex items-center justify-between gap-4 border-t border-[#2A2A2E] pt-3">
+      <div className="min-w-0">
+        <p className={`font-mono text-xl font-semibold ${finished ? 'text-[#C8FF3D]' : 'text-[#F5F5F7]'}`}>
+          {label}
+          <span className="ml-2 font-sans text-sm font-normal text-[#8E8E93]">
+            {finished ? 'Descanso finalizado' : 'Descanso entre séries'}
+          </span>
+        </p>
       </div>
-
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800">
-        <div
-          className="h-full rounded-full bg-emerald-400 transition-all"
-          style={{ width: `${progress}%` }}
-        />
-      </div>
+      <button
+        type="button"
+        className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-[#F5F5F7] transition hover:bg-[#1C1C1F]"
+        onClick={() => (running ? pauseTimer() : startTimer())}
+        aria-label={running ? 'Pausar descanso' : 'Iniciar descanso'}
+      >
+        {running ? <Pause size={22} /> : <Play size={22} fill="currentColor" />}
+      </button>
     </div>
   )
 }
