@@ -15,6 +15,22 @@ import { toLocalDateKey } from '../utils/date'
 
 const today = () => toLocalDateKey()
 
+function resolveExerciseRecord(exercise, selectedName, records) {
+  const exact = records[selectedName]
+  if (exact && Number(exact.last_weight || 0) > 0) {
+    return { ...exact, matched_name: selectedName, exact_match: true }
+  }
+
+  const equivalentNames = [exercise.name, ...(exercise.alternatives || [])]
+  const candidates = equivalentNames
+    .map((name) => records[name])
+    .filter((record) => record && Number(record.last_weight || 0) > 0)
+    .sort((a, b) => String(b.last_date || '').localeCompare(String(a.last_date || '')))
+
+  if (!candidates.length) return null
+  return { ...candidates[0], matched_name: candidates[0].exercise_name, exact_match: false }
+}
+
 export default function Workout() {
   const { profileId, type } = useParams()
   const navigate = useNavigate()
@@ -90,9 +106,11 @@ export default function Workout() {
 
   const renderExercise = (exercise) => {
     const value = exerciseValues[exercise.id] || {}
+    const selectedName = value.selectedName || exercise.name
+    const record = resolveExerciseRecord(exercise, selectedName, records)
     return (
       <div key={exercise.id}>
-        <ExerciseCard exercise={exercise} value={value} record={records[value.selectedName || exercise.name]} onChange={(nextValue) => updateExercise(exercise.id, nextValue)} />
+        <ExerciseCard exercise={exercise} value={value} record={record} onChange={(nextValue) => updateExercise(exercise.id, nextValue)} />
         {exercise.programExerciseId && value.detailsOpen === true && (
           <SmartExecutionPanel exercise={exercise} value={value} onChange={(nextValue) => updateExercise(exercise.id, nextValue)} />
         )}
