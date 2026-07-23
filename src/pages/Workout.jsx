@@ -17,12 +17,14 @@ const today = () => toLocalDateKey()
 
 function resolveExerciseRecord(exercise, selectedName, records) {
   const exact = records[selectedName]
-  if (exact) return { ...exact, matched_name: selectedName, exact_match: true }
+  if (exact && Number(exact.last_weight || 0) > 0) {
+    return { ...exact, matched_name: selectedName, exact_match: true }
+  }
 
   const equivalentNames = [exercise.name, ...(exercise.alternatives || [])]
   const candidates = equivalentNames
     .map((name) => records[name])
-    .filter(Boolean)
+    .filter((record) => record && Number(record.last_weight || 0) > 0)
     .sort((a, b) => String(b.last_date || '').localeCompare(String(a.last_date || '')))
 
   if (!candidates.length) return null
