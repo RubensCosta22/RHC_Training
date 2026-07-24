@@ -2,18 +2,19 @@
 
 ## Change classification
 
-- **SDD version:** v1.2
-- **Spec / Change Record ID:**
-- **Spec version:**
+- **SDD version:** v1.3
+- **Engineering record ID:**
+- **Record type:** R0 Lightweight Change / R1 Lite Spec / Feature Spec
+- **Record version:**
 - **Risk Tier:** R0 / R1 / R2 / R3 / R4
 - **Applicable Controls:**
-- **Spec status:** Approved / N/A for valid R0
+- **Approval status:** Approved / N/A for valid R0
 
-> No Risk Tier → No Ready. No Applicable Controls → No Ready.
+> Every relevant PR references the engineering record required by its Risk Tier. No Risk Tier → No Ready. No Applicable Controls → No Ready.
 
 ## What changed
 
-Summarize the implementation.
+Summarize the implementation or process/documentation change.
 
 ## What did not change
 
@@ -60,6 +61,8 @@ List important behavior intentionally preserved.
 
 ## Tests & evidence
 
+Record only evidence required by the Risk Tier and affected surfaces.
+
 | Requirement / AC | Applicable control | Implementation | Test | Evidence | Status |
 |---|---|---|---|---|---|
 | | | | | | |
@@ -67,14 +70,14 @@ List important behavior intentionally preserved.
 Commands/results:
 
 ```text
-<evidence>
+<evidence or N/A with reason>
 ```
 
 ## Quality Gates
 
-Mark only gates required by the Risk Tier Applicability Matrix and actual affected surfaces. `Conditional` is mandatory when its surface applies. Any `N/A` must have an explicit reason in the Verification Record.
+Mark only gates required by the Risk Tier Applicability Matrix and actual affected surfaces. `Conditional` is mandatory when its surface applies. A gate marked `—` by the Standard is not required merely because it appears here. Any `N/A` must have an explicit reason where a record is required.
 
-- [ ] G1 — Spec Compliance
+- [ ] G1 — Spec / Engineering Record Compliance
 - [ ] G2 — Build
 - [ ] G3 — Static Quality
 - [ ] G4 — Tests
@@ -92,6 +95,7 @@ Mark only gates required by the Risk Tier Applicability Matrix and actual affect
 
 - [ ] Not required: valid R0
 - [ ] Required and completed for R1–R4
+- [ ] R3/R4 separate review context recorded when tooling supports it
 - **Blockers remaining:** 0 / N/A
 - **R3/R4 Major findings remaining without approved exception:** 0 / N/A
 
@@ -101,10 +105,13 @@ Known residual risks or approved exception IDs:
 
 ## Release & production verification
 
-- Production verification required by applicable controls? Yes / No
-- Rollout/remediation strategy:
-- Post-release critical journey:
-- Telemetry/errors to verify:
+- **Runtime release impact?** Yes / No
+- **Production verification Required or Conditional-and-applicable?** Yes / No
+- Rollout/remediation strategy when applicable:
+- Post-release critical affected journey when applicable:
+- Telemetry/errors to verify when applicable:
+
+Documentation-only/process-only valid R0 changes do not require runtime production verification.
 
 ---
 
