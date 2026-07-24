@@ -1,9 +1,11 @@
 import { supabase } from '../lib/supabaseClient'
 import { profilesSeed } from '../data/workouts'
+import { validateUuid } from '../utils/validation'
 import { claimFamilyProfile, getFamilyContext } from './familyService'
 import { invokeSecureImageUpload } from './secureUploadService'
 
 const AVATAR_BUCKET = 'progress-photos'
+const ALLOWED_AVATAR_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
 async function attachAvatar(profile) {
   if (!profile?.avatar_url?.includes('/')) return { ...profile, avatarSignedUrl: null }
@@ -87,10 +89,11 @@ export async function getProfilesWithLastWorkout() {
 }
 
 export async function getProfile(profileId) {
+  const cleanProfileId = validateUuid(profileId, 'Perfil')
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
-    .eq('id', profileId)
+    .eq('id', cleanProfileId)
     .maybeSingle()
 
   if (error) throw error
@@ -98,13 +101,14 @@ export async function getProfile(profileId) {
 }
 
 export async function uploadProfileAvatar(profileId, file) {
+  const cleanProfileId = validateUuid(profileId, 'Perfil')
   if (!file) throw new Error('Selecione uma foto.')
-  if (!file.type.startsWith('image/')) throw new Error('O arquivo precisa ser uma imagem.')
+  if (!ALLOWED_AVATAR_TYPES.has(file.type)) throw new Error('Use uma imagem JPG, PNG ou WebP.')
   if (file.size > 3 * 1024 * 1024) throw new Error('Use uma imagem de ate 3 MB.')
 
   const body = new FormData()
   body.append('kind', 'avatar')
-  body.append('profileId', profileId)
+  body.append('profileId', cleanProfileId)
   body.append('file', file)
 
   const data = await invokeSecureImageUpload(body)
