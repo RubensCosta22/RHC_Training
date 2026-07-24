@@ -59,7 +59,11 @@ export function clearPendingWorkouts() {
   localStorage.removeItem(PENDING_KEY)
 }
 
+export function clearSelectedProfile() {
+  localStorage.removeItem(SELECTED_PROFILE_KEY)
+}
+
 export function clearWorkoutStorage() {
   localStorage.removeItem(PENDING_KEY)
-  localStorage.removeItem(SELECTED_PROFILE_KEY)
+  clearSelectedProfile()
 }
