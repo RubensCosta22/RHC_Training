@@ -1,6 +1,6 @@
 # <SPEC-ID> — <Title>
 
-> RHC Tech Spec-Driven Development Standard v1.1
+> RHC Tech Spec-Driven Development Standard v1.2
 
 ## 1. Identification
 
@@ -10,7 +10,8 @@
 - **Status:** Draft
 - **Owner:**
 - **Required Approvers:**
-- **Risk Classification:** R0 / R1 / R2 / R3 / R4
+- **Risk Tier:** R0 / R1 / R2 / R3 / R4
+- **SDD Process Budget Target:**
 - **Created:** YYYY-MM-DD
 - **Last Updated:** YYYY-MM-DD
 - **Related ADRs:**
@@ -18,24 +19,50 @@
 - **Target Release:**
 - **Supersedes:**
 
-## 2. Problem
+## 2. Applicable Controls
+
+Derive this block from SDD v1.2 Section 32. `Conditional` controls become mandatory when the affected surface applies.
+
+- [ ] Change record / Feature Spec
+- [ ] Acceptance Criteria
+- [ ] Solo AI Adversarial Review
+- [ ] Architecture Review
+- [ ] ADR
+- [ ] Security Review
+- [ ] Authorization / RLS Review
+- [ ] Privacy / LGPD Review
+- [ ] Database Impact Review
+- [ ] Migration Rollback / Remediation
+- [ ] Observability / Failure Handling
+- [ ] Performance Budget
+- [ ] Reliability Review
+- [ ] Supply Chain Review
+- [ ] Traceability
+- [ ] Automated Regression Testing
+- [ ] Manual UX Validation
+- [ ] Production Verification
+- [ ] Explicit Risk Acceptance
+
+**Why each unchecked conditional control does not apply:**
+
+## 3. Problem
 
 Describe the user/product problem. Do not describe the implementation.
 
-## 3. Objective
+## 4. Objective
 
 Define the measurable or objectively verifiable outcome.
 
-## 4. Non-Goals
+## 5. Non-Goals
 
 - 
 
-## 5. User Stories / Use Cases
+## 6. User Stories / Use Cases
 
 ### US-01
 As a <user>, I want <capability> so that <outcome>.
 
-## 6. Functional Requirements
+## 7. Functional Requirements
 
 ### FR-01
 The system must ...
@@ -43,11 +70,11 @@ The system must ...
 ### FR-02
 The system must ...
 
-## 7. Business Rules
+## 8. Business Rules
 
 ### BR-01
 
-## 8. Permissions & Authorization
+## 9. Permissions & Authorization
 
 | Operation | Who may perform it? | Enforcement layer | Denied behavior |
 |---|---|---|---|
@@ -61,7 +88,7 @@ The system must ...
 
 Describe the database/server guarantees. Frontend-only authorization is not sufficient.
 
-## 9. UX/UI Specification
+## 10. UX/UI Specification
 
 ### User journey
 
@@ -96,7 +123,7 @@ Describe the database/server guarantees. Frontend-only authorization is not suff
 
 Applicable RHC Tech Brand System rules and product-specific visual language.
 
-## 10. Architecture Impact
+## 11. Architecture Impact
 
 - **Components affected:**
 - **Data flow:**
@@ -112,7 +139,7 @@ Applicable RHC Tech Brand System rules and product-specific visual language.
 - **Migration strategy:**
 - **ADR required?** Yes / No
 
-## 11. Security & Privacy
+## 12. Security & Privacy
 
 ### Threat / abuse cases
 
@@ -131,16 +158,17 @@ Applicable RHC Tech Brand System rules and product-specific visual language.
 - Third parties:
 - Retention:
 - Deletion/export:
+- Backup implications:
 - Logging implications:
 - Masking/minimization:
 
-## 12. Observability
+## 13. Observability
 
 Define critical events, failure paths, structured-log context, metrics or alerts required.
 
 Sensitive data must be redacted before emission.
 
-## 13. Performance & Reliability
+## 14. Performance & Reliability
 
 - Performance budget:
 - Timeout policy:
@@ -151,7 +179,16 @@ Sensitive data must be redacted before emission.
 - Degraded mode:
 - Recovery behavior:
 
-## 14. Test Strategy
+## 15. Legacy / Touch Assessment
+
+- **Does this materially touch legacy code?** Yes / No
+- **Legacy risks discovered:**
+- **Critical surface involved?** Yes / No
+- **L1 Domain baseline trigger reached?** Yes / No
+- **L0 Product baseline trigger reached?** Yes / No
+- **Unrelated legacy debt explicitly out of scope:**
+
+## 16. Test Strategy
 
 - [ ] Unit
 - [ ] Integration
@@ -162,9 +199,9 @@ Sensitive data must be redacted before emission.
 - [ ] Performance/reliability
 - [ ] Security/supply-chain
 
-Explain required coverage based on risk.
+Explain required coverage based on risk and applicable controls.
 
-## 15. Acceptance Criteria
+## 17. Acceptance Criteria
 
 ### AC-01
 **Given** ...  
@@ -176,20 +213,25 @@ Explain required coverage based on risk.
 **When** ...  
 **Then** ...
 
-## 16. Definition of Ready
+## 18. Definition of Ready
 
+- [ ] Risk tier assigned
+- [ ] Applicable Controls declared
+- [ ] SDD Process Budget target identified for R0–R3
 - [ ] Problem is clear
 - [ ] Scope and non-goals are explicit
 - [ ] Functional requirements are testable
 - [ ] Business rules are resolved
-- [ ] Authorization is defined
+- [ ] Authorization is defined when applicable
 - [ ] UX states are defined when applicable
 - [ ] Architecture impact is understood
 - [ ] Security/privacy impact is assessed
-- [ ] Risk classification is assigned
+- [ ] Legacy touch/baseline triggers assessed
 - [ ] Acceptance criteria exist
 - [ ] Material open questions are closed
-- [ ] Adversarial review completed
+- [ ] Required adversarial review completed for R1–R4
 - [ ] Blocking findings resolved
 
+**No Risk Tier → No Ready.**  
+**No Applicable Controls → No Ready.**  
 **No Ready → No Code.**
