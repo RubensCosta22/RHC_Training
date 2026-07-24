@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildAdminStatsSnapshot } from './adminStatsService'
+import { buildAdminStatsSnapshot } from './adminStatsSnapshot'
 
 const now = new Date('2026-07-24T12:00:00')
 
