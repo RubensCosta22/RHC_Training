@@ -1,3 +1,5 @@
+import { logger } from '../lib/observability/logger'
+
 const PENDING_KEY = 'mtp_pending_workouts'
 const SELECTED_PROFILE_KEY = 'mtp_selected_profile_id'
 const MAX_PENDING_WORKOUTS = 20
@@ -19,18 +21,27 @@ export function getPendingWorkouts() {
   try {
     const parsed = JSON.parse(localStorage.getItem(PENDING_KEY) || '[]')
     return Array.isArray(parsed) ? parsed.slice(0, MAX_PENDING_WORKOUTS) : []
-  } catch {
+  } catch (error) {
+    logger.warn('offline_storage.pending_workouts_parse_failed', {
+      storageKey: PENDING_KEY,
+      error
+    })
     return []
   }
 }
 
 export function addPendingWorkout(payload, ownerUserId) {
   if (!ownerUserId) {
+    logger.warn('offline_storage.pending_workout_owner_missing')
     throw new Error('Nao foi possivel identificar a conta para o salvamento offline.')
   }
 
   const item = { ...payload, ownerUserId, offlineId: crypto.randomUUID() }
   if (JSON.stringify(item).length > MAX_PENDING_BYTES) {
+    logger.warn('offline_storage.pending_workout_size_exceeded', {
+      userId: ownerUserId,
+      maxBytes: MAX_PENDING_BYTES
+    })
     throw new Error('Treino offline excede o limite seguro do aparelho.')
   }
   const current = getPendingWorkouts()

@@ -1,6 +1,9 @@
 import { supabase } from '../lib/supabaseClient'
+import { logger, createRequestId } from '../lib/observability/logger'
 
 export async function logEvent(eventName, eventData = {}, profileId = null) {
+  const requestId = createRequestId()
+
   try {
     const { error } = await supabase.rpc('log_app_event', {
       p_event_name: eventName,
@@ -11,6 +14,11 @@ export async function logEvent(eventName, eventData = {}, profileId = null) {
 
     if (error) throw error
   } catch (error) {
-    console.warn('Erro ao registrar telemetria:', error)
+    logger.warn('telemetry.delivery_failed', {
+      requestId,
+      action: eventName,
+      profileId,
+      error
+    })
   }
 }

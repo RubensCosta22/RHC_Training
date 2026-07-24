@@ -2,6 +2,7 @@ import { Activity, ArrowRight, KeyRound, Mail } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
+import { logger, createRequestId } from '../lib/observability/logger'
 import { friendlyError } from '../utils/validation'
 import { getPostLoginPath } from '../services/familyService'
 
@@ -20,23 +21,41 @@ export default function Login() {
       navigate('/login', { replace: true, state: null })
     }
 
-    supabase.auth.getSession().then(async ({ data }) => {
+    supabase.auth.getSession().then(async ({ data, error }) => {
+      if (error) {
+        logger.warn('auth.session_lookup_failed', {
+          requestId: createRequestId(),
+          error
+        })
+        return
+      }
       if (data.session) navigate(await getPostLoginPath(), { replace: true })
     })
   }, [location.state, navigate])
 
   async function handleGoogle() {
+    const requestId = createRequestId()
     setMessage('')
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/login` }
     })
 
-    if (error) setMessage(friendlyError(error))
+    if (error) {
+      logger.warn('auth.oauth_start_failed', {
+        requestId,
+        provider: 'google',
+        error
+      })
+      setMessage(friendlyError(error))
+    } else {
+      logger.info('auth.oauth_started', { requestId, provider: 'google' })
+    }
   }
 
   async function handleSubmit(event) {
     event.preventDefault()
+    const requestId = createRequestId()
     setLoading(true)
     setMessage('')
 
@@ -50,9 +69,15 @@ export default function Login() {
               options: { emailRedirectTo: `${window.location.origin}/login` }
             })
 
-      const { error } = await action
+      const { data, error } = await action
 
       if (error) throw error
+
+      logger.info(mode === 'login' ? 'auth.login_succeeded' : 'auth.signup_succeeded', {
+        requestId,
+        userId: data?.user?.id || undefined,
+        provider: 'password'
+      })
 
       if (mode === 'login') {
         navigate(await getPostLoginPath(), { replace: true })
@@ -60,6 +85,11 @@ export default function Login() {
         setMessage('Cadastro criado. Confirme seu e-mail se o Supabase solicitar.')
       }
     } catch (error) {
+      logger.warn(mode === 'login' ? 'auth.login_failed' : 'auth.signup_failed', {
+        requestId,
+        provider: 'password',
+        error
+      })
       setMessage(friendlyError(error))
     } finally {
       setLoading(false)
@@ -67,6 +97,7 @@ export default function Login() {
   }
 
   async function handlePasswordReset() {
+    const requestId = createRequestId()
     setMessage('')
     if (!email) {
       setMessage('Informe seu e-mail para receber o link de recuperacao.')
@@ -80,8 +111,13 @@ export default function Login() {
       })
       if (error) throw error
 
+      logger.info('auth.password_reset_requested', { requestId })
       setMessage('Se o e-mail estiver cadastrado, voce recebera um link temporario para criar uma nova senha.')
     } catch (error) {
+      logger.warn('auth.password_reset_failed', {
+        requestId,
+        error
+      })
       setMessage(friendlyError(error))
     } finally {
       setLoading(false)
