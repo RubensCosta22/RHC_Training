@@ -1,13 +1,15 @@
 # RHC Tech — Pull Request
 
-## Spec
+## Change classification
 
-- **Spec ID:**
+- **SDD version:** v1.2
+- **Spec / Change Record ID:**
 - **Spec version:**
-- **Risk classification:** R0 / R1 / R2 / R3 / R4
-- **Spec status:** Approved
+- **Risk Tier:** R0 / R1 / R2 / R3 / R4
+- **Applicable Controls:**
+- **Spec status:** Approved / N/A for valid R0
 
-> Relevant changes without an Approved/Ready Spec must not proceed. R0 changes may reference a lightweight change record.
+> No Risk Tier → No Ready. No Applicable Controls → No Ready.
 
 ## What changed
 
@@ -17,16 +19,23 @@ Summarize the implementation.
 
 List important behavior intentionally preserved.
 
-## Database impact
+## Legacy touch
 
-- [ ] No database change
-- [ ] Migration included
+- **Material legacy surface touched?** Yes / No
+- **Critical legacy surface?** Yes / No
+- **L1/L0 baseline trigger reached?** Yes / No
+- **Legacy risks recorded:**
+- **Unrelated legacy debt kept out of scope:**
+
+## Database / permissions impact
+
+- [ ] Not applicable
+- [ ] Database impact reviewed
+- [ ] Migration included where required
 - [ ] Existing-data impact evaluated
-- [ ] RLS impact evaluated
-- [ ] Rollback/remediation documented
-- [ ] Validation query/evidence recorded
-
-Details:
+- [ ] Authorization / RLS reviewed where applicable
+- [ ] Rollback/remediation documented where required
+- [ ] Validation evidence recorded
 
 ## Security & privacy impact
 
@@ -34,30 +43,26 @@ Details:
 - Authorization / RLS:
 - Input validation:
 - Sensitive data / logging:
-- Privacy / retention / third parties:
+- Privacy / LGPD / retention / third parties:
 
 ## UX / Brand impact
 
 - Screens/states affected:
-- Mobile verified:
-- Desktop verified:
-- Accessibility verified:
-- RHC Tech Brand System verified:
+- Mobile / Desktop:
+- Accessibility:
+- RHC Tech Brand System:
 
-## Observability & failure handling
+## Observability / reliability / supply chain
 
-Critical failure paths, structured logs, redaction, metrics or other telemetry added/changed:
+- Failure handling / telemetry:
+- Performance/reliability:
+- Dependency/supply-chain impact:
 
-## Tests
+## Tests & evidence
 
-- [ ] Unit
-- [ ] Integration
-- [ ] Permission/RLS
-- [ ] Regression
-- [ ] E2E
-- [ ] Manual UX
-- [ ] Performance/reliability
-- [ ] Security/dependency checks
+| Requirement / AC | Applicable control | Implementation | Test | Evidence | Status |
+|---|---|---|---|---|---|
+| | | | | | |
 
 Commands/results:
 
@@ -65,13 +70,9 @@ Commands/results:
 <evidence>
 ```
 
-## Traceability
-
-| Requirement / AC | Implementation | Test | Evidence | Status |
-|---|---|---|---|---|
-| | | | | |
-
 ## Quality Gates
+
+Mark only gates required by the Risk Tier Applicability Matrix and actual affected surfaces. `Conditional` is mandatory when its surface applies. Any `N/A` must have an explicit reason in the Verification Record.
 
 - [ ] G1 — Spec Compliance
 - [ ] G2 — Build
@@ -87,11 +88,12 @@ Commands/results:
 - [ ] G12 — Performance & Reliability
 - [ ] G13 — Regression
 
-Use `N/A` with an explicit reason in the verification record where a gate does not apply.
+## Adversarial review
 
-## Evidence
-
-Attach or reference screenshots, CI output, database verification, test output and before/after behavior where appropriate.
+- [ ] Not required: valid R0
+- [ ] Required and completed for R1–R4
+- **Blockers remaining:** 0 / N/A
+- **R3/R4 Major findings remaining without approved exception:** 0 / N/A
 
 ## Risks / exceptions
 
@@ -99,6 +101,7 @@ Known residual risks or approved exception IDs:
 
 ## Release & production verification
 
+- Production verification required by applicable controls? Yes / No
 - Rollout/remediation strategy:
 - Post-release critical journey:
 - Telemetry/errors to verify:
