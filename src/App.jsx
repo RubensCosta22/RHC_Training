@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import BottomNav from './components/BottomNav'
 import ProtectedRoute from './components/ProtectedRoute'
 import TopBar from './components/TopBar'
+import { logger, createRequestId } from './lib/observability/logger'
 import { syncPendingWorkouts } from './services/workoutService'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
@@ -44,10 +45,41 @@ function AppShell({ children }) {
 
 export default function App() {
   useEffect(() => {
-    const runSync = () => syncPendingWorkouts().catch(() => undefined)
+    const syncRequestId = createRequestId()
+    const runSync = () => syncPendingWorkouts().catch((error) => {
+      logger.error('offline_sync.failed', {
+        requestId: syncRequestId,
+        error
+      })
+    })
+
+    const handleWindowError = (event) => {
+      logger.fatal('application.unhandled_error', {
+        requestId: createRequestId(),
+        error: event.error || new Error(event.message || 'Unhandled window error'),
+        source: event.filename || undefined,
+        line: event.lineno || undefined,
+        column: event.colno || undefined
+      })
+    }
+
+    const handleUnhandledRejection = (event) => {
+      logger.fatal('application.unhandled_promise_rejection', {
+        requestId: createRequestId(),
+        error: event.reason instanceof Error ? event.reason : new Error('Unhandled promise rejection')
+      })
+    }
+
     runSync()
     window.addEventListener('online', runSync)
-    return () => window.removeEventListener('online', runSync)
+    window.addEventListener('error', handleWindowError)
+    window.addEventListener('unhandledrejection', handleUnhandledRejection)
+
+    return () => {
+      window.removeEventListener('online', runSync)
+      window.removeEventListener('error', handleWindowError)
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection)
+    }
   }, [])
 
   return (
