@@ -1,12 +1,10 @@
-import { assertEquals } from 'jsr:@std/assert@1'
+import { describe, expect, it, vi } from 'vitest'
 import { structuredLogger } from './structuredLogger.ts'
 
-Deno.test('structured logger redacts sensitive fields and embedded secrets', () => {
-  const originalError = console.error
-  let output = ''
-  console.error = (message?: unknown) => { output = String(message ?? '') }
+describe('edge structured logger', () => {
+  it('redacts sensitive fields and embedded secrets', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-  try {
     structuredLogger.error('security.test', {
       requestId: 'request-1',
       userId: 'user-1',
@@ -16,14 +14,15 @@ Deno.test('structured logger redacts sensitive fields and embedded secrets', () 
       error: new Error('failure for person@example.com Bearer embedded-token access_token=embedded-secret')
     })
 
-    assertEquals(output.includes('never-log-password'), false)
-    assertEquals(output.includes('never-log-token'), false)
-    assertEquals(output.includes('never-log-refresh'), false)
-    assertEquals(output.includes('person@example.com'), false)
-    assertEquals(output.includes('embedded-token'), false)
-    assertEquals(output.includes('embedded-secret'), false)
-    assertEquals(output.includes('[REDACTED]'), true)
-  } finally {
-    console.error = originalError
-  }
+    const output = String(spy.mock.calls[0]?.[0] || '')
+    expect(output).not.toContain('never-log-password')
+    expect(output).not.toContain('never-log-token')
+    expect(output).not.toContain('never-log-refresh')
+    expect(output).not.toContain('person@example.com')
+    expect(output).not.toContain('embedded-token')
+    expect(output).not.toContain('embedded-secret')
+    expect(output).toContain('[REDACTED]')
+
+    spy.mockRestore()
+  })
 })
