@@ -1,6 +1,6 @@
 # <SPEC-ID> — Implementation Plan
 
-> Implementation may begin only after the related Spec is Approved and Ready under RHC Tech SDD v1.2.
+> Implementation may begin only after the related Spec is Approved and Ready under RHC Tech SDD v1.3.
 
 ## 1. Spec Reference
 
