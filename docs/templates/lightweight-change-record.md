@@ -1,6 +1,6 @@
 # CHG-XXX — <Title>
 
-> Use only for **R0 — Trivial** changes that provably do not alter runtime behavior.
+> Use only for **R0 — Trivial** changes that provably do not alter runtime behavior under RHC Tech SDD v1.3.
 
 - **Product:** RHC Training
 - **Classification:** R0 — Trivial
@@ -41,4 +41,4 @@ Verification evidence:
 
 ## Escalation rule
 
-If review discovers any material runtime, security, data, UX, architecture, observability, performance or reliability impact, stop using this record and create a full Feature Spec with the correct risk classification.
+If review discovers material runtime, security, data, UX, architecture, observability, performance or reliability impact, stop using this record, reclassify the change, and create the engineering record required by the new Risk Tier: `r1-lite-spec.md` for valid R1 or a full Feature Spec for R2–R4.
