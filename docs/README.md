@@ -2,6 +2,12 @@
 
 RHC Training follows the **RHC Tech Spec-Driven Development Standard v1.3**.
 
+The corporate source of truth is the **RHC Tech Engineering** repository:
+
+`https://github.com/RubensCosta22/RHC-Tech-Engineering`
+
+The authoritative normative Standard is maintained under `standards/`; product-local templates exist for execution convenience only. If a local template conflicts with the central Standard, **the central Standard wins**.
+
 > **Define → Classify Risk → Apply Controls → Implement → Verify → Release when applicable**
 
 ## Mandatory operating rules
@@ -114,4 +120,4 @@ Material requirement or risk discoveries return the Spec to review.
 
 A successful merge or deployment does not prove that a change is Done or healthy in production.
 
-The Standard is normative. Templates, checklists and playbooks exist to make compliance efficient; if they conflict with the Standard, **the Standard wins**.
+The Standard is normative. Product-local templates, checklists and playbooks exist to make compliance efficient; if they conflict with the central Standard, **the central Standard wins**.
