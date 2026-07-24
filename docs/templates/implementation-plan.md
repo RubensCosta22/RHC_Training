@@ -1,12 +1,14 @@
 # <SPEC-ID> — Implementation Plan
 
-> Implementation may begin only after the related Spec is Approved and Ready.
+> Implementation may begin only after the related Spec is Approved and Ready under RHC Tech SDD v1.2.
 
 ## 1. Spec Reference
 
 - **Spec ID:**
 - **Spec Version:**
-- **Risk Classification:**
+- **Risk Tier:**
+- **Applicable Controls:**
+- **SDD Process Budget Target:**
 - **Approved By:**
 
 ## 2. Technical Summary
@@ -15,25 +17,17 @@ Describe how the approved Spec will be implemented without changing its requirem
 
 ## 3. Scope of Change
 
-### Files / modules affected
-
 | Area | File/module | Planned change |
 |---|---|---|
 | | | |
 
-### Components
-
-### Services / APIs
-
-### Database / Supabase
-
-### Migrations
-
-### RLS / permissions
-
-### Storage
-
-### External integrations
+- **Components:**
+- **Services / APIs:**
+- **Database / Supabase:**
+- **Migrations:**
+- **RLS / permissions:**
+- **Storage:**
+- **External integrations:**
 
 ## 4. Architecture Decisions
 
@@ -41,19 +35,11 @@ Describe how the approved Spec will be implemented without changing its requirem
 - New abstractions:
 - ADRs required:
 - Dependencies added/changed:
-- Dependency risk/license/security evaluation:
+- Dependency necessity/security/license/runtime evaluation:
 
 ## 5. Data & Migration Plan
 
-For every migration document:
-
-- objective;
-- compatibility;
-- existing-data impact;
-- RLS impact;
-- rollback/remediation;
-- validation query;
-- post-migration verification.
+For each applicable migration document objective, compatibility, existing-data impact, RLS impact, rollback/remediation, validation query and post-migration verification.
 
 ## 6. Failure Handling & Observability
 
@@ -63,13 +49,14 @@ For every migration document:
 
 Structured logs must redact credentials, tokens, cookies, session IDs, secrets and sensitive personal data before emission.
 
-## 7. Security Implementation
+## 7. Security / Privacy Implementation
 
 - Authentication impact:
 - Authorization boundaries:
 - Input validation:
 - Sensitive-data handling:
-- Abuse/privilege escalation mitigations:
+- Privacy/LGPD controls:
+- Abuse/privilege-escalation mitigations:
 - Secret handling:
 
 ## 8. UX Implementation
@@ -80,42 +67,55 @@ Structured logs must redact credentials, tokens, cookies, session IDs, secrets a
 - Accessibility:
 - Brand System compliance:
 
-## 9. Test Plan
+## 9. Legacy Touch Plan
 
-| Requirement / AC | Test level | Test or verification | Evidence expected |
-|---|---|---|---|
-| | | | |
+- Material legacy surfaces touched:
+- Newly discovered legacy risks to record:
+- Critical surfaces requiring immediate current controls:
+- L1 Domain baseline trigger:
+- L0 Product baseline trigger:
+- Unrelated legacy debt intentionally excluded:
 
-## 10. Performance & Reliability
+## 10. Test & Evidence Plan
+
+| Requirement / AC | Applicable control | Test level | Verification | Evidence expected |
+|---|---|---|---|---|
+| | | | | |
+
+## 11. Performance & Reliability
 
 - Expected performance impact:
 - Query/bundle/media impact:
+- Performance budget if required:
 - Timeouts/retries/idempotency:
 - Concurrency/race risks:
 - Degraded/recovery behavior:
 
-## 11. Rollout & Recovery
+## 12. Rollout & Recovery
 
 - Rollout sequence:
 - Feature flag/staging strategy if applicable:
 - Rollback/remediation strategy:
 - Production verification:
 
-## 12. Risk Register
+## 13. Risk Register
 
 | Risk | Probability | Impact | Mitigation | Residual risk |
 |---|---|---|---|---|
 | | | | | |
 
-## 13. Implementation Checklist
+## 14. Implementation Checklist
 
 - [ ] Plan matches approved Spec
+- [ ] Applicable Controls are preserved
 - [ ] No requirement changed silently
-- [ ] Security boundaries identified
-- [ ] Data migration/remediation defined
+- [ ] Risk tier has not been lowered to avoid controls
+- [ ] Security/data boundaries identified when applicable
+- [ ] Migration/remediation defined when applicable
 - [ ] Tests map to material requirements
-- [ ] Observability covers critical failures
-- [ ] Rollout and recovery are defined
+- [ ] Observability covers required failure paths
+- [ ] Legacy touch/baseline triggers addressed
+- [ ] Rollout and recovery are defined when required
 - [ ] Required ADRs prepared
 
-Material discoveries that change requirements return the item to **Spec Review**.
+Material discoveries that change requirements or risk return the item to **Spec Review**.
