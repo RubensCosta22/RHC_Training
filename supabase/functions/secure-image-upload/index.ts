@@ -5,6 +5,7 @@ import {
   MAX_AVATAR_BYTES,
   MAX_PROGRESS_BYTES
 } from '../_shared/imageInspection.ts'
+import { structuredLogger } from '../_shared/structuredLogger.ts'
 
 const BUCKET = 'progress-photos'
 
@@ -15,17 +16,30 @@ function json(body: Record<string, unknown>, status = 200) {
   })
 }
 
-function operationError(stage: string, error: unknown) {
-  const detail = error && typeof error === 'object' && 'message' in error
-    ? String(error.message)
-    : String(error)
-  console.error(`secure-image-upload ${stage} failed`, detail)
+function operationError(stage: string, error: unknown, context: Record<string, unknown> = {}) {
+  structuredLogger.error('secure_image_upload.operation_failed', {
+    stage,
+    error,
+    ...context
+  })
   return new Error(`${stage} failed`)
 }
 
 Deno.serve(async (request) => {
+  const requestId = crypto.randomUUID()
+
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
-  if (request.method !== 'POST') return json({ error: 'method not allowed' }, 405)
+  if (request.method !== 'POST') {
+    structuredLogger.warn('secure_image_upload.method_not_allowed', {
+      requestId,
+      method: request.method
+    })
+    return json({ error: 'method not allowed' }, 405)
+  }
+
+  let userId: string | undefined
+  let profileId = ''
+  let kind = ''
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
@@ -33,6 +47,13 @@ Deno.serve(async (request) => {
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     const authorization = request.headers.get('Authorization')
     if (!supabaseUrl || !anonKey || !serviceRoleKey || !authorization) {
+      structuredLogger.warn('secure_image_upload.authentication_required', {
+        requestId,
+        hasSupabaseUrl: Boolean(supabaseUrl),
+        hasAnonKey: Boolean(anonKey),
+        hasServiceRoleKey: Boolean(serviceRoleKey),
+        hasAuthorization: Boolean(authorization)
+      })
       return json({ error: 'authentication required' }, 401)
     }
 
@@ -45,21 +66,42 @@ Deno.serve(async (request) => {
     })
 
     const { data: userData, error: userError } = await userClient.auth.getUser()
-    if (userError || !userData.user) return json({ error: 'invalid session' }, 401)
+    if (userError || !userData.user) {
+      structuredLogger.warn('secure_image_upload.invalid_session', {
+        requestId,
+        error: userError
+      })
+      return json({ error: 'invalid session' }, 401)
+    }
+    userId = userData.user.id
 
     const form = await request.formData()
-    const kind = String(form.get('kind') || '')
-    const profileId = String(form.get('profileId') || '')
+    kind = String(form.get('kind') || '')
+    profileId = String(form.get('profileId') || '')
     const file = form.get('file')
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(profileId)) {
+      structuredLogger.warn('secure_image_upload.invalid_profile', { requestId, userId })
       return json({ error: 'invalid profile' }, 400)
     }
-    if (!(file instanceof File)) return json({ error: 'image required' }, 400)
+    if (!(file instanceof File)) {
+      structuredLogger.warn('secure_image_upload.image_required', { requestId, userId, profileId })
+      return json({ error: 'image required' }, 400)
+    }
 
     const isAvatar = kind === 'avatar'
     const isProgress = kind === 'progress'
-    if (!isAvatar && !isProgress) return json({ error: 'invalid upload kind' }, 400)
+    if (!isAvatar && !isProgress) {
+      structuredLogger.warn('secure_image_upload.invalid_kind', { requestId, userId, profileId, kind })
+      return json({ error: 'invalid upload kind' }, 400)
+    }
     if (file.size <= 0 || file.size > (isAvatar ? MAX_AVATAR_BYTES : MAX_PROGRESS_BYTES)) {
+      structuredLogger.warn('secure_image_upload.size_rejected', {
+        requestId,
+        userId,
+        profileId,
+        kind,
+        sizeBytes: file.size
+      })
       return json({ error: 'image size exceeds safe limit' }, 413)
     }
 
@@ -67,13 +109,29 @@ Deno.serve(async (request) => {
     const { data: allowed, error: permissionError } = await userClient.rpc(permissionFunction, {
       target_profile_id: profileId
     })
-    if (permissionError || allowed !== true) return json({ error: 'access denied' }, 403)
+    if (permissionError || allowed !== true) {
+      structuredLogger.warn('secure_image_upload.access_denied', {
+        requestId,
+        userId,
+        profileId,
+        kind,
+        error: permissionError
+      })
+      return json({ error: 'access denied' }, 403)
+    }
 
     const { error: rateError } = await userClient.rpc('enforce_security_rate_limit', {
       p_action: isAvatar ? 'avatar_upload' : 'progress_photo_upload'
     })
     if (rateError) {
       const limited = rateError.message?.includes('rate limit exceeded')
+      structuredLogger.warn(limited ? 'secure_image_upload.rate_limited' : 'secure_image_upload.rate_limit_unavailable', {
+        requestId,
+        userId,
+        profileId,
+        kind,
+        error: rateError
+      })
       return json({ error: limited ? 'rate limit exceeded' : 'rate limit unavailable' }, limited ? 429 : 503)
     }
 
@@ -85,7 +143,13 @@ Deno.serve(async (request) => {
     const { data: profile, error: profileError } = await userClient
       .from('profiles').select('user_id,avatar_url').eq('id', profileId).single()
     if (profileError || !profile) {
-      console.error('secure-image-upload profile lookup failed', profileError?.message || 'profile not found')
+      structuredLogger.error('secure_image_upload.profile_lookup_failed', {
+        requestId,
+        userId,
+        profileId,
+        kind,
+        error: profileError || new Error('profile not found')
+      })
       return json({ error: 'profile not found' }, 404)
     }
 
@@ -99,6 +163,13 @@ Deno.serve(async (request) => {
       date = String(form.get('date') || '')
       photoType = String(form.get('photoType') || '')
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !['frente', 'lado', 'costas'].includes(photoType)) {
+        structuredLogger.warn('secure_image_upload.invalid_photo_metadata', {
+          requestId,
+          userId,
+          profileId,
+          kind,
+          photoType
+        })
         return json({ error: 'invalid photo metadata' }, 400)
       }
       path = `${profile.user_id}/${profileId}/${date}/${photoType}-${id}.${image.extension}`
@@ -107,7 +178,7 @@ Deno.serve(async (request) => {
     const { error: uploadError } = await adminClient.storage.from(BUCKET).upload(path, bytes, {
       contentType: image.contentType, cacheControl: '3600', upsert: false
     })
-    if (uploadError) throw operationError('storage upload', uploadError)
+    if (uploadError) throw operationError('storage upload', uploadError, { requestId, userId, profileId, kind })
 
     if (isAvatar) {
       const { error: updateError } = await userClient.rpc('update_profile_avatar', {
@@ -116,13 +187,21 @@ Deno.serve(async (request) => {
       })
       if (updateError) {
         await adminClient.storage.from(BUCKET).remove([path])
-        throw operationError('avatar update', updateError)
+        throw operationError('avatar update', updateError, { requestId, userId, profileId, kind })
       }
       const oldPath = profile.avatar_url
       if (oldPath?.startsWith(`${profile.user_id}/${profileId}/avatars/`)) {
         await adminClient.storage.from(BUCKET).remove([oldPath])
       }
       const { data: signed } = await adminClient.storage.from(BUCKET).createSignedUrl(path, 3600)
+      structuredLogger.info('secure_image_upload.succeeded', {
+        requestId,
+        userId,
+        profileId,
+        kind,
+        width: image.width,
+        height: image.height
+      })
       return json({ path, signedUrl: signed?.signedUrl || null, width: image.width, height: image.height })
     }
 
@@ -133,12 +212,27 @@ Deno.serve(async (request) => {
     }).select('*').single()
     if (insertError) {
       await adminClient.storage.from(BUCKET).remove([path])
-      throw operationError('photo insert', insertError)
+      throw operationError('photo insert', insertError, { requestId, userId, profileId, kind })
     }
     const { data: signed } = await adminClient.storage.from(BUCKET).createSignedUrl(path, 900)
+    structuredLogger.info('secure_image_upload.succeeded', {
+      requestId,
+      userId,
+      profileId,
+      kind,
+      photoType,
+      width: image.width,
+      height: image.height
+    })
     return json({ photo: { ...photo, signedUrl: signed?.signedUrl || null }, width: image.width, height: image.height })
   } catch (error) {
-    console.error('secure-image-upload failed', error instanceof Error ? error.message : 'unknown error')
+    structuredLogger.error('secure_image_upload.failed', {
+      requestId,
+      userId,
+      profileId: profileId || undefined,
+      kind: kind || undefined,
+      error
+    })
     const message = error instanceof Error ? error.message : 'upload failed'
     const safeMessages = new Set(['unsupported or invalid image', 'image dimensions exceed safe limit'])
     return json({ error: safeMessages.has(message) ? message : 'upload failed' }, 400)
