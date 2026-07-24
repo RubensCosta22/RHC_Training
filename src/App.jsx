@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import AppErrorBoundary from './components/AppErrorBoundary'
 import BottomNav from './components/BottomNav'
 import ProtectedRoute from './components/ProtectedRoute'
 import TopBar from './components/TopBar'
@@ -83,27 +84,29 @@ export default function App() {
   }, [])
 
   return (
-    <Suspense fallback={<PageFallback />}>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route element={<ProtectedRoute />}>
-          <Route path="/profiles" element={<AppShell><Profiles /></AppShell>} />
-          <Route path="/admin" element={<AppShell><Admin /></AppShell>} />
-          <Route path="/family" element={<AppShell><Family /></AppShell>} />
-          <Route path="/plans" element={<AppShell><Plans /></AppShell>} />
-          <Route path="/schedule" element={<AppShell><Schedule /></AppShell>} />
-          <Route path="/dashboard/:profileId" element={<AppShell><Dashboard /></AppShell>} />
-          <Route path="/workout/:profileId/:type" element={<AppShell><Workout /></AppShell>} />
-          <Route path="/history/:profileId" element={<AppShell><History /></AppShell>} />
-          <Route path="/progress/:profileId" element={<AppShell><Progress /></AppShell>} />
-          <Route path="/measurements/:profileId" element={<AppShell><Measurements /></AppShell>} />
-          <Route path="/photos/:profileId" element={<AppShell><Photos /></AppShell>} />
-          <Route path="/settings/:profileId" element={<AppShell><Settings /></AppShell>} />
-          <Route path="/archived/:profileId" element={<AppShell><Archived /></AppShell>} />
-        </Route>
-        <Route path="*" element={<Navigate to="/profiles" replace />} />
-      </Routes>
-    </Suspense>
+    <AppErrorBoundary>
+      <Suspense fallback={<PageFallback />}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route element={<ProtectedRoute />}>
+            <Route path="/profiles" element={<AppShell><Profiles /></AppShell>} />
+            <Route path="/admin" element={<AppShell><Admin /></AppShell>} />
+            <Route path="/family" element={<AppShell><Family /></AppShell>} />
+            <Route path="/plans" element={<AppShell><Plans /></AppShell>} />
+            <Route path="/schedule" element={<AppShell><Schedule /></AppShell>} />
+            <Route path="/dashboard/:profileId" element={<AppShell><Dashboard /></AppShell>} />
+            <Route path="/workout/:profileId/:type" element={<AppShell><Workout /></AppShell>} />
+            <Route path="/history/:profileId" element={<AppShell><History /></AppShell>} />
+            <Route path="/progress/:profileId" element={<AppShell><Progress /></AppShell>} />
+            <Route path="/measurements/:profileId" element={<AppShell><Measurements /></AppShell>} />
+            <Route path="/photos/:profileId" element={<AppShell><Photos /></AppShell>} />
+            <Route path="/settings/:profileId" element={<AppShell><Settings /></AppShell>} />
+            <Route path="/archived/:profileId" element={<AppShell><Archived /></AppShell>} />
+          </Route>
+          <Route path="*" element={<Navigate to="/profiles" replace />} />
+        </Routes>
+      </Suspense>
+    </AppErrorBoundary>
   )
 }
