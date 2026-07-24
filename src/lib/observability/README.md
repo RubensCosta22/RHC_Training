@@ -1,23 +1,36 @@
 # Observability
 
-## Structured logs
+RHC Training uses structured JSON logs for operational diagnostics. Product analytics remain separate in `telemetryService`.
 
-Application logs must be emitted as JSON with a stable `action` and one of these levels: `info`, `warn`, `error`, `fatal`.
+## Levels
 
-Prefer contextual identifiers such as `requestId`, `userId` and `profileId` when they are available. Never attach raw request bodies, form payloads, sessions or Supabase auth objects to logs.
+- `info`: successful operational milestones such as login, workout save and completed offline sync.
+- `warn`: recoverable conditions such as invalid local cache, denied access, rate limiting and retryable sync failures.
+- `error`: failed operations such as database writes, authentication dependencies and upload stages.
+- `fatal`: unhandled application errors, rejected promises and React render failures.
 
-## Sensitive data
+## Required context
 
-Passwords, credentials, tokens, authorization headers, cookies, API keys and direct personal data must not be intentionally passed to the logger. The logger redactor is a defense-in-depth layer and replaces known sensitive keys with `[REDACTED]`.
+Use `requestId` for correlation and add `userId`, `profileId` and `action` whenever they are available and relevant.
 
-## Event naming
+## Security rules
 
-Use dot-separated actions that describe the operation and outcome, for example:
+Never pass full request bodies, form payloads, Supabase sessions, Authorization headers, cookies, signed URLs or secrets to the logger.
 
-- `auth.login.success`
-- `auth.login.failed`
-- `workout.save.failed`
-- `offline_sync.completed`
-- `upload.avatar.failed`
+The sanitizer is defense in depth. It redacts known sensitive keys and also masks e-mail addresses, Bearer credentials and common secret assignments embedded inside strings.
 
-Product analytics and operational logging are separate concerns. Do not use operational logs to store workout content, notes, measurements or other user-generated personal data.
+## Current coverage
+
+- authentication and password recovery
+- workout save/archive
+- offline workout synchronization
+- local pending-workout parsing failures
+- dashboard last-measurement lookup
+- telemetry delivery failures
+- secure image upload Edge Function
+- global browser errors and unhandled promise rejections
+- React render failures through `AppErrorBoundary`
+
+## Naming
+
+Prefer stable domain-oriented event names such as `workout.save_failed`, `offline_sync.item_failed` and `secure_image_upload.access_denied`. Do not include user-provided text in event names.
