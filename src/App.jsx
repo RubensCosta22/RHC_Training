@@ -10,6 +10,7 @@ import { syncPendingWorkouts } from './services/workoutService'
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Archived = lazy(() => import('./pages/Archived'))
 const Admin = lazy(() => import('./pages/Admin'))
+const AdminStats = lazy(() => import('./pages/AdminStats'))
 const History = lazy(() => import('./pages/History'))
 const Login = lazy(() => import('./pages/Login'))
 const Measurements = lazy(() => import('./pages/Measurements'))
@@ -33,7 +34,7 @@ function PageFallback() {
 
 function AppShell({ children }) {
   const { pathname } = useLocation()
-  const wide = ['/admin', '/family', '/plans', '/schedule'].includes(pathname)
+  const wide = ['/admin', '/admin/stats', '/family', '/plans', '/schedule'].includes(pathname)
   const profileArea = /^\/(dashboard|workout|history|progress|measurements|photos|settings|archived)\//.test(pathname)
   return (
     <main className={`mx-auto min-h-screen max-w-[1440px] px-5 pb-32 sm:px-8 ${profileArea?'lg:pl-[244px] lg:pr-10':'lg:px-12'} ${wide?'2xl:max-w-[1560px]':''}`}>
@@ -92,6 +93,7 @@ export default function App() {
           <Route element={<ProtectedRoute />}>
             <Route path="/profiles" element={<AppShell><Profiles /></AppShell>} />
             <Route path="/admin" element={<AppShell><Admin /></AppShell>} />
+            <Route path="/admin/stats" element={<AppShell><AdminStats /></AppShell>} />
             <Route path="/family" element={<AppShell><Family /></AppShell>} />
             <Route path="/plans" element={<AppShell><Plans /></AppShell>} />
             <Route path="/schedule" element={<AppShell><Schedule /></AppShell>} />
