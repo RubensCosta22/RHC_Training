@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabaseClient'
+import { normalizeEmail, sanitizeText, validateUuid } from '../utils/validation'
 
 export async function claimFamilyProfile() {
   const { data, error } = await supabase.rpc('claim_family_profile')
@@ -40,18 +41,22 @@ export async function getPostLoginPath() {
 }
 
 export async function createFamilyGroup(name, adminEmail) {
+  const cleanName = sanitizeText(name || 'Familia RHC', 80) || 'Familia RHC'
+  const cleanAdminEmail = normalizeEmail(adminEmail)
   const { data, error } = await supabase.rpc('create_family_group', {
-    p_name: name || 'Familia RHC',
-    p_admin_email: adminEmail
+    p_name: cleanName,
+    p_admin_email: cleanAdminEmail
   })
   if (error) throw error
   return data
 }
 
 export async function associateProfileEmail(profileId, email) {
+  const cleanProfileId = validateUuid(profileId, 'Perfil')
+  const cleanEmail = normalizeEmail(email)
   const { error } = await supabase.rpc('invite_profile_user', {
-    p_profile_id: profileId,
-    p_email: email
+    p_profile_id: cleanProfileId,
+    p_email: cleanEmail
   })
   if (error) throw error
 }
