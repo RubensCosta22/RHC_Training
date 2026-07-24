@@ -1,3 +1,5 @@
+import { logger, createRequestId } from '../lib/observability/logger'
+
 const RECOVERY_KEY = 'rhc_password_recovery'
 
 export function isPasswordRecoveryUrl(location = typeof window !== 'undefined' ? window.location : {}) {
@@ -24,7 +26,12 @@ export function hasPasswordRecovery(session) {
       session?.user?.id && marker?.userId === session.user.id &&
       Number(marker.expiresAt || 0) >= Math.floor(Date.now() / 1000)
     )
-  } catch {
+  } catch (error) {
+    logger.warn('auth.password_recovery_marker_parse_failed', {
+      requestId: createRequestId(),
+      userId: session?.user?.id || undefined,
+      error
+    })
     return false
   }
 }
