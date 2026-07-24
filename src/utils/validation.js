@@ -1,8 +1,12 @@
 export const LIMITS = {
   gymName: 80,
   notes: 500,
-  shortText: 120
+  shortText: 120,
+  email: 254
 }
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 export function sanitizeText(value = '', maxLength = LIMITS.notes) {
   return String(value)
@@ -13,10 +17,24 @@ export function sanitizeText(value = '', maxLength = LIMITS.notes) {
     .trim()
 }
 
+export function normalizeEmail(value = '') {
+  const email = String(value).trim().toLowerCase()
+  if (!email || email.length > LIMITS.email || !EMAIL_PATTERN.test(email)) {
+    throw new Error('Informe um e-mail valido.')
+  }
+  return email
+}
+
+export function validateUuid(value, fieldLabel = 'identificador') {
+  const id = String(value || '').trim()
+  if (!UUID_PATTERN.test(id)) throw new Error(`${fieldLabel} invalido.`)
+  return id
+}
+
 export function parsePositiveNumber(value, fieldLabel = 'valor') {
   if (value === '' || value === null || value === undefined) return null
   const parsed = Number(value)
-  if (Number.isNaN(parsed) || parsed < 0) {
+  if (!Number.isFinite(parsed) || parsed < 0) {
     throw new Error(`${fieldLabel} não pode ser negativo.`)
   }
   return parsed
