@@ -1,9 +1,16 @@
 const SENSITIVE_KEY_PATTERN = /(password|passwd|secret|token|authorization|cookie|api[-_]?key|service[-_]?role|jwt|session|credential|email|phone|cpf|birth[-_]?date|address)/i
 const MAX_DEPTH = 6
 const MAX_STRING_LENGTH = 1000
+const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi
+const BEARER_PATTERN = /Bearer\s+[A-Za-z0-9._~+/=-]+/gi
+const SECRET_ASSIGNMENT_PATTERN = /\b(access_token|refresh_token|token|password|secret|api_key|apikey)=([^\s&]+)/gi
 
 function redactString(value) {
-  return value.length > MAX_STRING_LENGTH ? `${value.slice(0, MAX_STRING_LENGTH)}…` : value
+  const truncated = value.length > MAX_STRING_LENGTH ? `${value.slice(0, MAX_STRING_LENGTH)}…` : value
+  return truncated
+    .replace(EMAIL_PATTERN, '[REDACTED_EMAIL]')
+    .replace(BEARER_PATTERN, 'Bearer [REDACTED]')
+    .replace(SECRET_ASSIGNMENT_PATTERN, '$1=[REDACTED]')
 }
 
 export function sanitizeLogValue(value, depth = 0, seen = new WeakSet()) {
