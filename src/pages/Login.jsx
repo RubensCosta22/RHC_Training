@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { logger, createRequestId } from '../lib/observability/logger'
-import { friendlyError } from '../utils/validation'
+import { friendlyError, normalizeEmail, validateNewPassword } from '../utils/validation'
 import { getPostLoginPath } from '../services/familyService'
 
 export default function Login() {
@@ -60,11 +60,14 @@ export default function Login() {
     setMessage('')
 
     try {
+      const cleanEmail = normalizeEmail(email)
+      if (mode === 'signup') validateNewPassword(password, password)
+
       const action =
         mode === 'login'
-          ? supabase.auth.signInWithPassword({ email, password })
+          ? supabase.auth.signInWithPassword({ email: cleanEmail, password })
           : supabase.auth.signUp({
-              email,
+              email: cleanEmail,
               password,
               options: { emailRedirectTo: `${window.location.origin}/login` }
             })
@@ -106,7 +109,8 @@ export default function Login() {
 
     setLoading(true)
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      const cleanEmail = normalizeEmail(email)
+      const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
         redirectTo: `${window.location.origin}/reset-password`
       })
       if (error) throw error
@@ -142,8 +146,8 @@ export default function Login() {
         <div className="my-6 flex items-center gap-3 text-[10px] uppercase tracking-[.16em] text-[#62676f]"><span className="h-px flex-1 bg-[#272a2f]" />ou<span className="h-px flex-1 bg-[#272a2f]" /></div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          <label className="block text-xs font-semibold text-[#92979f]">E-mail<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required placeholder="voce@exemplo.com" autoComplete="email" /></label>
-          <label className="block text-xs font-semibold text-[#92979f]">Senha<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={6} placeholder="Sua senha" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} /></label>
+          <label className="block text-xs font-semibold text-[#92979f]">E-mail<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required maxLength={254} placeholder="voce@exemplo.com" autoComplete="email" /></label>
+          <label className="block text-xs font-semibold text-[#92979f]">Senha<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={mode === 'signup' ? 8 : 6} maxLength={128} placeholder="Sua senha" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} /></label>
           <button disabled={loading} className="btn-secondary flex w-full items-center justify-center gap-2" type="submit">{loading ? 'Aguarde...' : mode === 'login' ? 'Entrar com e-mail' : 'Criar conta'} {!loading&&<ArrowRight size={17}/>}</button>
         </form>
 
