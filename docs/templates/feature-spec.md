@@ -1,6 +1,6 @@
 # <SPEC-ID> — <Title>
 
-> RHC Tech Spec-Driven Development Standard v1.2
+> RHC Tech Spec-Driven Development Standard v1.3
 
 ## 1. Identification
 
@@ -10,7 +10,7 @@
 - **Status:** Draft
 - **Owner:**
 - **Required Approvers:**
-- **Risk Tier:** R0 / R1 / R2 / R3 / R4
+- **Risk Tier:** R1 / R2 / R3 / R4
 - **SDD Process Budget Target:**
 - **Created:** YYYY-MM-DD
 - **Last Updated:** YYYY-MM-DD
@@ -19,9 +19,11 @@
 - **Target Release:**
 - **Supersedes:**
 
+> R0 uses `lightweight-change-record.md`; do not create a full Feature Spec for valid R0 merely for formality.
+
 ## 2. Applicable Controls
 
-Derive this block from SDD v1.2 Section 32. `Conditional` controls become mandatory when the affected surface applies.
+Derive this block from SDD v1.3 Section 32. `Conditional` controls become mandatory when the affected surface applies.
 
 - [ ] Change record / Feature Spec
 - [ ] Acceptance Criteria
@@ -217,7 +219,7 @@ Explain required coverage based on risk and applicable controls.
 
 - [ ] Risk tier assigned
 - [ ] Applicable Controls declared
-- [ ] SDD Process Budget target identified for R0–R3
+- [ ] SDD Process Budget target identified for R1–R3
 - [ ] Problem is clear
 - [ ] Scope and non-goals are explicit
 - [ ] Functional requirements are testable
@@ -230,6 +232,7 @@ Explain required coverage based on risk and applicable controls.
 - [ ] Acceptance criteria exist
 - [ ] Material open questions are closed
 - [ ] Required adversarial review completed for R1–R4
+- [ ] For R3/R4, independent review context recorded when tooling supports separation
 - [ ] Blocking findings resolved
 
 **No Risk Tier → No Ready.**  
