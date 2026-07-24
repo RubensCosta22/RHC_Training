@@ -3,6 +3,8 @@
 ## 1. Release Candidate
 
 - **Spec ID / Version:**
+- **Risk Tier:**
+- **Applicable Controls:**
 - **PR:**
 - **Commit SHA:**
 - **Environment:**
@@ -17,70 +19,55 @@
 
 ## 3. Quality Gates
 
-| Gate | Result | Evidence / Notes |
-|---|---|---|
-| G1 — Spec Compliance | Pass / Fail / N/A | |
-| G2 — Build | Pass / Fail / N/A | |
-| G3 — Static Quality | Pass / Fail / N/A | |
-| G4 — Tests | Pass / Fail / N/A | |
-| G5 — Security | Pass / Fail / N/A | |
-| G6 — Permissions | Pass / Fail / N/A | |
-| G7 — UX | Pass / Fail / N/A | |
-| G8 — Brand | Pass / Fail / N/A | |
-| G9 — Observability | Pass / Fail / N/A | |
-| G10 — Privacy & Data Governance | Pass / Fail / N/A | |
-| G11 — Supply Chain Security | Pass / Fail / N/A | |
-| G12 — Performance & Reliability | Pass / Fail / N/A | |
-| G13 — Regression | Pass / Fail / N/A | |
+Only gates required by the Risk Tier Applicability Matrix and the actual affected surfaces are mandatory. `Conditional` becomes mandatory when its surface applies.
 
-Any mandatory failed gate blocks release.
+| Gate | Required? | Result | Evidence / Notes |
+|---|---|---|---|
+| G1 — Spec Compliance | Yes / No | Pass / Fail / N/A | |
+| G2 — Build | Yes / No | Pass / Fail / N/A | |
+| G3 — Static Quality | Yes / No | Pass / Fail / N/A | |
+| G4 — Tests | Yes / No | Pass / Fail / N/A | |
+| G5 — Security | Yes / No | Pass / Fail / N/A | |
+| G6 — Permissions | Yes / No | Pass / Fail / N/A | |
+| G7 — UX | Yes / No | Pass / Fail / N/A | |
+| G8 — Brand | Yes / No | Pass / Fail / N/A | |
+| G9 — Observability | Yes / No | Pass / Fail / N/A | |
+| G10 — Privacy & Data Governance | Yes / No | Pass / Fail / N/A | |
+| G11 — Supply Chain Security | Yes / No | Pass / Fail / N/A | |
+| G12 — Performance & Reliability | Yes / No | Pass / Fail / N/A | |
+| G13 — Regression | Yes / No | Pass / Fail / N/A | |
+
+Any required failed gate blocks release. Every `N/A` for a conditional control must include a reason.
 
 ## 4. Automated Evidence
 
-### Build
+### Build / static analysis
 
 ```text
-<command and result>
-```
-
-### Static analysis
-
-```text
-<command and result>
+<commands and results>
 ```
 
 ### Tests
 
 ```text
-<command and result>
+<commands and results>
 ```
 
 ### Security / dependency checks
 
 ```text
-<command and result>
+<commands and results>
 ```
 
 ## 5. Manual Verification
 
 ### Critical journeys
-
 - [ ]
 
-### Mobile
-
+### Mobile / Desktop / Accessibility
 - [ ]
 
-### Desktop
-
-- [ ]
-
-### Accessibility
-
-- [ ]
-
-### Error/degraded states
-
+### Error / degraded states
 - [ ]
 
 ## 6. Database / Migration Verification
@@ -91,40 +78,43 @@ Any mandatory failed gate blocks release.
 - Existing-data verification:
 - Rollback/remediation readiness:
 
-## 7. Production Verification
+## 7. Legacy Touch Verification
 
-- [ ] Authentication
-- [ ] API/data access
-- [ ] Critical UI
-- [ ] Storage
-- [ ] Telemetry
-- [ ] Major errors checked
+- Material legacy surface touched:
+- Legacy risks discovered and recorded:
+- L1/L0 baseline trigger status:
+- Critical surfaces brought to current controls:
+- Unrelated legacy debt remained outside scope:
+
+## 8. Production Verification
+
+- [ ] Authentication, when applicable
+- [ ] API/data access, when applicable
+- [ ] Critical UI, when applicable
+- [ ] Storage, when applicable
+- [ ] Telemetry/errors, when applicable
 
 Evidence / observations:
 
-## 8. Residual Risks & Accepted Exceptions
+## 9. Residual Risks & Accepted Exceptions
 
 | Item | Severity | Owner | Decision / follow-up |
 |---|---|---|---|
 | | | | |
 
-## 9. Definition of Done
+## 10. Definition of Done
 
 - [ ] Approved Spec implemented
+- [ ] Applicable Controls executed
 - [ ] Acceptance criteria pass
-- [ ] Required tests pass
-- [ ] Build passes
-- [ ] Authorization verified
-- [ ] Migrations verified
-- [ ] Error handling is intentional
-- [ ] Sensitive log data is protected
-- [ ] Responsive behavior checked
-- [ ] Accessibility checked
-- [ ] Brand compliance checked
-- [ ] Privacy/supply-chain/performance gates checked when applicable
-- [ ] Traceability evidence exists
+- [ ] Required tests/build/static checks pass
+- [ ] Required authorization/migration/security/privacy checks pass
+- [ ] Error handling and observability verified when applicable
+- [ ] Required responsive/accessibility/Brand validation completed
+- [ ] Required supply-chain/performance/reliability checks completed
+- [ ] Required traceability evidence exists
 - [ ] No blocking regression remains
-- [ ] Documentation updated
-- [ ] Release evidence exists
+- [ ] Documentation updated when necessary
+- [ ] Required production verification completed
 
 **No evidence → No Done.**
