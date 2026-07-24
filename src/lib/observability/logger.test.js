@@ -26,6 +26,16 @@ describe('observability logger', () => {
     })
   })
 
+  it('redacts sensitive values embedded in strings', () => {
+    const value = sanitizeLogValue({
+      message: 'failed for person@example.com with Bearer abc.def.ghi and access_token=secret-value'
+    })
+
+    expect(value.message).not.toContain('person@example.com')
+    expect(value.message).not.toContain('abc.def.ghi')
+    expect(value.message).not.toContain('secret-value')
+  })
+
   it('never serializes known secrets', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
