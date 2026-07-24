@@ -7,9 +7,13 @@
 - **Spec ID / Version:**
 - **Risk Tier:** R1 / R2 / R3 / R4
 - **Applicable Controls reviewed:**
+- **Reviewed artifact / commit / stable reference:**
 - **Reviewer:**
 - **Review Date:**
-- **Authoring context separated from review pass?** Yes / No
+- **Independent review context from authoring/implementation?** Yes / No
+- **If No for R3/R4, tooling limitation and review-independence risk:**
+
+For R1/R2, separate review context is preferred whenever practical. For R3/R4, separate context is mandatory whenever tooling supports it.
 
 ## 2. Adversarial Question
 
