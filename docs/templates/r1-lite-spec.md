@@ -1,6 +1,6 @@
 # <SPEC-ID> — R1 Lite Spec
 
-> Use only for R1 low-risk changes under RHC Tech SDD v1.2. Reclassify if review reveals higher impact.
+> Use only for R1 low-risk changes under RHC Tech SDD v1.3. Reclassify if review reveals higher impact.
 
 ## Identification
 
@@ -22,7 +22,7 @@
 
 ## Applicable Controls
 
-Derive from `docs/checklists/risk-tiers.md`.
+Derive from `docs/checklists/risk-tiers.md`. `Conditional` becomes mandatory when the surface is affected.
 
 - [x] Lite Feature Spec
 - [x] Acceptance Criteria
@@ -66,6 +66,7 @@ Derive from `docs/checklists/risk-tiers.md`.
 ## Adversarial Review
 
 - Review file/reference:
+- Reviewer/context:
 - Blockers remaining:
 - Major findings remaining:
 
