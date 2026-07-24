@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabaseClient'
+import { logger, createRequestId } from '../lib/observability/logger'
 import { calculateVolume, getProgressionStatus } from '../utils/progression'
 import { getPendingWorkouts, replacePendingWorkouts } from '../utils/storage'
 import { sanitizeText, validateWorkoutInput, parsePositiveNumber } from '../utils/validation'
@@ -76,57 +77,94 @@ export async function saveWorkoutSession({
   notes,
   exercises
 }) {
+  const requestId = createRequestId()
   const { data: userData, error: userError } = await supabase.auth.getUser()
 
-  if (userError) throw userError
+  if (userError) {
+    logger.error('workout.save_auth_failed', {
+      requestId,
+      profileId,
+      action: 'workout.save',
+      error: userError
+    })
+    throw userError
+  }
 
   const userId = userData.user?.id
 
   if (!userId) {
+    logger.warn('workout.save_user_missing', {
+      requestId,
+      profileId,
+      action: 'workout.save'
+    })
     throw new Error('Faça login novamente para salvar o treino.')
   }
 
-  const cleanWorkout = validateWorkoutInput({
-    gymName,
-    durationMinutes,
-    notes
-  })
+  try {
+    const cleanWorkout = validateWorkoutInput({
+      gymName,
+      durationMinutes,
+      notes
+    })
 
-  const cleanExercises = exercises.map(normalizeExerciseForDb)
-  const personalRecords = await detectPersonalRecords(profileId, cleanExercises)
-  const completedCount = cleanExercises.filter((item) => item.completed).length
+    const cleanExercises = exercises.map(normalizeExerciseForDb)
+    const personalRecords = await detectPersonalRecords(profileId, cleanExercises)
+    const completedCount = cleanExercises.filter((item) => item.completed).length
 
-  const completionPercentage = cleanExercises.length
-    ? Math.round((completedCount / cleanExercises.length) * 100)
-    : 0
+    const completionPercentage = cleanExercises.length
+      ? Math.round((completedCount / cleanExercises.length) * 100)
+      : 0
 
-  const totalVolume = calculateVolume(
-    cleanExercises.map((item) => ({
-      ...item,
-      name: item.exercise_name
-    }))
-  )
+    const totalVolume = calculateVolume(
+      cleanExercises.map((item) => ({
+        ...item,
+        name: item.exercise_name
+      }))
+    )
 
-  const { data: session, error: sessionError } = await supabase.rpc(
-    'save_family_workout_session_atomic',
-    {
-      p_profile_id: profileId,
-      p_workout_type: workoutType,
-      p_date: date,
-      p_gym_name: cleanWorkout.gymName,
-      p_duration_minutes: cleanWorkout.durationMinutes,
-      p_completion_percentage: completionPercentage,
-      p_total_volume: totalVolume,
-      p_notes: cleanWorkout.notes || null,
-      p_exercises: cleanExercises
+    const { data: session, error: sessionError } = await supabase.rpc(
+      'save_family_workout_session_atomic',
+      {
+        p_profile_id: profileId,
+        p_workout_type: workoutType,
+        p_date: date,
+        p_gym_name: cleanWorkout.gymName,
+        p_duration_minutes: cleanWorkout.durationMinutes,
+        p_completion_percentage: completionPercentage,
+        p_total_volume: totalVolume,
+        p_notes: cleanWorkout.notes || null,
+        p_exercises: cleanExercises
+      }
+    )
+
+    if (sessionError) throw sessionError
+
+    logger.info('workout.save_succeeded', {
+      requestId,
+      userId,
+      profileId,
+      action: 'workout.save',
+      workoutType,
+      completedCount,
+      exerciseCount: cleanExercises.length,
+      personalRecordCount: personalRecords.length
+    })
+
+    return {
+      ...session,
+      personalRecords
     }
-  )
-
-  if (sessionError) throw sessionError
-
-  return {
-    ...session,
-    personalRecords
+  } catch (error) {
+    logger.error('workout.save_failed', {
+      requestId,
+      userId,
+      profileId,
+      action: 'workout.save',
+      workoutType,
+      error
+    })
+    throw error
   }
 }
 
@@ -201,7 +239,7 @@ export async function getDashboardSummary(profileId) {
   const streak = calculateStreak(normalized.map((session) => session.date))
   const bestStreak = calculateBestStreak(normalized.map((session) => session.date))
 
-  const { data: lastMeasurement } = await supabase
+  const { data: lastMeasurement, error: lastMeasurementError } = await supabase
     .from('body_measurements')
     .select('weight,date')
     .eq('profile_id', profileId)
@@ -209,6 +247,15 @@ export async function getDashboardSummary(profileId) {
     .order('date', { ascending: false })
     .limit(1)
     .maybeSingle()
+
+  if (lastMeasurementError) {
+    logger.warn('dashboard.last_measurement_load_failed', {
+      requestId: createRequestId(),
+      profileId,
+      action: 'dashboard.load_last_measurement',
+      error: lastMeasurementError
+    })
+  }
 
   return {
     lastWorkout,
@@ -313,6 +360,7 @@ export async function getProgressData(profileId) {
 }
 
 async function runPendingWorkoutSync() {
+  const requestId = createRequestId()
   const pending = getPendingWorkouts()
 
   if (!pending.length || !navigator.onLine) {
@@ -323,16 +371,37 @@ async function runPendingWorkoutSync() {
   }
 
   const { data: userData, error: userError } = await supabase.auth.getUser()
-  if (userError) throw userError
+  if (userError) {
+    logger.error('offline_sync.auth_failed', {
+      requestId,
+      action: 'offline_sync',
+      pendingCount: pending.length,
+      error: userError
+    })
+    throw userError
+  }
 
   const userId = userData.user?.id
-  if (!userId) return { synced: 0, remaining: pending.length }
+  if (!userId) {
+    logger.warn('offline_sync.user_missing', {
+      requestId,
+      action: 'offline_sync',
+      pendingCount: pending.length
+    })
+    return { synced: 0, remaining: pending.length }
+  }
 
   const remaining = []
   let synced = 0
 
   for (const item of pending) {
     if (!item.ownerUserId || item.ownerUserId !== userId) {
+      logger.warn('offline_sync.owner_mismatch', {
+        requestId,
+        userId,
+        action: 'offline_sync',
+        offlineId: item.offlineId || undefined
+      })
       remaining.push(item)
       continue
     }
@@ -341,12 +410,29 @@ async function runPendingWorkoutSync() {
       const { ownerUserId: _ownerUserId, offlineId: _offlineId, ...payload } = item
       await saveWorkoutSession(payload)
       synced += 1
-    } catch {
+    } catch (error) {
+      logger.warn('offline_sync.item_failed', {
+        requestId,
+        userId,
+        profileId: item.profileId,
+        action: 'offline_sync',
+        offlineId: item.offlineId || undefined,
+        error
+      })
       remaining.push(item)
     }
   }
 
   replacePendingWorkouts(remaining)
+
+  logger.info('offline_sync.completed', {
+    requestId,
+    userId,
+    action: 'offline_sync',
+    pendingCount: pending.length,
+    synced,
+    remaining: remaining.length
+  })
 
   return {
     synced,
@@ -366,10 +452,25 @@ export function syncPendingWorkouts() {
 }
 
 export async function archiveWorkoutSession(sessionId) {
+  const requestId = createRequestId()
   const { error } = await supabase
     .from('workout_sessions')
     .update({ archived_at: new Date().toISOString() })
     .eq('id', sessionId)
 
-  if (error) throw error
+  if (error) {
+    logger.error('workout.archive_failed', {
+      requestId,
+      action: 'workout.archive',
+      sessionId,
+      error
+    })
+    throw error
+  }
+
+  logger.info('workout.archive_succeeded', {
+    requestId,
+    action: 'workout.archive',
+    sessionId
+  })
 }
