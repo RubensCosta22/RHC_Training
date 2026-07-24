@@ -3,6 +3,35 @@ import { getWorkoutSessions } from './workoutService'
 import { listMeasurements } from './measurementService'
 import { toCsv, downloadFile } from '../utils/csvExport'
 
+const MAX_BACKUP_BYTES = 10 * 1024 * 1024
+const MAX_BACKUP_RECORDS = 5000
+const MAX_BACKUP_DEPTH = 12
+const FORBIDDEN_JSON_KEYS = new Set(['__proto__', 'prototype', 'constructor'])
+
+function assertSafeJsonTree(value, depth = 0) {
+  if (depth > MAX_BACKUP_DEPTH) throw new Error('Backup invalido: estrutura muito profunda.')
+  if (value === null || typeof value !== 'object') return
+
+  if (Array.isArray(value)) {
+    for (const item of value) assertSafeJsonTree(item, depth + 1)
+    return
+  }
+
+  for (const [key, item] of Object.entries(value)) {
+    if (FORBIDDEN_JSON_KEYS.has(key)) throw new Error('Backup invalido: estrutura nao permitida.')
+    assertSafeJsonTree(item, depth + 1)
+  }
+}
+
+function assertJsonFile(file) {
+  const name = String(file?.name || '').toLowerCase()
+  const type = String(file?.type || '').toLowerCase()
+  const acceptedType = !type || type === 'application/json' || type === 'text/json'
+  if (!acceptedType || (name && !name.endsWith('.json'))) {
+    throw new Error('Selecione um arquivo JSON valido.')
+  }
+}
+
 export async function exportHistoryCsv(profileId) {
   const sessions = await getWorkoutSessions(profileId)
   const rows = sessions.flatMap((session) =>
@@ -33,17 +62,20 @@ export async function exportHistoryJson(profileId) {
 }
 
 export async function importBackupJson(profileId, file) {
-  if (file.size > 10 * 1024 * 1024) {
+  assertJsonFile(file)
+  if (file.size > MAX_BACKUP_BYTES) {
     throw new Error('Backup muito grande. Use um arquivo de ate 10 MB.')
   }
 
   const text = await file.text()
   const backup = JSON.parse(text)
+  assertSafeJsonTree(backup)
+
   if (!backup || ![1, 2].includes(backup.version)) throw new Error('Backup invalido.')
   if (!Array.isArray(backup.sessions) || !Array.isArray(backup.measurements)) {
     throw new Error('Backup invalido: listas de dados ausentes.')
   }
-  if (backup.sessions.length > 5000 || backup.measurements.length > 5000) {
+  if (backup.sessions.length > MAX_BACKUP_RECORDS || backup.measurements.length > MAX_BACKUP_RECORDS) {
     throw new Error('Backup excede o limite seguro de registros.')
   }
 
