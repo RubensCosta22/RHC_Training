@@ -51,6 +51,7 @@ docs/
     adr.md
     bug-record.md
     exception-record.md
+    lightweight-change-record.md
 ```
 
 The directories above are adopted progressively. Do not create empty documentation solely to satisfy structure; add each source of truth when it is reviewed and useful.
@@ -83,6 +84,12 @@ RHCT-STATS-001
 Risk may be raised during review. It must not be lowered to avoid a required gate.
 
 ## Starting a relevant change
+
+### R0 — Trivial
+
+Use `docs/templates/lightweight-change-record.md` only when the change provably does not alter runtime behavior. If review discovers material runtime, security, data, UX, architecture, observability, performance or reliability impact, reclassify the change and create a full Feature Spec.
+
+### R1–R4
 
 1. Copy `docs/templates/feature-spec.md` into `docs/specs/<SPEC-ID>/spec.md`.
 2. Complete the Spec and assign risk.
