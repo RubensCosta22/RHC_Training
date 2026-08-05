@@ -1,7 +1,7 @@
 import { MapPin, Pause, Play, RotateCcw, Square } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import {
-  acceptGpsPoint,
+  accumulateGpsPoint,
   calculatePaceSecondsPerKm,
   formatDuration,
   formatPace,
@@ -21,13 +21,20 @@ export default function RunningSessionPanel({ value, onChange, onImportantEvent 
   const timer = running.timer || resetTimer()
   const [now, setNow] = useState(Date.now())
   const watchIdRef = useRef(null)
-  const lastPointRef = useRef(null)
+  const gpsStateRef = useRef({ lastPoint: null, distanceMeters: 0 })
+  const runningRef = useRef(running)
+
+  runningRef.current = running
 
   const elapsedSeconds = timer.status === 'running'
     ? getElapsedSeconds(timer, now)
     : Math.max(0, Number(running.durationSeconds || timer.accumulatedSeconds) || 0)
   const distanceMeters = Math.max(0, Number(running.distanceMeters) || 0)
   const pace = calculatePaceSecondsPerKm(distanceMeters, elapsedSeconds)
+
+  useEffect(() => {
+    gpsStateRef.current.distanceMeters = distanceMeters
+  }, [distanceMeters])
 
   useEffect(() => {
     if (timer.status !== 'running') return undefined
@@ -42,10 +49,13 @@ export default function RunningSessionPanel({ value, onChange, onImportantEvent 
   }, [])
 
   function patch(next, important = false) {
-    const merged = { ...running, ...next }
-    const effectiveDuration = next.durationSeconds ?? getElapsedSeconds(merged.timer || timer)
-    const effectiveDistance = next.distanceMeters ?? distanceMeters
+    const current = runningRef.current || {}
+    const currentTimer = current.timer || resetTimer()
+    const merged = { ...current, ...next }
+    const effectiveDuration = next.durationSeconds ?? getElapsedSeconds(merged.timer || currentTimer)
+    const effectiveDistance = next.distanceMeters ?? Math.max(0, Number(current.distanceMeters) || 0)
     merged.averagePaceSecondsPerKm = calculatePaceSecondsPerKm(effectiveDistance, effectiveDuration)
+    runningRef.current = merged
     onChange(merged)
     if (important) onImportantEvent?.(merged)
   }
@@ -67,6 +77,7 @@ export default function RunningSessionPanel({ value, onChange, onImportantEvent 
 
   function reset() {
     stopGps()
+    gpsStateRef.current = { lastPoint: null, distanceMeters: 0 }
     patch({ timer: resetTimer(), durationSeconds: 0, distanceMeters: 0, averagePaceSecondsPerKm: null, mode: 'manual', gpsStatus: 'idle', status: 'idle' }, true)
   }
 
@@ -75,7 +86,7 @@ export default function RunningSessionPanel({ value, onChange, onImportantEvent 
       navigator.geolocation.clearWatch(watchIdRef.current)
       watchIdRef.current = null
     }
-    lastPointRef.current = null
+    gpsStateRef.current.lastPoint = null
   }
 
   function startGps() {
@@ -84,6 +95,10 @@ export default function RunningSessionPanel({ value, onChange, onImportantEvent 
       return
     }
     stopGps()
+    gpsStateRef.current = {
+      lastPoint: null,
+      distanceMeters: Math.max(0, Number(runningRef.current?.distanceMeters) || 0)
+    }
     patch({ gpsStatus: 'acquiring', mode: 'gps', timer: startTimer(timer) })
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
@@ -93,13 +108,13 @@ export default function RunningSessionPanel({ value, onChange, onImportantEvent 
           accuracy: position.coords.accuracy,
           timestamp: position.timestamp
         }
-        const result = acceptGpsPoint(lastPointRef.current, point)
-        if (!result.accepted) {
-          patch({ gpsStatus: result.reason === 'accuracy' ? 'weak' : 'tracking' })
+        const nextGpsState = accumulateGpsPoint(gpsStateRef.current, point)
+        gpsStateRef.current = nextGpsState
+        if (!nextGpsState.accepted) {
+          patch({ gpsStatus: nextGpsState.reason === 'accuracy' ? 'weak' : 'tracking' })
           return
         }
-        lastPointRef.current = point
-        patch({ gpsStatus: 'tracking', distanceMeters: distanceMeters + Number(result.distanceMeters || 0), mode: 'gps' })
+        patch({ gpsStatus: 'tracking', distanceMeters: nextGpsState.distanceMeters, mode: 'gps' })
       },
       () => {
         stopGps()
