@@ -20,7 +20,13 @@ import {
   removeLocalWorkoutDraft,
   saveLocalWorkoutDraft
 } from '../services/workoutDraftLocalService'
-import { removeRemoteWorkoutDraft, upsertRemoteWorkoutDraft } from '../services/workoutDraftService'
+import {
+  getLatestRemoteWorkoutDraft,
+  getRemoteWorkoutDraft,
+  remoteRecordToWorkoutDraft,
+  removeRemoteWorkoutDraft,
+  upsertRemoteWorkoutDraft
+} from '../services/workoutDraftService'
 import { getExerciseRecords } from '../services/workoutService'
 import { addPendingWorkout, isOnline } from '../utils/storage'
 import { friendlyError, sanitizeText } from '../utils/validation'
@@ -67,6 +73,15 @@ function mergeDraftExercises(workout, saved = {}) {
   return { values: initial, unapplied }
 }
 
+function isRemoteNewer(localDraft, remoteDraft) {
+  if (!remoteDraft) return false
+  if (!localDraft) return true
+  if (remoteDraft.draftId !== localDraft.draftId) return true
+  const localVersion = Number(localDraft.remoteVersion || localDraft.version || 0)
+  if (Number(remoteDraft.version || 0) > localVersion) return true
+  return Date.parse(remoteDraft.updatedAt || '') > Date.parse(localDraft.updatedAt || '')
+}
+
 export default function Workout() {
   const { profileId, type } = useParams()
   const navigate = useNavigate()
@@ -82,6 +97,7 @@ export default function Workout() {
   const [running, setRunning] = useState(emptyRunning())
   const [draft, setDraft] = useState(null)
   const [pendingPlanDraft, setPendingPlanDraft] = useState(null)
+  const [pendingRemoteDraft, setPendingRemoteDraft] = useState(null)
   const [draftStatus, setDraftStatus] = useState('')
   const [message, setMessage] = useState('')
   const [saving, setSaving] = useState(false)
@@ -96,54 +112,118 @@ export default function Workout() {
 
   useEffect(() => {
     const handle = () => setOnline(isOnline())
-    window.addEventListener('online', handle); window.addEventListener('offline', handle)
-    return () => { window.removeEventListener('online', handle); window.removeEventListener('offline', handle) }
+    window.addEventListener('online', handle)
+    window.addEventListener('offline', handle)
+    return () => {
+      window.removeEventListener('online', handle)
+      window.removeEventListener('offline', handle)
+    }
   }, [])
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || null)).catch(() => setMessage('Faça login novamente para continuar.'))
-    getProfile(profileId).then(async (value) => { setProfile(value); setWorkout(await getWorkoutPlan(value, type)) }).catch((error) => setMessage(friendlyError(error)))
+    getProfile(profileId).then(async (value) => {
+      setProfile(value)
+      setWorkout(await getWorkoutPlan(value, type))
+    }).catch((error) => setMessage(friendlyError(error)))
   }, [profileId, type])
 
-  useEffect(() => {
-    if (!workout || !userId || !draftIdentity) return
-    const initializationKey = `${userId}:${profileId}:${type}:${enrollmentId || 'none'}:${planFingerprint}`
-    if (initializationKeyRef.current === initializationKey) return
-    initializationKeyRef.current = initializationKey
-
-    purgeExpiredWorkoutDrafts({ userId })
-    const saved = loadLocalWorkoutDraft(draftIdentity)
-    const baseExercises = buildInitialExerciseValues(workout)
-    const freshDraft = createWorkoutDraftIdentity({ userId, profileId, workoutType: type, programEnrollmentId: enrollmentId, planFingerprint })
-
-    if (saved && !isWorkoutDraftExpired(saved)) {
-      const compatibility = classifyWorkoutDraftCompatibility(saved, planFingerprint)
-      if (compatibility.canRestoreAutomatically) {
-        const payload = saved.payload || {}
-        const restored = mergeDraftExercises(workout, payload.exerciseValues || {})
-        setGymName(payload.gymName || '')
-        setDate(payload.date || today())
-        setDurationMinutes(String(payload.durationMinutes ?? '60'))
-        setNotes(payload.notes || '')
-        setExerciseValues(restored.values)
-        setRunning({ ...emptyRunning(), ...(payload.running || {}) })
-        setDraft(saved)
-        setPendingPlanDraft(null)
-        setDraftStatus(restored.unapplied.length ? `Rascunho restaurado com ${restored.unapplied.length} item(ns) não aplicado(s).` : 'Rascunho restaurado deste dispositivo.')
-      } else {
-        setExerciseValues(baseExercises)
-        setDraft(freshDraft)
-        setPendingPlanDraft(saved)
-        setDraftStatus('O plano mudou desde o último acesso. Escolha como tratar o rascunho anterior.')
-      }
-    } else {
-      setExerciseValues(baseExercises)
-      setDraft(freshDraft)
-      setPendingPlanDraft(null)
+  function applyDraftSnapshot(saved, status) {
+    const compatibility = classifyWorkoutDraftCompatibility(saved, planFingerprint)
+    if (!compatibility.canRestoreAutomatically) {
+      setExerciseValues(buildInitialExerciseValues(workout))
+      setRunning(emptyRunning())
+      setPendingPlanDraft(saved)
+      setDraft(createWorkoutDraftIdentity({ userId, profileId, workoutType: type, programEnrollmentId: enrollmentId, planFingerprint }))
+      setDraftStatus('O plano mudou desde o último acesso. Escolha como tratar o rascunho anterior.')
+      return
     }
 
-    getExerciseRecords(profileId, workout.exercises.flatMap((exercise) => [exercise.name, ...(exercise.alternatives || [])])).then(setRecords).catch(() => undefined)
+    const payload = saved.payload || {}
+    const restored = mergeDraftExercises(workout, payload.exerciseValues || {})
+    setGymName(payload.gymName || '')
+    setDate(payload.date || today())
+    setDurationMinutes(String(payload.durationMinutes ?? '60'))
+    setNotes(payload.notes || '')
+    setExerciseValues(restored.values)
+    setRunning({ ...emptyRunning(), ...(payload.running || {}) })
+    setDraft(saved)
+    setPendingPlanDraft(null)
+    setDraftStatus(restored.unapplied.length ? `${status} ${restored.unapplied.length} item(ns) não aplicado(s).` : status)
+  }
+
+  useEffect(() => {
+    if (!workout || !userId || !draftIdentity) return undefined
+    const initializationKey = `${userId}:${profileId}:${type}:${enrollmentId || 'none'}:${planFingerprint}`
+    if (initializationKeyRef.current === initializationKey) return undefined
+    initializationKeyRef.current = initializationKey
+    let cancelled = false
+
+    async function initializeDraft() {
+      purgeExpiredWorkoutDrafts({ userId })
+      const saved = loadLocalWorkoutDraft(draftIdentity)
+      const localDraft = saved && !isWorkoutDraftExpired(saved) ? saved : null
+      const freshDraft = createWorkoutDraftIdentity({ userId, profileId, workoutType: type, programEnrollmentId: enrollmentId, planFingerprint })
+      let remoteDraft = null
+
+      if (isOnline()) {
+        try {
+          const remoteRecord = await getLatestRemoteWorkoutDraft({ profileId, workoutType: type, programEnrollmentId: enrollmentId })
+          remoteDraft = remoteRecordToWorkoutDraft(remoteRecord)
+        } catch {
+          setDraftStatus('Não foi possível verificar outros dispositivos. O rascunho local continua protegido.')
+        }
+      }
+      if (cancelled) return
+
+      if (remoteDraft && isRemoteNewer(localDraft, remoteDraft)) {
+        setExerciseValues(buildInitialExerciseValues(workout))
+        setRunning(emptyRunning())
+        setDraft(localDraft || freshDraft)
+        setPendingRemoteDraft({ remote: remoteDraft, local: localDraft || freshDraft })
+        setDraftStatus('Existe um treino mais recente em outro dispositivo. Escolha qual versão continuar.')
+      } else if (localDraft) {
+        const reconciled = remoteDraft && remoteDraft.draftId === localDraft.draftId
+          ? { ...localDraft, remoteVersion: remoteDraft.version, version: remoteDraft.version }
+          : localDraft
+        applyDraftSnapshot(reconciled, 'Rascunho restaurado deste dispositivo.')
+      } else {
+        setExerciseValues(buildInitialExerciseValues(workout))
+        setDraft(freshDraft)
+        setPendingPlanDraft(null)
+        setPendingRemoteDraft(null)
+      }
+
+      getExerciseRecords(profileId, workout.exercises.flatMap((exercise) => [exercise.name, ...(exercise.alternatives || [])])).then(setRecords).catch(() => undefined)
+    }
+
+    initializeDraft()
+    return () => { cancelled = true }
   }, [workout, userId, profileId, type, enrollmentId, planFingerprint, draftIdentity])
+
+  function openRemoteDraft() {
+    if (!pendingRemoteDraft) return
+    const remote = pendingRemoteDraft.remote
+    saveLocalWorkoutDraft(remote)
+    setPendingRemoteDraft(null)
+    applyDraftSnapshot(remote, 'Versão mais recente do outro dispositivo restaurada.')
+  }
+
+  function continueThisDevice() {
+    if (!pendingRemoteDraft) return
+    const { remote, local } = pendingRemoteDraft
+    const adopted = saveLocalWorkoutDraft({
+      ...local,
+      draftId: remote.draftId,
+      remoteVersion: remote.version,
+      version: remote.version,
+      createdAt: remote.createdAt,
+      planFingerprint
+    })
+    setDraft(adopted)
+    setPendingRemoteDraft(null)
+    setDraftStatus('Esta versão foi escolhida. A próxima sincronização substituirá a versão remota com controle de conflito.')
+  }
 
   function applyChangedPlanDraft() {
     if (!pendingPlanDraft) return
@@ -178,7 +258,7 @@ export default function Workout() {
   }
 
   function persistLocal(nextExercises = exerciseValues, nextRunning = running, overrides = {}) {
-    if (!draft || pendingPlanDraft) return null
+    if (!draft || pendingPlanDraft || pendingRemoteDraft) return null
     try {
       const next = saveLocalWorkoutDraft({ ...draft, planFingerprint, payload: draftPayload(nextExercises, nextRunning, overrides) })
       setDraft(next)
@@ -194,11 +274,27 @@ export default function Workout() {
     const local = persistLocal(nextExercises, nextRunning)
     if (!local || !online) return
     try {
-      const remote = await upsertRemoteWorkoutDraft(local, draft?.remoteVersion ?? null)
-      setDraft((current) => ({ ...current, remoteVersion: remote.version, version: remote.version }))
+      const remote = await upsertRemoteWorkoutDraft(local, local.remoteVersion ?? null)
+      const synced = saveLocalWorkoutDraft({
+        ...local,
+        remoteVersion: remote.version,
+        version: remote.version
+      })
+      setDraft(synced)
       setDraftStatus('Rascunho sincronizado.')
     } catch (error) {
-      setDraftStatus(error?.code === 'DRAFT_CONFLICT' ? 'Há uma versão mais recente em outro dispositivo.' : 'Salvo no aparelho; sincronização pendente.')
+      if (error?.code === 'DRAFT_CONFLICT') {
+        try {
+          const remoteRecord = await getRemoteWorkoutDraft({ draftId: local.draftId, profileId })
+          const remote = remoteRecordToWorkoutDraft(remoteRecord)
+          if (remote) setPendingRemoteDraft({ remote, local })
+        } catch {
+          // O rascunho local permanece íntegro mesmo se a leitura remota falhar.
+        }
+        setDraftStatus('Há uma versão mais recente em outro dispositivo. Escolha qual versão continuar.')
+      } else {
+        setDraftStatus('Salvo no aparelho; sincronização pendente.')
+      }
     }
   }
 
@@ -229,14 +325,19 @@ export default function Workout() {
     const variation = values.selectedName || exercise.name
     const recent = await getRecentProgramExposures(exercise.programEnrollmentId, exercise.programExerciseId, variation, 3)
     let previousFailures = 0
-    for (const item of recent) { if (item.progression_action === 'increase') break; previousFailures += 1 }
+    for (const item of recent) {
+      if (item.progression_action === 'increase') break
+      previousFailures += 1
+    }
     const suggestion = calculateProgramSuggestion(exercise, values, previousFailures)
     await saveProgramExposure({ profileId, workoutSessionId, exercise, value: values, suggestion })
   }
 
   async function finalizeWorkout() {
-    if (savingRef.current || pendingPlanDraft) return
-    savingRef.current = true; setSaving(true); setMessage('')
+    if (savingRef.current || pendingPlanDraft || pendingRemoteDraft) return
+    savingRef.current = true
+    setSaving(true)
+    setMessage('')
     try {
       const local = persistLocal()
       const exercises = workout.exercises.map((exercise) => {
@@ -264,7 +365,8 @@ export default function Workout() {
       setMessage(friendlyError(error))
       setDraftStatus('Falha ao finalizar; rascunho preservado.')
     } finally {
-      savingRef.current = false; setSaving(false)
+      savingRef.current = false
+      setSaving(false)
     }
   }
 
@@ -301,6 +403,17 @@ export default function Workout() {
         {draftStatus && <p className="mt-3 text-xs text-[#8E8E93]" role="status">{draftStatus}</p>}
       </header>
 
+      {pendingRemoteDraft && (
+        <section className="mb-6 border border-amber-400/40 bg-amber-400/10 p-4" role="alert">
+          <h2 className="font-semibold text-[#F5F5F7]">Treino em andamento em outro dispositivo</h2>
+          <p className="mt-2 text-sm text-[#C5C5CA]">Nenhuma versão será substituída automaticamente. Abra a versão mais recente ou continue com os dados deste dispositivo.</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button type="button" onClick={openRemoteDraft} className="rounded-lg bg-[#C8FF3D] px-4 py-2 text-sm font-semibold text-[#0A0A0B]">Abrir versão mais recente</button>
+            <button type="button" onClick={continueThisDevice} className="rounded-lg border border-[#3A3A40] px-4 py-2 text-sm font-semibold text-[#F5F5F7]">Continuar neste dispositivo</button>
+          </div>
+        </section>
+      )}
+
       {pendingPlanDraft && (
         <section className="mb-6 border border-amber-400/40 bg-amber-400/10 p-4" role="alert">
           <h2 className="font-semibold text-[#F5F5F7]">O plano deste treino foi alterado</h2>
@@ -329,7 +442,7 @@ export default function Workout() {
       <section>{pendingExercises.map(renderExercise)}</section>
       {completedExercises.length > 0 && <section className="mt-8"><h2 className="mb-2 text-lg font-semibold text-[#F5F5F7]">Concluídos</h2>{completedExercises.map(renderExercise)}</section>}
       {message && <p className="mt-4 border border-[#2A2A2E] bg-[#141416] p-3 text-sm text-[#F5F5F7]">{message}</p>}
-      <Button onClick={finalizeWorkout} disabled={saving || Boolean(pendingPlanDraft)} className="sticky bottom-24 z-20 mt-8 w-full" icon={online ? Save : CloudOff}>{saving ? 'Salvando...' : 'Finalizar treino'}</Button>
+      <Button onClick={finalizeWorkout} disabled={saving || Boolean(pendingPlanDraft) || Boolean(pendingRemoteDraft)} className="sticky bottom-24 z-20 mt-8 w-full" icon={online ? Save : CloudOff}>{saving ? 'Salvando...' : 'Finalizar treino'}</Button>
     </div>
   )
 }
