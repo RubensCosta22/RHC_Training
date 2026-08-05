@@ -5,7 +5,7 @@ import BottomNav from './components/BottomNav'
 import ProtectedRoute from './components/ProtectedRoute'
 import TopBar from './components/TopBar'
 import { logger, createRequestId } from './lib/observability/logger'
-import { syncPendingWorkouts } from './services/workoutService'
+import { syncPendingWorkoutsV2 } from './services/offlineWorkoutSyncV2Service'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Archived = lazy(() => import('./pages/Archived'))
@@ -48,7 +48,7 @@ function AppShell({ children }) {
 export default function App() {
   useEffect(() => {
     const syncRequestId = createRequestId()
-    const runSync = () => syncPendingWorkouts().catch((error) => {
+    const runSync = () => syncPendingWorkoutsV2().catch((error) => {
       logger.error('offline_sync.failed', {
         requestId: syncRequestId,
         error
