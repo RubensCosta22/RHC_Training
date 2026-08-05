@@ -2,84 +2,83 @@
 
 ## Resultado
 
-- **Status:** RETURN TO REVIEW
+- **Status:** APPROVE
 - **Blocker:** 0
-- **Major:** 3
-- **Minor:** 2
+- **Major:** 0
+- **Minor:** 0
+- **Spec revisada:** v1.1
 
-## Major 1 — Persistência apenas local pode conflitar entre dispositivos
+## Findings anteriores e resolução
 
-A Spec define cópia local para sobreviver a refresh/offline, mas não define claramente o comportamento quando o mesmo treino é aberto em dois dispositivos.
+### Major 1 — Conflito entre dispositivos
 
-### Risco
+**Resolvido.**
 
-- dispositivo A possui rascunho antigo;
-- dispositivo B finaliza o treino;
-- dispositivo A reabre e oferece restaurar conteúdo já concluído;
-- nova finalização pode duplicar sessão ou sobrescrever intenção do usuário.
+A Spec agora exige:
 
-### Correção exigida
+- `draftId` estável e chave idempotente de finalização;
+- `updatedAt`, usuário, perfil, treino, enrollment e versão do plano;
+- detecção de versão remota mais recente;
+- opções explícitas ao usuário;
+- proibição de resolução silenciosa por last-write-wins;
+- invalidação do rascunho local quando o mesmo `draftId` já tiver sido concluído.
 
-- cada rascunho deve possuir `draftId`, `updatedAt`, `userId`, `profileId`, `workoutType` e identificador/versionamento do plano;
-- antes de finalizar, verificar se já existe sessão equivalente criada pelo mesmo `draftId` ou chave idempotente;
-- rascunho local antigo deve ser invalidado quando a sessão correspondente já tiver sido concluída;
-- conflitos entre dispositivos devem ser apresentados ao usuário, nunca resolvidos silenciosamente.
+### Major 2 — Isolamento e logout
 
-## Major 2 — Limpeza no logout está ambígua
+**Resolvido.**
 
-A frase “quando a política de segurança exigir” não define o comportamento real.
+A Spec agora exige:
 
-### Risco
+- isolamento lógico por `auth.user.id` + perfil + treino + enrollment;
+- remoção do rascunho carregado da memória no logout;
+- impossibilidade de enumeração/restauração por outro usuário no mesmo dispositivo;
+- ação explícita para descarte no dispositivo;
+- teste obrigatório de aparelho compartilhado.
 
-Em dispositivo compartilhado, outro membro da família pode entrar e encontrar o rascunho anterior no armazenamento local.
+### Major 3 — Compatibilidade após mudança de plano
 
-### Correção exigida
+**Resolvido.**
 
-- o rascunho deve ser criptograficamente/logicamentе separado pelo `auth.user.id`;
-- logout deve remover da memória todos os rascunhos carregados;
-- rascunhos locais do usuário anterior não podem ser enumerados/restaurados por outro usuário;
-- definir retenção local e ação explícita “descartar rascunho neste dispositivo”.
+A restauração passa a usar ordem determinística:
 
-## Major 3 — Compatibilidade parcial precisa de regra determinística
-
-A Spec permite restauração parcial quando o plano muda, mas não define como mapear exercícios.
-
-### Risco
-
-Mapeamento apenas por nome pode aplicar carga/repetições ao exercício errado, principalmente após troca de alternativa ou alteração de seed.
-
-### Correção exigida
-
-A restauração deve seguir esta prioridade:
-
-1. `programExerciseId`, quando existir;
+1. `programExerciseId`;
 2. identificador estável do exercício original;
-3. combinação controlada de exercício original + alternativa selecionada;
-4. caso contrário, não restaurar aquele exercício automaticamente.
+3. combinação controlada de exercício original e alternativa;
+4. nenhum mapeamento automático quando não houver correspondência segura.
 
-Itens não aplicados devem ser listados ao usuário. Nunca mapear por posição no array.
+A Spec proíbe mapeamento por posição e exige informar itens não aplicados.
 
-## Minor 1 — Retenção não definida
+### Minor 1 — Retenção
 
-Definir retenção padrão do rascunho, recomendação inicial: 7 dias após a última alteração. Depois disso, solicitar confirmação antes de restaurar ou remover automaticamente conforme decisão de produto.
+**Resolvido.**
 
-## Minor 2 — GPS deve ter critério mínimo explícito
+Retenção definida em 30 dias após `updatedAt`. Rascunhos antigos não são restaurados automaticamente e exigem confirmação do usuário.
 
-Definir limites configuráveis para:
+### Minor 2 — Critérios de GPS
 
-- `accuracy` máxima aceita;
-- intervalo mínimo entre pontos;
-- velocidade máxima plausível;
-- distância mínima para reduzir ruído;
-- descarte automático de pontos antigos após finalizar/cancelar.
+**Resolvido.**
 
-Os valores devem ser tratados como configuração testável, não números espalhados pela UI.
+A Spec exige configuração central testável para precisão, intervalo, distância mínima, velocidade plausível, saltos incompatíveis e expiração de pontos. Coordenadas permanecem somente em memória e são descartadas ao finalizar ou cancelar.
 
-## Conclusão
+## Revisão da decisão final de Auto Save
 
-A direção da Feature é válida e compatível com R2, mas a Spec não deve sair de Draft até incorporar:
+A decisão do owner foi incorporada corretamente:
 
-- idempotência por rascunho e conflito entre dispositivos;
-- isolamento e limpeza de sessão local;
-- regra determinística de compatibilidade de exercícios;
-- retenção e critérios mínimos de GPS.
+- persistência local imediata protege qualquer edição relevante contra refresh/offline;
+- sincronização remota não ocorre por tecla;
+- Auto Save remoto acontece apenas em eventos importantes, com destaque para conclusão de exercício, troca de alternativa, observações confirmadas e eventos de corrida;
+- Auto Save atualiza somente o rascunho e nunca cria sessão concluída;
+- finalização permanece idempotente por `draftId`.
+
+Essa divisão reduz gravações desnecessárias sem enfraquecer a garantia de recuperação.
+
+## Riscos residuais aceitos
+
+- GPS em navegador pode apresentar precisão inferior a aplicativo nativo e pode sofrer limitação em segundo plano. O modo manual continua obrigatório e GPS pode permanecer experimental conforme evidência mobile.
+- Sincronização entre dispositivos adiciona complexidade, mas os critérios de conflito e idempotência estão definidos e são testáveis.
+
+## Veredito
+
+A Spec v1.1 define comportamento, segurança, preservação de dados, UX, conflitos, retenção, idempotência e evidências suficientes para uma Feature R2.
+
+**APPROVE — Ready for Implementation Plan.**
