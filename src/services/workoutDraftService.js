@@ -11,14 +11,57 @@ function sanitizeDraftPayload(payload) {
   return safe
 }
 
+function createConflictError() {
+  const conflict = new Error('O treino foi atualizado em outro dispositivo.')
+  conflict.code = 'DRAFT_CONFLICT'
+  return conflict
+}
+
+export function remoteRecordToWorkoutDraft(record) {
+  if (!record) return null
+  return {
+    draftId: record.draft_id,
+    userId: record.user_id,
+    profileId: record.profile_id,
+    workoutType: record.workout_type,
+    programEnrollmentId: record.program_enrollment_id || null,
+    planFingerprint: record.plan_fingerprint || null,
+    payload: record.payload || {},
+    version: Number(record.version || 1),
+    remoteVersion: Number(record.version || 1),
+    createdAt: record.created_at,
+    updatedAt: record.updated_at
+  }
+}
+
 export async function getRemoteWorkoutDraft({ draftId, profileId }) {
   const { data, error } = await supabase
     .from('workout_drafts')
     .select('*')
     .eq('draft_id', draftId)
     .eq('profile_id', profileId)
+    .is('consumed_session_id', null)
     .maybeSingle()
 
+  if (error) throw error
+  return data || null
+}
+
+export async function getLatestRemoteWorkoutDraft({ profileId, workoutType, programEnrollmentId = null }) {
+  let query = supabase
+    .from('workout_drafts')
+    .select('*')
+    .eq('profile_id', profileId)
+    .eq('workout_type', workoutType)
+    .is('consumed_session_id', null)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+
+  query = programEnrollmentId
+    ? query.eq('program_enrollment_id', programEnrollmentId)
+    : query.is('program_enrollment_id', null)
+
+  const { data, error } = await query.maybeSingle()
   if (error) throw error
   return data || null
 }
@@ -50,25 +93,23 @@ export async function upsertRemoteWorkoutDraft(draft, expectedVersion = null) {
       .eq('draft_id', draft.draftId)
       .eq('user_id', userId)
       .eq('version', expectedVersion)
+      .is('consumed_session_id', null)
       .select('*')
       .maybeSingle()
 
     if (error) throw error
-    if (!data) {
-      const conflict = new Error('O treino foi atualizado em outro dispositivo.')
-      conflict.code = 'DRAFT_CONFLICT'
-      throw conflict
-    }
+    if (!data) throw createConflictError()
     return data
   }
 
   const { data, error } = await supabase
     .from('workout_drafts')
-    .upsert(record, { onConflict: 'draft_id' })
+    .insert(record)
     .select('*')
     .single()
 
   if (error) {
+    if (error.code === '23505') throw createConflictError()
     logger.warn('workout_draft.remote_save_failed', {
       requestId,
       userId,
