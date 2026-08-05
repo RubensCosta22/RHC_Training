@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabaseClient'
 import { getWorkout, getWorkoutTypes } from '../data/workouts'
+import { WORKOUT_TYPES, normalizeWorkoutTypes } from '../domain/workoutTypes'
 import { sanitizeText } from '../utils/validation'
 import { getActiveProgramWorkout } from './programExecutionService'
 
@@ -49,21 +50,21 @@ export async function getAvailablePlanTypes(profile) {
   if (activeEnrollment) {
     const { data: sessions, error: sessionsError } = await supabase.from('program_sessions').select('code').eq('program_id', activeEnrollment.program_id).order('day_order')
     if (sessionsError && !isProgramFeatureUnavailable(sessionsError)) throw sessionsError
-    if (!sessionsError) return (sessions || []).map((item) => item.code)
+    if (!sessionsError) return normalizeWorkoutTypes((sessions || []).map((item) => item.code))
   }
 
   const { data: plans, error } = await supabase.from('workout_plans').select('workout_type,active').eq('profile_id', profile.id).order('workout_type')
   if (error) throw error
   const types = new Set(getWorkoutTypes(profile.name))
   ;(plans || []).forEach((item) => item.active ? types.add(item.workout_type) : types.delete(item.workout_type))
-  return [...types].sort()
+  return normalizeWorkoutTypes([...types])
 }
 
 export async function listPlansForAdmin(profile) {
   const { data, error } = await supabase.from('workout_plans').select('*').eq('profile_id', profile.id).order('workout_type')
   if (error) throw error
   const saved = new Map((data || []).map((item) => [item.workout_type, item]))
-  return ['A','B','C','D','E','F'].map((type) => {
+  return WORKOUT_TYPES.map((type) => {
     const current = saved.get(type)
     const fallback = getWorkout(profile.name, type)
     return current || { profile_id: profile.id, workout_type: type, title: fallback?.title || `Treino ${type}`, description: fallback?.description || '', exercises: fallback?.exercises || [normalizeExercise({ name: 'Novo exercicio', muscleGroup: 'Geral', sets: 3, reps: '8-12', rest: 60 }, 0)], active: Boolean(fallback), fallback: true }
