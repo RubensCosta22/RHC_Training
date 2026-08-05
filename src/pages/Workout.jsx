@@ -5,6 +5,7 @@ import Button from '../components/ui/Button'
 import ExerciseCard from '../components/ExerciseCard'
 import RunningSessionPanel from '../components/RunningSessionPanel'
 import SmartExecutionPanel from '../components/SmartExecutionPanel'
+import { classifyWorkoutDraftCompatibility, mapDraftExerciseValues } from '../domain/workoutDraftCompatibility'
 import { supabase } from '../lib/supabaseClient'
 import { calculatePaceSecondsPerKm, getElapsedSeconds, resetTimer } from '../lib/runningSession'
 import { getProfile } from '../services/profileService'
@@ -57,14 +58,13 @@ function createPlanFingerprint(workout, type) {
 
 function mergeDraftExercises(workout, saved = {}) {
   const initial = buildInitialExerciseValues(workout)
+  const { mapped, unapplied } = mapDraftExerciseValues(workout, saved)
   for (const exercise of workout.exercises) {
-    const stableKeys = [exercise.programExerciseId, exercise.id].filter(Boolean).map(String)
-    const candidate = stableKeys.map((key) => saved[key]).find(Boolean)
-      || Object.values(saved).find((item) => item?.originalName === exercise.name)
+    const candidate = mapped[exercise.id]
     if (!candidate) continue
     initial[exercise.id] = { ...initial[exercise.id], ...candidate, originalName: exercise.name }
   }
-  return initial
+  return { values: initial, unapplied }
 }
 
 export default function Workout() {
@@ -81,16 +81,18 @@ export default function Workout() {
   const [exerciseValues, setExerciseValues] = useState({})
   const [running, setRunning] = useState(emptyRunning())
   const [draft, setDraft] = useState(null)
+  const [pendingPlanDraft, setPendingPlanDraft] = useState(null)
   const [draftStatus, setDraftStatus] = useState('')
   const [message, setMessage] = useState('')
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
-  const initializedRef = useRef(false)
+  const initializationKeyRef = useRef(null)
   const [online, setOnline] = useState(isOnline())
   const [showDetails, setShowDetails] = useState(false)
 
   const enrollmentId = workout?.enrollment?.id || workout?.enrollment?.enrollment_id || null
   const planFingerprint = useMemo(() => workout ? createPlanFingerprint(workout, type) : null, [workout, type])
+  const draftIdentity = useMemo(() => userId ? ({ userId, profileId, workoutType: type, programEnrollmentId: enrollmentId || 'none' }) : null, [userId, profileId, type, enrollmentId])
 
   useEffect(() => {
     const handle = () => setOnline(isOnline())
@@ -104,39 +106,81 @@ export default function Workout() {
   }, [profileId, type])
 
   useEffect(() => {
-    if (!workout || !userId || initializedRef.current) return
-    initializedRef.current = true
+    if (!workout || !userId || !draftIdentity) return
+    const initializationKey = `${userId}:${profileId}:${type}:${enrollmentId || 'none'}:${planFingerprint}`
+    if (initializationKeyRef.current === initializationKey) return
+    initializationKeyRef.current = initializationKey
+
     purgeExpiredWorkoutDrafts({ userId })
-    const identity = { userId, profileId, workoutType: type, programEnrollmentId: enrollmentId || 'none' }
-    const saved = loadLocalWorkoutDraft(identity)
+    const saved = loadLocalWorkoutDraft(draftIdentity)
     const baseExercises = buildInitialExerciseValues(workout)
+    const freshDraft = createWorkoutDraftIdentity({ userId, profileId, workoutType: type, programEnrollmentId: enrollmentId, planFingerprint })
 
     if (saved && !isWorkoutDraftExpired(saved)) {
-      const payload = saved.payload || {}
-      setGymName(payload.gymName || '')
-      setDate(payload.date || today())
-      setDurationMinutes(String(payload.durationMinutes ?? '60'))
-      setNotes(payload.notes || '')
-      setExerciseValues(mergeDraftExercises(workout, payload.exerciseValues || {}))
-      setRunning({ ...emptyRunning(), ...(payload.running || {}) })
-      setDraft(saved)
-      setDraftStatus('Rascunho restaurado deste dispositivo.')
+      const compatibility = classifyWorkoutDraftCompatibility(saved, planFingerprint)
+      if (compatibility.canRestoreAutomatically) {
+        const payload = saved.payload || {}
+        const restored = mergeDraftExercises(workout, payload.exerciseValues || {})
+        setGymName(payload.gymName || '')
+        setDate(payload.date || today())
+        setDurationMinutes(String(payload.durationMinutes ?? '60'))
+        setNotes(payload.notes || '')
+        setExerciseValues(restored.values)
+        setRunning({ ...emptyRunning(), ...(payload.running || {}) })
+        setDraft(saved)
+        setPendingPlanDraft(null)
+        setDraftStatus(restored.unapplied.length ? `Rascunho restaurado com ${restored.unapplied.length} item(ns) não aplicado(s).` : 'Rascunho restaurado deste dispositivo.')
+      } else {
+        setExerciseValues(baseExercises)
+        setDraft(freshDraft)
+        setPendingPlanDraft(saved)
+        setDraftStatus('O plano mudou desde o último acesso. Escolha como tratar o rascunho anterior.')
+      }
     } else {
       setExerciseValues(baseExercises)
-      setDraft(createWorkoutDraftIdentity({ userId, profileId, workoutType: type, programEnrollmentId: enrollmentId, planFingerprint }))
+      setDraft(freshDraft)
+      setPendingPlanDraft(null)
     }
 
     getExerciseRecords(profileId, workout.exercises.flatMap((exercise) => [exercise.name, ...(exercise.alternatives || [])])).then(setRecords).catch(() => undefined)
-  }, [workout, userId, profileId, type, enrollmentId, planFingerprint])
+  }, [workout, userId, profileId, type, enrollmentId, planFingerprint, draftIdentity])
 
-  function draftPayload(nextExercises = exerciseValues, nextRunning = running) {
-    return { gymName, date, durationMinutes, notes, exerciseValues: nextExercises, running: nextRunning }
+  function applyChangedPlanDraft() {
+    if (!pendingPlanDraft) return
+    const payload = pendingPlanDraft.payload || {}
+    const restored = mergeDraftExercises(workout, payload.exerciseValues || {})
+    setGymName(payload.gymName || '')
+    setDate(payload.date || today())
+    setDurationMinutes(String(payload.durationMinutes ?? '60'))
+    setNotes(payload.notes || '')
+    setExerciseValues(restored.values)
+    setRunning({ ...emptyRunning(), ...(payload.running || {}) })
+    setDraft({ ...pendingPlanDraft, planFingerprint })
+    setPendingPlanDraft(null)
+    setDraftStatus(restored.unapplied.length ? `Plano atualizado. ${restored.unapplied.length} item(ns) antigo(s) não foram aplicados automaticamente.` : 'Rascunho compatível restaurado no plano atualizado.')
   }
 
-  function persistLocal(nextExercises = exerciseValues, nextRunning = running) {
-    if (!draft) return null
+  function discardChangedPlanDraft() {
+    if (draftIdentity) removeLocalWorkoutDraft(draftIdentity)
+    setPendingPlanDraft(null)
+    setExerciseValues(buildInitialExerciseValues(workout))
+    setRunning(emptyRunning())
+    setGymName('')
+    setDate(today())
+    setDurationMinutes('60')
+    setNotes('')
+    setDraft(createWorkoutDraftIdentity({ userId, profileId, workoutType: type, programEnrollmentId: enrollmentId, planFingerprint }))
+    setDraftStatus('Rascunho anterior descartado neste dispositivo.')
+  }
+
+  function draftPayload(nextExercises = exerciseValues, nextRunning = running, overrides = {}) {
+    return { gymName, date, durationMinutes, notes, exerciseValues: nextExercises, running: nextRunning, ...overrides }
+  }
+
+  function persistLocal(nextExercises = exerciseValues, nextRunning = running, overrides = {}) {
+    if (!draft || pendingPlanDraft) return null
     try {
-      const next = saveLocalWorkoutDraft({ ...draft, planFingerprint, payload: draftPayload(nextExercises, nextRunning) })
+      const next = saveLocalWorkoutDraft({ ...draft, planFingerprint, payload: draftPayload(nextExercises, nextRunning, overrides) })
       setDraft(next)
       setDraftStatus('Salvo neste dispositivo.')
       return next
@@ -191,7 +235,7 @@ export default function Workout() {
   }
 
   async function finalizeWorkout() {
-    if (savingRef.current) return
+    if (savingRef.current || pendingPlanDraft) return
     savingRef.current = true; setSaving(true); setMessage('')
     try {
       const local = persistLocal()
@@ -211,8 +255,7 @@ export default function Workout() {
         await Promise.all(workout.exercises.map((exercise) => buildProgramExposure(exercise, exerciseValues[exercise.id] || {}, savedSession?.id || null)))
       }
       if (local?.draftId || draft?.draftId) {
-        const identity = { userId, profileId, workoutType: type, programEnrollmentId: enrollmentId || 'none' }
-        removeLocalWorkoutDraft(identity)
+        removeLocalWorkoutDraft(draftIdentity)
         await removeRemoteWorkoutDraft({ draftId: local?.draftId || draft?.draftId, profileId }).catch(() => undefined)
       }
       setMessage('Treino salvo com sucesso.')
@@ -258,6 +301,17 @@ export default function Workout() {
         {draftStatus && <p className="mt-3 text-xs text-[#8E8E93]" role="status">{draftStatus}</p>}
       </header>
 
+      {pendingPlanDraft && (
+        <section className="mb-6 border border-amber-400/40 bg-amber-400/10 p-4" role="alert">
+          <h2 className="font-semibold text-[#F5F5F7]">O plano deste treino foi alterado</h2>
+          <p className="mt-2 text-sm text-[#C5C5CA]">Podemos aplicar apenas exercícios identificados com segurança. Dados de exercícios removidos não serão transferidos automaticamente.</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button type="button" onClick={applyChangedPlanDraft} className="rounded-lg bg-[#C8FF3D] px-4 py-2 text-sm font-semibold text-[#0A0A0B]">Aplicar dados compatíveis</button>
+            <button type="button" onClick={discardChangedPlanDraft} className="rounded-lg border border-[#3A3A40] px-4 py-2 text-sm font-semibold text-[#F5F5F7]">Descartar rascunho</button>
+          </div>
+        </section>
+      )}
+
       {type === 'E' && <RunningSessionPanel value={running} onChange={(next) => updateRunning(next, false)} onImportantEvent={(next) => updateRunning(next, true)} />}
 
       <button type="button" onClick={() => setShowDetails((current) => !current)} className="mb-3 flex w-full items-center justify-between border-y border-[#2A2A2E] py-3 text-left text-sm font-semibold text-[#F5F5F7]">
@@ -265,17 +319,17 @@ export default function Workout() {
       </button>
       {showDetails && (
         <div className="mb-6 grid gap-3 bg-[#141416] p-4 md:grid-cols-3">
-          <label><span className="mb-1 block text-xs text-[#8E8E93]">Academia</span><input value={gymName} onChange={(event) => { setGymName(event.target.value); persistLocal() }} maxLength={80} placeholder="Ex: Smart Fit Centro" /></label>
-          <label><span className="mb-1 block text-xs text-[#8E8E93]">Data</span><input type="date" value={date} onChange={(event) => { setDate(event.target.value); persistLocal() }} /></label>
-          <label><span className="mb-1 block text-xs text-[#8E8E93]">Duração</span><input type="number" min="0" value={durationMinutes} onChange={(event) => { setDurationMinutes(event.target.value); persistLocal() }} /></label>
-          <label className="md:col-span-3"><span className="mb-1 block text-xs text-[#8E8E93]">Observação geral</span><textarea rows="2" maxLength={500} value={notes} onChange={(event) => { setNotes(event.target.value); persistLocal() }} placeholder="Como foi o treino?" /></label>
+          <label><span className="mb-1 block text-xs text-[#8E8E93]">Academia</span><input value={gymName} onChange={(event) => { const value = event.target.value; setGymName(value); persistLocal(exerciseValues, running, { gymName: value }) }} maxLength={80} placeholder="Ex: Smart Fit Centro" /></label>
+          <label><span className="mb-1 block text-xs text-[#8E8E93]">Data</span><input type="date" value={date} onChange={(event) => { const value = event.target.value; setDate(value); persistLocal(exerciseValues, running, { date: value }) }} /></label>
+          <label><span className="mb-1 block text-xs text-[#8E8E93]">Duração</span><input type="number" min="0" value={durationMinutes} onChange={(event) => { const value = event.target.value; setDurationMinutes(value); persistLocal(exerciseValues, running, { durationMinutes: value }) }} /></label>
+          <label className="md:col-span-3"><span className="mb-1 block text-xs text-[#8E8E93]">Observação geral</span><textarea rows="2" maxLength={500} value={notes} onChange={(event) => { const value = event.target.value; setNotes(value); persistLocal(exerciseValues, running, { notes: value }) }} placeholder="Como foi o treino?" /></label>
         </div>
       )}
 
       <section>{pendingExercises.map(renderExercise)}</section>
       {completedExercises.length > 0 && <section className="mt-8"><h2 className="mb-2 text-lg font-semibold text-[#F5F5F7]">Concluídos</h2>{completedExercises.map(renderExercise)}</section>}
       {message && <p className="mt-4 border border-[#2A2A2E] bg-[#141416] p-3 text-sm text-[#F5F5F7]">{message}</p>}
-      <Button onClick={finalizeWorkout} disabled={saving} className="sticky bottom-24 z-20 mt-8 w-full" icon={online ? Save : CloudOff}>{saving ? 'Salvando...' : 'Finalizar treino'}</Button>
+      <Button onClick={finalizeWorkout} disabled={saving || Boolean(pendingPlanDraft)} className="sticky bottom-24 z-20 mt-8 w-full" icon={online ? Save : CloudOff}>{saving ? 'Salvando...' : 'Finalizar treino'}</Button>
     </div>
   )
 }
