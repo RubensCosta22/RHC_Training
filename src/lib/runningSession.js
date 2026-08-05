@@ -49,6 +49,26 @@ export function acceptGpsPoint(previous, next, limits = GPS_LIMITS) {
   return { accepted: true, distanceMeters }
 }
 
+export function accumulateGpsPoint(state = {}, nextPoint, limits = GPS_LIMITS) {
+  const previousPoint = state.lastPoint || null
+  const result = acceptGpsPoint(previousPoint, nextPoint, limits)
+  if (!result.accepted) {
+    return {
+      accepted: false,
+      reason: result.reason,
+      lastPoint: previousPoint,
+      distanceMeters: Math.max(0, Number(state.distanceMeters) || 0)
+    }
+  }
+
+  return {
+    accepted: true,
+    reason: null,
+    lastPoint: nextPoint,
+    distanceMeters: Math.max(0, Number(state.distanceMeters) || 0) + Number(result.distanceMeters || 0)
+  }
+}
+
 export function calculatePaceSecondsPerKm(distanceMeters, durationSeconds) {
   const distance = Number(distanceMeters)
   const duration = Number(durationSeconds)
