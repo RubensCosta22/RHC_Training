@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   acceptGpsPoint,
+  accumulateGpsPoint,
   calculateDistanceMeters,
   calculatePaceSecondsPerKm,
   getElapsedSeconds,
@@ -28,6 +29,31 @@ describe('runningSession', () => {
     expect(acceptGpsPoint(first, { ...first, accuracy: 100, timestamp: 3000 }).reason).toBe('accuracy')
     const far = { latitude: -22.99, longitude: -43.0, accuracy: 5, timestamp: 2000 }
     expect(acceptGpsPoint(first, far).reason).toBe('speed')
+  })
+
+  it('accumulates three sequential GPS segments instead of replacing distance', () => {
+    const limits = {
+      maxAccuracyMeters: 50,
+      minIntervalMs: 1000,
+      maxPlausibleSpeedMetersPerSecond: 20,
+      minSegmentMeters: 1
+    }
+    const points = [
+      { latitude: 0, longitude: 0, accuracy: 5, timestamp: 1000 },
+      { latitude: 0, longitude: 0.00005, accuracy: 5, timestamp: 3000 },
+      { latitude: 0, longitude: 0.00010, accuracy: 5, timestamp: 5000 },
+      { latitude: 0, longitude: 0.00015, accuracy: 5, timestamp: 7000 }
+    ]
+
+    const finalState = points.reduce(
+      (state, point) => accumulateGpsPoint(state, point, limits),
+      { lastPoint: null, distanceMeters: 0 }
+    )
+
+    const oneSegment = calculateDistanceMeters(points[0], points[1])
+    expect(finalState.accepted).toBe(true)
+    expect(finalState.distanceMeters).toBeGreaterThan(oneSegment * 2.9)
+    expect(finalState.distanceMeters).toBeLessThan(oneSegment * 3.1)
   })
 
   it('calculates geographic distance without persisting coordinates', () => {
