@@ -2,11 +2,16 @@ import { supabase } from '../lib/supabaseClient'
 import { logger, createRequestId } from '../lib/observability/logger'
 import { calculateVolume } from '../utils/progression'
 import { parsePositiveNumber, sanitizeText, validateWorkoutInput } from '../utils/validation'
+import { normalizeMuscleGroup } from '../domain/muscleGroupTaxonomy'
 
 function normalizeExercise(item) {
+  const muscleGroup = normalizeMuscleGroup(item.muscleGroup || item.muscle_group)
+  const movementPattern = sanitizeText(item.movementPattern || item.movement_pattern || '', 80) || null
+
   return {
     exercise_name: sanitizeText(item.name || item.exercise_name, 120),
-    muscle_group: sanitizeText(item.muscleGroup || item.muscle_group, 80),
+    muscle_group: muscleGroup,
+    movement_pattern: movementPattern,
     sets: Number(item.sets || 0),
     reps: sanitizeText(item.reps || '', 40),
     actual_reps: sanitizeText(item.actualReps || item.actual_reps || '', 40),
