@@ -1,589 +1,402 @@
 # RHCT-DATA-002 — Database V2 & Controlled Migration
 
-**Status:** Draft — Architecture Definition  
+**Status:** Draft — revised after R4 adversarial review  
 **Risk Tier:** R4 — Critical  
 **Product:** RHC Training  
-**Scope:** Database, authorization, RLS, Auth integration, storage references, data migration, rollback and cutover  
 **Normative process:** RHC Tech SDD v1.3
 
----
+## 1. Purpose
 
-## 1. Context
+Rebuild the RHC Training database in a new Supabase project from an approved canonical model, migrate only the historical data that must be preserved, recreate clean profiles when no retained history exists, and cut over with deterministic authorization, reconciliation and rollback.
 
-The current RHC Training database evolved incrementally and now contains overlapping authorization concepts, legacy ownership fields, duplicate profile identities and historical migrations that are difficult to reason about safely.
+Legacy remains production/source-of-truth until formal R4 cutover approval.
 
-A production incident demonstrated that legacy `profiles.user_id` semantics could coexist with explicit access relationships and expose a profile to the wrong authenticated account. Emergency fail-closed hotfixes reduce immediate risk, but the long-term solution is a clean database rebuild based on the current business model instead of the historical implementation path.
+## 2. Non-goals
 
-This Spec defines a new Supabase project and a controlled migration of production data. The existing database remains the source of truth until the V2 cutover is explicitly approved.
+- no commercial/SaaS multi-tenancy;
+- no families, family members, invitations or organization hierarchy;
+- no coach/community/billing features;
+- no broad UI redesign;
+- no blind database dump/restore of application-domain data;
+- no copying Legacy authorization shortcuts into V2.
 
----
+## 3. Identity and authorization architecture
 
-## 2. Goals
+V2 uses only:
 
-1. Create a minimal, explicit and auditable identity/authorization model.
-2. Ensure one logical person maps to one canonical profile.
-3. Make authorization derive from exactly one explicit access model plus the global admin role.
-4. Remove legacy implicit ownership rules from the new schema.
-5. Preserve all valid historical training data.
-6. Normalize domain taxonomy such as muscle group, movement pattern and exercise category.
-7. Validate data equivalence before production cutover.
-8. Provide deterministic rollback to the legacy production database.
-9. Establish a clean baseline so future migrations are incremental changes to an approved architecture, not architecture discovery in production.
+- Supabase `auth.users` — authentication;
+- `app_users` — application role/status;
+- `profiles` — trained-person identity;
+- `profile_access` — one explicit normal-account-to-profile mapping.
 
----
+### 3.1 `app_users`
 
-## 3. Non-goals
+Required contract:
 
-- No new commercial/SaaS functionality.
-- No public multi-tenant organization model.
-- No `families`, `family_members` or team hierarchy.
-- No community, billing, subscriptions or professional-coach features.
-- No broad UI redesign.
-- No deletion of the legacy database during migration.
-- No blind `pg_dump -> restore` of application-domain data.
+- `user_id uuid primary key references auth.users(id)` with deletion protection rather than automatic cascade;
+- `role in ('user','admin')`;
+- `status in ('active','disabled')`;
+- timestamps.
 
----
+Every application authorization decision requires a matching active `app_users` row. Missing/disabled application identity is DENY even if a profile mapping exists.
 
-## 4. Core architecture decision
+### 3.2 `profiles`
 
-### 4.1 Identity model
+Profiles represent people being trained, not Auth ownership.
 
-The V2 identity model SHALL contain only:
+They SHALL NOT contain an authorization `user_id`, family/group ownership or email-based access relationship.
 
-- Supabase `auth.users` — authentication identity;
-- `app_users` — application-level global role/status;
-- `profiles` — the person being trained;
-- `profile_access` — explicit relationship between an authenticated user and a profile.
+Inactive profiles retain history. Normal users cannot access inactive profile-domain data; active admins may inspect/reactivate through approved admin paths.
 
-There SHALL NOT be:
+### 3.3 `profile_access`
 
-- `families`;
-- `family_members`;
-- `family_invitations`;
-- `family_group_id`;
-- bootstrap roles;
-- authorization fallback through `profiles.user_id`;
-- authorization inferred from creator, email, name or legacy ownership fields.
+V2 launch is intentionally one-to-one and role-free.
 
-### 4.2 Authorization principle
+Required invariants:
 
-> A profile is accessible only when the current account is an active global admin or has an explicit active `profile_access` row for that profile.
+- `user_id UNIQUE NOT NULL`;
+- `profile_id UNIQUE NOT NULL`;
+- no `owner/editor` role;
+- one normal account -> at most one profile;
+- one profile -> at most one normal account;
+- admins require no synthetic mapping rows;
+- direct client writes are denied;
+- assign/revoke/reassign operations are admin-only and audited.
 
-No parallel authorization mechanism is permitted.
+Shared/delegated profile editing is out of scope and requires a future Spec/ADR.
 
----
+### 3.4 Canonical authorization logic
 
-## 5. Proposed identity schema
+```text
+is_active_app_user() =
+  authenticated AND app_users.status = active
 
-### 5.1 `app_users`
+is_admin() =
+  is_active_app_user() AND app_users.role = admin
 
-Purpose: application role/status associated with Supabase Auth.
+can_access_profile(profile_id) =
+  is_active_app_user()
+  AND target profile is active
+  AND (
+    is_admin()
+    OR unique profile_access(auth.uid(), profile_id) exists
+  )
+```
 
-Required fields:
+No helper may fall back to profile owner fields, creator, email, name, invitation, family/group or client route state.
 
-- `user_id uuid primary key references auth.users(id) on delete cascade`
-- `role text not null check (role in ('user','admin'))`
-- `status text not null default 'active' check (status in ('active','disabled'))`
-- `created_at timestamptz not null default now()`
-- `updated_at timestamptz not null default now()`
+## 4. Admin lifecycle
 
-Rules:
+### First admin
 
-- new accounts default to `user`;
-- only an active admin can promote/demote another user;
-- frontend SHALL NOT update `role` directly;
-- role changes occur through a security-definer RPC with authorization checks;
-- the system SHALL prevent removal/demotion of the last active admin.
+The first V2 admin is created only during controlled environment bootstrap:
 
-### 5.2 `profiles`
+1. create and verify the intended V2 Supabase Auth account;
+2. manually verify the exact Auth UUID;
+3. execute an operator-only setup statement that creates `app_users(role='admin', status='active')` for that UUID;
+4. record evidence in the R4 migration package.
 
-Purpose: canonical identity of the person whose training data is stored.
+There is no client bootstrap endpoint and the baseline does not hard-code production email/UUID values.
 
-Representative fields:
+### Additional admins
 
-- `id uuid primary key`
-- `name text not null`
-- `birth_date date null`
-- `sex text null`
-- `goal text null`
-- `avatar_path text null`
-- `is_active boolean not null default true`
-- `created_at timestamptz not null default now()`
-- `updated_at timestamptz not null default now()`
+Only an active admin may promote another active application user through a reviewed server-side RPC.
 
-Rules:
+### Last admin
 
-- `profiles` SHALL NOT contain an authorization `user_id` field;
-- a person SHALL have one canonical profile;
-- duplicate identity prevention SHALL use an explicit migration mapping and application/admin workflow, not name-only matching;
-- profile deletion in normal operation SHOULD be soft-delete/deactivation unless a future approved Spec defines otherwise.
+The database must prevent zero active admins. Protected admin operations must serialize/check active-admin count and reject demotion, disablement or retirement of the final active admin. Auth-user deletion must be blocked while the application identity is still referenced; it may occur only after safe application retirement.
 
-### 5.3 `profile_access`
+## 5. Security-definer and RLS implementation contract
 
-Purpose: explicit account-to-profile authorization.
+Any `SECURITY DEFINER` helper/RPC SHALL:
 
-Required fields:
+- schema-qualify referenced objects;
+- use a fixed safe `search_path`;
+- revoke default PUBLIC execute;
+- grant execute only to minimum required roles;
+- validate `auth.uid()` and active application status server-side;
+- avoid recursive RLS dependency chains;
+- validate all client-supplied target IDs;
+- emit audit events for privileged admin mutations.
 
-- `profile_id uuid not null references profiles(id) on delete cascade`
-- `user_id uuid not null references auth.users(id) on delete cascade`
-- `role text not null check (role in ('owner','editor'))`
-- `is_active boolean not null default true`
-- `created_at timestamptz not null default now()`
-- `updated_at timestamptz not null default now()`
-- primary key or unique constraint on `(profile_id, user_id)`
+RLS is enabled on all application/profile-owned tables exposed through Supabase client APIs. Default posture is deny.
 
-Rules:
+Frontend route guards are defense-in-depth only.
 
-- current normal users SHOULD have exactly one active `owner` profile;
-- each profile SHALL have at most one active owner unless a future Spec changes this business rule;
-- admins do not require synthetic access rows for every profile;
-- disabled access rows grant no permissions.
+## 6. Canonical domain model
 
----
+The baseline SHALL include only approved current-domain entities, including as required:
 
-## 6. Authorization functions
+- `app_users`;
+- `profiles`;
+- `profile_access`;
+- `exercise_catalog`;
+- `muscle_groups`;
+- `movement_patterns`;
+- `exercise_categories`;
+- `workout_plans`;
+- `profile_training_state`;
+- `workout_sessions`;
+- `workout_exercises`;
+- `exercise_records`;
+- `body_measurements`;
+- `progress_photos`;
+- `workout_drafts`;
+- `training_programs`;
+- `program_sessions`;
+- `program_exercises`;
+- `program_exercise_substitutions`;
+- `program_enrollments`;
+- `event_logs`.
 
-V2 SHALL keep authorization helpers minimal.
+No Legacy table is copied merely because it exists today.
 
-### `is_admin()`
+## 7. Exercise and taxonomy contract
 
-Returns true only when:
+### `exercise_catalog`
 
-- `auth.uid()` exists;
-- matching `app_users` row exists;
-- `role = 'admin'`;
-- `status = 'active'`.
+V2 has a canonical exercise catalog with stable identity (`id` + unique machine `code`) and current display metadata.
 
-### `can_access_profile(target_profile_id uuid)`
+Plans, programs, progression records and new workout sessions reference canonical exercise IDs.
 
-Returns true only when:
+### Completed workout history
 
-- `is_admin()` is true; OR
-- an active `profile_access` row exists for `auth.uid()` and `target_profile_id`.
+Completed `workout_exercises` SHALL also preserve immutable snapshot fields needed to reproduce historical display/statistics. Later catalog edits cannot rewrite history.
 
-### `can_edit_profile(target_profile_id uuid)`
+### Structured taxonomy
 
-Returns true only when:
+Muscle group, movement pattern and exercise category are distinct canonical concepts. Values such as `puxar_vertical` cannot be stored as muscle groups. Structured taxonomy is validated at write time; no admin free-text mutation for these concepts.
 
-- `is_admin()` is true; OR
-- an active `profile_access` row exists with an allowed edit role.
+`exercise_records` uniqueness is deterministic on `(profile_id, exercise_id)`.
 
-There SHALL be no `OR profiles.user_id = auth.uid()` fallback.
+## 8. Training/rotation state
 
----
+Current A–F progression/rotation state must be explicit rather than inferred ambiguously.
 
-## 7. Admin model
+`profile_training_state` stores the minimal durable state required by current behavior, such as current/next workout code, active plan/program reference where applicable, last-completion reference/time when required and concurrency/version metadata.
 
-The application has one or more global admins.
+Gate 1 inventory must identify all current persisted scheduling/rotation fields before the baseline contract is finalized.
 
-Admins may:
+## 9. Idempotency and offline writes
 
-- view all profiles;
-- create profiles;
-- assign/revoke profile access;
-- manage plans/programs;
-- promote another account to admin;
-- demote another admin when at least one active admin remains;
-- perform approved administrative operations.
+Durable workout/draft/offline operations use a client-generated `client_operation_id` or equivalent deterministic idempotency key.
 
-Admins SHALL NOT be modeled as owners of every profile.
+V2 must reject duplicate operation IDs and incompatible backend/schema epochs.
 
-High-impact admin mutations SHALL:
+Persisted client queues record the backend instance/schema epoch that created them. A Legacy queue must never be silently replayed into V2.
 
-- execute through reviewed RPCs or trusted backend paths;
-- validate caller authorization server-side;
-- emit an audit/event log;
-- reject self-escalation by non-admins;
-- prevent zero-active-admin state.
+## 10. Storage contract
 
----
+Storage ownership is tied to profile ID, not Legacy Auth ownership.
 
-## 8. Domain schema direction
+For retained media migration, evidence includes:
 
-The target schema SHALL be derived from current product behavior and may include:
+- source and destination bucket/path;
+- source/destination profile mapping;
+- object byte size;
+- cryptographic hash when technically available;
+- copy/readability result;
+- authorization test result.
 
-- `app_users`
-- `profiles`
-- `profile_access`
-- `workout_plans`
-- `training_programs`
-- `program_sessions`
-- `program_exercises`
-- `program_exercise_substitutions`
-- `program_enrollments`
-- `workout_sessions`
-- `workout_exercises`
-- `exercise_records`
-- `body_measurements`
-- `progress_photos`
-- `workout_drafts`
-- `event_logs`
+Unauthorized profile users must not access another profile's storage object even by guessed path.
 
-Every table must have a documented business purpose, ownership model, PK/FK strategy, constraints, indexes and RLS policy before implementation.
+## 11. Audit/event logs
 
-No legacy table is copied merely because it exists today.
+Event logs are audit evidence, never authorization state.
 
----
+Minimum event shape includes event type/id, timestamp, actor ID where available, target profile/entity where applicable, correlation/request ID where available and minimal structured metadata.
 
-## 9. Domain taxonomy
+Passwords, tokens, secrets, raw authorization headers and unnecessary sensitive payloads are prohibited. Retention is defined before cutover.
 
-Structured concepts SHALL NOT be stored as arbitrary free text when the product relies on their semantics.
+## 12. Selective migration policy
 
-At minimum the model SHALL distinguish:
+Profiles are classified by evidence as:
 
-- `muscle_group` — canonical muscle group;
-- `movement_pattern` — biomechanical movement pattern;
-- `exercise_category` — e.g. strength/cardio/mobility;
-- `workout_type` — canonical workout code/type;
-- access/application roles.
+- `MIGRATE_HISTORY` — exactly one profile, if Gate 1 confirms the current assumption that only one profile has retained production history;
+- `RECREATE_CLEAN` — intended profiles with no approved historical data to retain.
 
-A value such as `puxar_vertical` SHALL NOT be stored as a muscle group.
+A clean profile gets a new V2 UUID, new Auth identity mapping and new `profile_access`; Legacy ownership/family artifacts are not imported.
 
-Canonical values SHALL be defined in one source of truth and validated at write time.
+Before `RECREATE_CLEAN`, inventory must prove absence of retained data across sessions, exercises, records, measurements, photos/storage, durable drafts/sync, program/training state and other user-visible records.
 
----
+If the inventory proves more than one profile has retained history, the plan changes to migrate every profile with retained data; data is never discarded to preserve the assumption.
 
-## 10. Data ownership rule
+## 13. Authentication migration decision
 
-Domain data belongs to `profile_id`, not implicitly to `auth.users.id`.
+V2 Auth accounts are recreated rather than importing Legacy password credentials.
 
-Tables representing profile-owned data SHALL reference `profile_id` directly where semantically appropriate.
+For each intended user:
 
-Duplicated `user_id` ownership columns SHALL NOT be introduced unless a separately documented technical need exists and they SHALL NOT be used as an authorization fallback.
+1. create V2 Auth account with approved email;
+2. require controlled password reset/re-authentication;
+3. record Legacy Auth UUID -> V2 Auth UUID mapping;
+4. create `app_users` explicitly;
+5. create one `profile_access` mapping for each normal user;
+6. bootstrap the first admin through the controlled process in Section 4.
 
----
+No runtime authorization is inferred from email.
 
-## 11. RLS strategy
+## 14. ETL
 
-RLS SHALL be enabled on all profile-owned tables exposed through the Supabase client.
+Migration is Extract -> Transform -> Load -> Reconcile.
 
-The default posture is deny.
+Transformation includes:
 
-Profile-owned resources SHALL derive access from `can_access_profile(profile_id)` or the equivalent profile relationship through a parent row.
-
-Required adversarial cases:
-
-- normal user -> own profile: ALLOW;
-- normal user -> another profile: DENY;
-- normal user -> guessed profile UUID: DENY;
-- normal user -> old/legacy profile UUID: DENY;
-- user with no access row: DENY;
-- disabled user: DENY;
-- disabled profile access: DENY;
-- admin -> any active profile: ALLOW;
-- non-admin -> admin RPC: DENY;
-- direct role update from client: DENY.
-
-RLS tests are release-blocking.
-
----
-
-## 12. Storage authorization
-
-Storage objects SHALL have deterministic ownership metadata/path rules tied to `profile_id`.
-
-Signed URL generation and upload paths SHALL validate profile authorization server-side.
-
-Legacy path semantics based on historical owner user IDs SHALL NOT be copied into V2 unless required solely for migration compatibility.
-
-The migration plan must map every retained media object to the canonical V2 profile.
-
----
-
-## 13. Migration strategy
-
-Migration SHALL use controlled ETL, not blind database restore.
-
-### Phase A — Extract
-
-Export all source tables and storage metadata required by the approved mapping.
-
-The legacy production database remains unchanged except for emergency corrective maintenance.
-
-### Phase B — Transform
-
-Transformation SHALL include:
-
-- old profile ID -> canonical V2 profile ID mapping;
-- duplicate-profile consolidation;
-- authorization mapping;
+- Legacy entity ID -> V2 entity ID mapping;
+- canonical exercise mapping;
 - taxonomy normalization;
-- legacy field translation;
+- profile history classification;
 - orphan detection;
-- invalid-record quarantine;
+- invalid/ambiguous record quarantine;
 - conflict reporting.
 
-No ambiguous mapping is silently guessed.
+No ambiguous mapping is guessed silently.
 
-### Phase C — Load
+ETL rehearsals must be repeatable/idempotent.
 
-Load data into an isolated V2 Supabase project.
+## 15. Reconciliation
 
-Load order SHALL respect referential integrity and be idempotent/repeatable for rehearsals.
+For the historical profile, reconciliation includes at least:
 
-### Phase D — Reconcile
-
-Source and destination SHALL be compared before cutover.
-
-Required reconciliation includes at least:
-
-- profiles;
-- workout sessions;
-- workout exercises;
-- exercise records;
+- workout session count/dates/types;
+- executed exercises/sets;
+- loads, reps and represented volume;
+- exercise progression latest/best values;
+- running distance/time/pace;
 - body measurements;
-- progress photos metadata/files;
-- plans/programs/enrollments;
-- drafts where migration is approved;
-- aggregate volume/count/date checks.
+- plan/program/training state approved for retention;
+- aggregate statistics used by the product;
+- progress photo count, readability, size and content hash.
 
-A mismatch blocks cutover until explained and accepted.
-
----
-
-## 14. Known duplicate-profile case
-
-The current database contains more than one historical profile for Rudney with valid records across both identities.
-
-The migration SHALL:
-
-1. create one canonical V2 Rudney profile;
-2. map all approved historical Rudney profile IDs to that canonical profile;
-3. preserve distinct workout sessions;
-4. reconcile `exercise_records` deterministically;
-5. preserve source IDs in migration audit/mapping artifacts where useful;
-6. never deduplicate workouts solely by profile name.
-
-The same process SHALL be applied to any additional duplicates discovered during inventory.
-
----
-
-## 15. Auth migration
-
-Authentication migration must be explicitly designed before cutover.
-
-Preferred objective:
-
-- preserve the intended user identities/emails;
-- establish V2 `app_users` rows;
-- create only explicit `profile_access` mappings;
-- verify every account individually.
-
-If Supabase Auth credentials cannot be migrated safely in-place between projects, the approved plan SHALL define a controlled re-authentication/password-reset path rather than weakening security.
-
-No profile access may be inferred from email at runtime after migration.
-
----
+Every mismatch is `FIXED`, `EXPLAINED_AND_APPROVED` or `BLOCKING`. Unexplained mismatches block cutover.
 
 ## 16. Migration gates
 
-### Gate 0 — Legacy freeze
+### Gate 0 — Legacy freeze policy
 
-- schema-changing feature development paused;
-- only P0/P1 corrective work allowed;
-- final legacy backup strategy confirmed.
+- schema-changing feature work paused;
+- only P0/P1 corrective work on Legacy;
+- backup/restore ability confirmed.
 
 ### Gate 1 — Inventory
 
-Complete catalog of:
+Catalog schema, constraints, FKs, indexes, functions, triggers, RLS/policies, storage rules, RPCs/Edge Functions, row counts by profile and all durable/offline state. Produce evidence for `MIGRATE_HISTORY` vs `RECREATE_CLEAN`.
 
-- tables;
-- columns;
-- constraints;
-- FKs;
-- indexes;
-- functions;
-- triggers;
-- RLS/policies;
-- buckets/storage rules;
-- RPCs/Edge Functions;
-- row counts by profile/resource.
+### Gate 2 — Canonical architecture approval
 
-### Gate 2 — Canonical model approval
+Required before baseline:
 
-- ERD approved;
-- table contracts approved;
-- authorization matrix approved;
-- ADR approved;
-- rollback/recovery approved.
+- revised Spec;
+- ADR;
+- canonical ERD;
+- authorization matrix;
+- table contracts;
+- migration strategy;
+- security/database review;
+- rollback/cutover strategy;
+- second R4 adversarial review with no unresolved Blocker/Major.
 
-### Gate 3 — V2 baseline
+### Gate 3 — V2 baseline/environment
 
-- new Supabase project created;
-- single baseline schema applied;
-- RLS and storage rules installed;
-- test identities created;
+Only after Gate 2 approval:
+
+- create separate Supabase V2 project;
+- apply one reviewed `00000000000000_baseline_v2.sql` against an empty project;
+- configure RLS/storage/functions;
+- bootstrap test/admin identities;
 - no production cutover.
 
 ### Gate 4 — ETL rehearsal
 
-- complete extract/transform/load executed on a snapshot;
-- all mappings recorded;
-- no unexplained orphan/conflict.
+Run full snapshot ETL and mapping/reconciliation.
 
-### Gate 5 — Reconciliation
+### Gate 5 — Shadow validation
 
-- row-level/count/aggregate checks pass;
-- historical data parity confirmed;
-- duplicate consolidation verified.
+Test V2 with all intended normal accounts plus admin, including A–F, running, autosave/F5, offline behavior, history, progression, measures, photos, programs/plans and admin operations.
 
-### Gate 6 — Shadow validation
+### Gate 6 — Cutover approval
 
-A non-production build points to V2 and validates:
+Explicit R4 approval required.
 
-- Henrique;
-- Rudney;
-- Nicole;
-- Karol;
-- admin;
-- cross-profile denial;
-- workout A-F;
-- running flow;
-- autosave/F5;
-- offline sync;
-- history;
-- progress;
-- measurements;
-- photos;
-- plans/programs;
-- admin operations.
+### Gate 7 — Cutover read-only verification
 
-### Gate 7 — Cutover approval
+1. coordinate all known devices;
+2. resolve pending Legacy offline queues;
+3. take final Legacy backup/checkpoint;
+4. enforce Legacy write freeze so stale clients cannot append writes;
+5. load/reconcile final historical delta;
+6. deploy V2-connected application with V2 production writes still gated;
+7. execute login, RLS, storage and smoke validation.
 
-Requires explicit R4 release approval.
+Failure here returns to Legacy with no V2 production write loss.
 
-### Gate 8 — Cutover
+### Gate 8 — Open V2 writes
 
-- final legacy backup;
-- short write freeze;
-- delta extraction;
-- delta transformation/load;
-- final reconciliation;
-- environment switch;
-- deploy;
-- production smoke tests;
-- authorization tests.
+Only after read-only verification passes:
 
-### Gate 9 — Observation / rollback window
+- enable V2 writes;
+- keep Legacy write-frozen/read-only;
+- begin observation window;
+- monitor authorization/data-integrity signals.
 
-Legacy database remains intact and available for rollback/read-only comparison for an explicitly defined retention period.
+### Gate 9 — Observation/retention
 
----
+Legacy remains intact until rollback window ends and retirement is separately approved.
 
-## 17. Cutover rollback
+## 17. Rollback
 
-Rollback must be practical, documented and rehearsed.
+### Before V2 writes open
 
-Before cutover:
+Restore known-good Legacy application configuration and remove Legacy write freeze after validation.
 
-- legacy environment variables are preserved securely;
-- legacy database remains intact;
-- backup restore procedure is verified;
-- last accepted source checkpoint is recorded.
+### After V2 writes open
 
-If any P0/P1 issue occurs during cutover validation:
+No accepted V2 production write may be discarded.
 
-1. stop writes to V2 if necessary;
-2. restore frontend/backend configuration to Legacy;
-3. redeploy known-good application configuration;
-4. validate user login/profile isolation;
-5. record any V2-only writes for later reconciliation;
-6. open incident review before attempting another cutover.
+A rollback requires:
 
----
+1. gate V2 writes;
+2. export V2 delta since cutover checkpoint using operation IDs/timestamps/mapping artifacts;
+3. transform supported V2 writes through a rehearsed reverse-delta mapping;
+4. load/reconcile that delta into Legacy;
+5. restore Legacy configuration only after reconciliation passes.
 
-## 18. Baseline migration policy
+If an entity cannot be reverse-mapped safely, production writes for that entity cannot be enabled during the rollback window without an explicit approved remediation.
 
-V2 SHALL start from one reviewed baseline representing the approved architecture, e.g.:
+## 18. Profile creation duplicate prevention
 
-`00000000000000_baseline_v2.sql`
+“One logical person = one profile” is enforced operationally through admin workflow rather than name uniqueness.
 
-The baseline SHALL be reproducible against an empty V2 project.
+Before creating a profile, admin workflow must display/search existing active and inactive profiles and require explicit confirmation. Duplicate detection may use normalized name plus secondary attributes only as warnings, never as authorization or hard identity proof.
 
-After V2 launch, normal timestamped migrations resume.
-
-Future migrations must reference a Spec/change record and document:
-
-- intent;
-- data impact;
-- authorization/RLS impact;
-- compatibility;
-- rollback/remediation;
-- automated tests;
-- production verification.
-
-A migration SHALL NOT be used as a substitute for unresolved architecture design.
-
----
+The one-to-one `profile_access` constraints prevent accidental multiple account/profile mappings.
 
 ## 19. Acceptance criteria
 
-The V2 migration cannot be considered complete until all of the following are true:
+The V2 architecture/migration is not complete until:
 
-- [ ] `families`, `family_members`, `family_invitations`, `family_group_id` do not exist in V2.
-- [ ] `profiles.user_id` is not used as an authorization mechanism and is preferably absent from V2.
-- [ ] `app_users` is the only source of global admin status.
-- [ ] `profile_access` is the only non-admin source of profile authorization.
-- [ ] normal users cannot access another profile by URL, query, RPC, storage path or direct API call.
-- [ ] admin can access/manage all profiles according to the approved matrix.
-- [ ] non-admin cannot self-promote.
-- [ ] the last active admin cannot be removed/demoted.
-- [ ] duplicate logical profiles are consolidated according to explicit mappings.
-- [ ] all approved historical workout sessions are preserved.
-- [ ] all approved historical exercise records are reconciled.
-- [ ] measurements and photos are preserved and linked to the correct canonical profile.
-- [ ] taxonomy no longer mixes muscle group, movement pattern and category.
-- [ ] no unexplained orphan records remain.
-- [ ] reconciliation reports show accepted parity between Legacy and V2.
-- [ ] automated RLS regression suite passes.
-- [ ] Security CI passes.
-- [ ] manual account-by-account validation passes.
-- [ ] rollback has been rehearsed.
-- [ ] explicit R4 release approval is recorded before production cutover.
+- no family/team tables or `family_group_id` exist;
+- no `profiles.user_id` authorization ownership exists;
+- every app authorization requires active `app_users`;
+- `profile_access` is one-to-one and role-free at launch;
+- normal users cannot access another/inactive profile by URL, REST, RPC or storage path;
+- direct client mutation of admin/access state is denied;
+- first-admin bootstrap is documented and tested;
+- last active admin cannot be removed by demotion, disablement or Auth deletion;
+- security-definer/RLS hardening tests pass;
+- canonical exercise identity and structured taxonomy are implemented;
+- current training rotation/state has an explicit V2 contract;
+- offline/idempotency/backend-epoch behavior is tested;
+- every retained historical record/object reconciles or has approved explanation;
+- Auth recreation/password-reset path is tested for every intended account;
+- cross-profile and admin adversarial suites pass;
+- pre-write and post-write rollback procedures are rehearsed;
+- explicit R4 cutover approval is recorded.
 
----
+## 20. Baseline policy
 
-## 20. Definition of Done
+Only after Gate 2 approval may implementation create:
 
-The database rebuild is Done only when:
+`00000000000000_baseline_v2.sql`
 
-- the V2 canonical model is documented and implemented;
-- authorization is understandable from `app_users + profile_access` without hidden fallbacks;
-- data migration is reproducible;
-- reconciliation evidence is stored;
-- all critical flows pass against V2;
-- production cutover succeeds;
-- the observation window completes without unresolved P0/P1 incidents;
-- Legacy is retained or retired according to an explicit approved retention decision.
-
----
-
-## 21. Required R4 review artifacts
-
-Before implementation/cutover, this Spec SHALL be accompanied by:
-
-1. ADR — Database V2 identity and authorization architecture;
-2. ERD / canonical data model;
-3. Authorization & RLS matrix;
-4. Security review;
-5. Database impact review;
-6. Migration mapping document;
-7. ETL design;
-8. Reconciliation plan/report;
-9. Backup and rollback runbook;
-10. Production cutover runbook;
-11. Adversarial review with all Blocker/Major findings resolved or explicitly accepted under the RHC Tech process.
-
----
-
-## 22. Current decision
-
-Approved architectural direction for further review:
-
-- no family/team abstraction;
-- global admin role in `app_users`;
-- explicit profile authorization in `profile_access`;
-- admins can create/promote additional admins through protected server-side operations;
-- profiles represent trained people, not auth ownership;
-- legacy authorization shortcuts are not carried into V2;
-- migration proceeds in parallel with Legacy remaining production until formal cutover.
+The baseline must reproduce the full approved V2 schema against an empty project. Future migrations require a Spec/change record, data/RLS impact analysis, verification and rollback/remediation plan. Migrations are not substitutes for unresolved architecture decisions.
