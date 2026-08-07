@@ -1,170 +1,182 @@
 # RHCT-DATA-002 — Selective Migration Strategy
 
-**Status:** Draft for R4 review  
+**Status:** Revised after R4 adversarial review  
 **Parent Spec:** RHCT-DATA-002  
-**Decision:** migrate historical data only for the profile that actually owns relevant history; recreate the remaining profiles cleanly in V2.
+**Decision:** migrate historical data only for the single profile proven to contain relevant history; recreate all other intended profiles cleanly in V2.
 
----
+## 1. Migration modes
 
-## 1. Migration principle
+Each intended profile is classified from inventory evidence as exactly one of:
 
-The V2 migration SHALL NOT copy every legacy profile merely because it exists.
+1. **MIGRATE_HISTORY** — preserve and reconcile approved production history.
+2. **RECREATE_CLEAN** — create a fresh V2 profile and fresh access mapping because no approved retained history exists.
 
-Profiles are classified into one of two migration modes:
+No classification is based only on name.
 
-1. **MIGRATE_HISTORY** — canonical profile with relevant production history that must be preserved.
-2. **RECREATE_CLEAN** — profile exists in the current product but has no history that must be retained; create a fresh canonical V2 profile and new access relationship.
+## 2. MIGRATE_HISTORY
 
-This classification must be produced from an explicit inventory before ETL execution.
+For the single historical profile, migrate every approved profile-owned resource discovered by inventory, including when present:
 
-No profile is classified based only on name.
-
----
-
-## 2. MIGRATE_HISTORY flow
-
-For the single profile confirmed to contain relevant history, migrate and reconcile every approved profile-owned resource.
-
-At minimum inspect and migrate when present:
-
-- profile attributes required by the current product;
-- workout sessions;
-- workout exercises / sets represented in the current schema;
-- exercise records / progression data;
+- required profile attributes;
+- workout sessions and executed sets/exercises;
+- exercise records/progression;
 - workout plans;
-- training program enrollment and current program state;
+- program enrollment/state;
+- profile training/rotation state;
 - body measurements;
 - progress photos and storage objects;
 - running metrics;
-- schedule state required by the current product;
-- any persistent progress/autosave data explicitly approved for migration;
-- other profile-owned records discovered during inventory and approved in the mapping contract.
+- drafts/pending durable state explicitly approved for migration;
+- any additional profile-owned row required by current behavior.
 
-Historical IDs may be replaced by new V2 UUIDs. Referential integrity SHALL be maintained through an explicit migration mapping table/artifact.
+All Legacy IDs map explicitly to new V2 IDs through a migration artifact. ETL must be deterministic and repeatable.
 
-Suggested migration mapping artifact:
+## 3. RECREATE_CLEAN
 
-```text
-entity_type | legacy_id | v2_id | migration_mode | notes
-profile     | ...       | ...   | MIGRATE_HISTORY | canonical historical profile
-session     | ...       | ...   | MIGRATE_HISTORY | ...
-...
-```
+For a clean profile:
 
-The ETL must be repeatable and deterministic.
+- do not copy its Legacy profile row or Legacy ID;
+- do not copy Legacy authorization/family/owner artifacts;
+- create a fresh V2 profile from approved current attributes;
+- create exactly one fresh `profile_access` mapping for its intended normal account;
+- recreate only the current approved plan/program configuration required for normal operation;
+- history starts at zero.
 
----
+Before this classification is allowed, inventory must prove there is no approved retained history across sessions, exercises, records, measurements, photos/storage, durable drafts/sync state, program state or other user-visible domain records.
 
-## 3. RECREATE_CLEAN flow
+## 4. Canonical exercise transformation
 
-For profiles with no approved history to preserve:
+Before ETL rehearsal, build the V2 `exercise_catalog` and mapping contract.
 
-- DO NOT migrate the legacy profile row;
-- DO NOT preserve the legacy `profile_id`;
-- DO NOT migrate legacy ownership/access artifacts;
-- DO NOT migrate legacy `user_id`, `family_group_id`, invitation or family relationships;
-- create a new V2 `profiles` row using only approved current profile attributes;
-- create a fresh `profile_access` row for the intended authenticated account;
-- create fresh plan/program enrollment state from the approved current configuration when required by product behavior;
-- start history at zero in V2.
-
-A clean recreation is not data loss when inventory confirms the profile has no approved history to retain.
-
-The source Legacy database remains available during the rollback/observation window.
-
----
-
-## 4. Mandatory pre-migration proof
-
-Before any profile may be classified as RECREATE_CLEAN, the inventory must prove zero approved historical data for that profile across every relevant profile-owned table and storage namespace.
-
-The verification must not rely only on `workout_sessions`.
-
-Required checks include at least:
-
-- workout sessions;
-- workout exercises;
-- exercise records;
-- body measurements;
-- progress photos / objects;
-- plan/program state;
-- drafts/pending sync data if persisted;
-- event/domain records that materially affect the user experience.
-
-If any retained data is found, classification returns to review.
-
----
-
-## 5. Historical profile reconciliation
-
-The historical profile has a stricter parity requirement.
-
-Before cutover, Legacy and V2 reports must reconcile at least:
-
-- number of workout sessions;
-- session dates and workout types;
-- exercises per session;
-- loads/reps/volume values represented in Legacy;
-- exercise-record latest/best values after deterministic reconciliation;
-- running duration/distance metrics;
-- body measurements;
-- progress photo count and file accessibility;
-- plan/program state that should survive cutover;
-- aggregate total volume and other statistics used by the product.
-
-Every mismatch must have one of these states:
-
-- FIXED;
-- EXPLAINED_AND_APPROVED;
-- BLOCKING.
-
-No unexplained mismatch is acceptable.
-
----
-
-## 6. Authentication mapping
-
-User accounts are handled separately from profile history.
-
-For each intended V2 user:
+For every historical/planned Legacy exercise:
 
 ```text
-legacy auth identity -> intended V2 auth identity -> app_users -> profile_access
+legacy exercise representation -> canonical exercise_catalog.id/code
 ```
 
-For RECREATE_CLEAN profiles, only the intended V2 identity and fresh profile/access records are needed.
+Mapping rules:
 
-For the MIGRATE_HISTORY profile, historical domain data maps to the fresh canonical V2 profile regardless of its legacy authorization artifacts.
+- no matching by capitalization alone without normalization/review;
+- ambiguous mappings are BLOCKING;
+- completed workout rows retain immutable snapshot fields required to reproduce historical display/statistics;
+- canonical catalog edits after cutover do not rewrite historical snapshots.
 
-Runtime access SHALL never be inferred from legacy email/profile ownership fields.
+## 5. Historical reconciliation
 
----
+Legacy and V2 must reconcile at least:
 
-## 7. Cutover impact
+- session count;
+- session dates/types;
+- exercises and sets per session;
+- load/repetition/volume values;
+- exercise-record latest/best values;
+- running distance/time/pace data;
+- body measurements;
+- plan/program/training-state values approved for retention;
+- aggregate statistics used by the app;
+- progress-photo object count, readability, byte size and cryptographic hash for every retained object when technically available.
 
-Immediately before cutover:
+Every mismatch is classified as `FIXED`, `EXPLAINED_AND_APPROVED`, or `BLOCKING`. No unexplained mismatch may pass cutover.
 
-1. freeze writes to Legacy for the cutover window;
-2. extract the final delta for the MIGRATE_HISTORY profile only;
-3. apply deterministic transforms;
-4. load delta into V2;
-5. recreate/verify clean profiles and access rows;
-6. run parity and RLS tests;
-7. switch application environment only after R4 approval.
+## 6. Authentication strategy
 
-The Legacy database remains intact for rollback/read-only comparison.
+V2 SHALL use recreated Supabase Auth identities rather than importing Legacy password credentials.
 
----
+For this small private user set:
 
-## 8. Release-blocking checks
+1. create each intended account in the V2 Auth project using the approved email;
+2. require controlled password reset/re-authentication before production use;
+3. record `legacy_auth_user_id -> v2_auth_user_id` in the migration mapping artifact;
+4. create `app_users` rows explicitly;
+5. create exactly one `profile_access` mapping for each normal account;
+6. bootstrap the first admin separately using the verified V2 Auth UUID and operator-only setup procedure.
 
-- [ ] exactly one profile is classified MIGRATE_HISTORY, based on inventory evidence;
-- [ ] every RECREATE_CLEAN profile has zero approved retained history;
-- [ ] historical profile row/data mapping is explicit;
-- [ ] no legacy authorization relationship is imported as ownership authority;
-- [ ] all V2 profiles receive fresh canonical IDs unless a documented exception exists;
-- [ ] every normal account receives exactly one intended active profile access;
-- [ ] admin access derives only from `app_users.role = 'admin'`;
+Runtime profile access is never inferred from email.
+
+## 7. Storage migration
+
+For each retained storage object record:
+
+```text
+legacy_bucket/path
+v2_bucket/path
+legacy_profile_id
+v2_profile_id
+byte_size
+sha256 (or approved cryptographic hash)
+copy_status
+verification_status
+```
+
+The migrated object must be readable after copy and inaccessible to unauthorized accounts under V2 policies.
+
+## 8. Backend/cutover epoch
+
+Legacy and V2 are separate backend epochs. The client must know which backend instance/schema epoch created a persisted offline operation.
+
+Required behavior:
+
+- durable offline writes/drafts carry a `client_operation_id` and backend/schema epoch;
+- V2 rejects operations created for an incompatible Legacy epoch unless an explicit migration path handles them;
+- replay is idempotent through unique `client_operation_id` constraints or equivalent;
+- on backend fingerprint/epoch change, the client must not silently replay a Legacy queue into V2;
+- unsynced Legacy data discovered before cutover blocks cutover until synchronized, exported or explicitly resolved.
+
+## 9. Cutover protocol
+
+Cutover has two write phases.
+
+### Phase 1 — read-only verification
+
+1. announce/coordinate the short maintenance window for all known devices;
+2. ensure no unresolved pending offline queues remain;
+3. take final Legacy backup/checkpoint;
+4. put Legacy application data into enforced read-only/write-frozen state so stale clients cannot append new domain writes;
+5. extract the final MIGRATE_HISTORY delta;
+6. transform/load to V2;
+7. run final data reconciliation;
+8. deploy the V2-connected application while V2 production writes remain gated;
+9. run login, profile-isolation, RLS, storage and smoke tests.
+
+If validation fails here, rollback is simple: restore the known-good Legacy app configuration and remove the Legacy write freeze. No V2 production user write has been accepted.
+
+### Phase 2 — open V2 writes
+
+Only after Phase 1 is explicitly accepted:
+
+1. enable V2 production writes;
+2. keep Legacy write-frozen/read-only;
+3. begin the observation window;
+4. audit V2 write health and authorization.
+
+## 10. Rollback after V2 writes open
+
+Once V2 has accepted production writes, rollback cannot discard them.
+
+If a P0/P1 requires return to Legacy:
+
+1. immediately gate V2 writes;
+2. export all V2 writes since the cutover checkpoint using `client_operation_id`, timestamps and entity mappings;
+3. transform those writes through an approved reverse-delta mapping for the supported profile-owned entities;
+4. load/reconcile the reverse delta into Legacy before reopening Legacy writes;
+5. validate counts, key values and profile ownership;
+6. restore Legacy application configuration only after reconciliation passes.
+
+The cutover runbook must prove this reverse-delta procedure in rehearsal. If a V2-only entity cannot be safely reverse-mapped, V2 writes for that entity may not be enabled until the rollback window closes or an approved remediation exists.
+
+## 11. Release-blocking checks
+
+- [ ] exactly one profile is `MIGRATE_HISTORY` based on inventory evidence;
+- [ ] each `RECREATE_CLEAN` profile has zero approved retained history;
+- [ ] canonical exercise mappings have no unresolved ambiguity;
+- [ ] every normal V2 account has exactly one mapping and every mapped profile has at most one normal account;
+- [ ] V2 Auth identities and password-reset/re-authentication path are tested;
+- [ ] first-admin bootstrap evidence exists;
+- [ ] all retained photos pass path/size/hash/readability verification;
+- [ ] all pending offline Legacy queues are resolved before cutover;
+- [ ] Legacy write freeze blocks stale-client writes;
+- [ ] V2 rejects incompatible backend epochs and duplicate operation IDs;
 - [ ] historical parity checks pass;
-- [ ] cross-profile RLS suite passes;
-- [ ] rollback remains possible until the observation window closes.
+- [ ] cross-profile RLS/storage suite passes;
+- [ ] pre-write rollback and post-write reverse-delta rollback have been rehearsed;
+- [ ] Legacy remains intact until the approved observation/retention window ends.
