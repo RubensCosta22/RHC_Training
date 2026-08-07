@@ -27,17 +27,24 @@ export async function getPostLoginPath() {
   const context = await getFamilyContext()
   if (context?.role === 'admin') return '/admin'
 
-  // RLS limita esta consulta aos perfis associados ao usuário autenticado.
-  // Usuários comuns não escolhem perfil: entram diretamente no próprio dashboard.
+  // Fail closed: uma conta familiar comum deve possuir exatamente um perfil
+  // acessivel. Nunca escolha silenciosamente o primeiro perfil retornado pelo RLS.
   const { data, error } = await supabase
     .from('profiles')
-    .select('id')
+    .select('id,name')
     .order('name')
-    .limit(1)
+    .limit(2)
 
   if (error) throw error
-  const profileId = data?.[0]?.id
-  return profileId ? `/dashboard/${profileId}` : '/profiles'
+
+  const profiles = data || []
+  if (profiles.length === 1) return `/dashboard/${profiles[0].id}`
+
+  if (profiles.length === 0) {
+    throw new Error('Nenhum perfil foi associado a esta conta. Entre em contato com o administrador.')
+  }
+
+  throw new Error('Mais de um perfil foi associado a esta conta. O acesso foi bloqueado por seguranca; entre em contato com o administrador.')
 }
 
 export async function createFamilyGroup(name, adminEmail) {
