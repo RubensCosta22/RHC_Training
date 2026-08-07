@@ -6,6 +6,7 @@ import { listPlansForAdmin, savePlan } from '../services/planService'
 import { applyProgramToProfile, getProfileProgramState, listPublishedPrograms } from '../services/programAdminService'
 import { friendlyError } from '../utils/validation'
 import { applyRequestedPlan } from '../services/scheduleService'
+import { CANONICAL_MUSCLE_GROUPS, normalizeMuscleGroup } from '../domain/muscleGroupTaxonomy'
 
 const emptyExercise = () => ({ id: crypto.randomUUID(), name: '', muscleGroup: '', sets: 3, reps: '8-12', rest: 60, goal: '', alternatives: [], active: true })
 
@@ -51,7 +52,18 @@ export default function Plans() {
 
   async function save() {
     setSaving(true); setMessage('')
-    try { const saved=await savePlan(profile.id, plan); setPlans((items)=>items.map((item)=>item.workout_type===selectedType?saved:item)); setMessage('Plano salvo. A mudanca vale para os proximos treinos.') }
+    try {
+      const normalizedPlan = {
+        ...plan,
+        exercises: plan.exercises.map((exercise) => ({
+          ...exercise,
+          muscleGroup: normalizeMuscleGroup(exercise.muscleGroup)
+        }))
+      }
+      const saved=await savePlan(profile.id, normalizedPlan)
+      setPlans((items)=>items.map((item)=>item.workout_type===selectedType?saved:item))
+      setMessage('Plano salvo. A mudanca vale para os proximos treinos.')
+    }
     catch(error){ setMessage(friendlyError(error)) } finally { setSaving(false) }
   }
 
@@ -112,7 +124,12 @@ export default function Plans() {
         <div className="mb-3 flex items-center justify-between"><strong>Exercicio {index+1}</strong><div className="flex gap-2"><button onClick={()=>move(index,-1)} aria-label="Mover para cima"><ArrowUp size={18}/></button><button onClick={()=>move(index,1)} aria-label="Mover para baixo"><ArrowDown size={18}/></button><button onClick={()=>patchPlan({exercises:plan.exercises.filter((_,position)=>position!==index)})} aria-label="Remover"><Trash2 size={18}/></button></div></div>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="text-sm">Nome<input value={exercise.name} onChange={(event)=>patchExercise(index,{name:event.target.value})}/></label>
-          <label className="text-sm">Grupo muscular<input value={exercise.muscleGroup || ''} onChange={(event)=>patchExercise(index,{muscleGroup:event.target.value})}/></label>
+          <label className="text-sm">Grupo muscular
+            <select value={normalizeMuscleGroup(exercise.muscleGroup) || ''} onChange={(event)=>patchExercise(index,{muscleGroup:event.target.value || null})}>
+              <option value="">Sem grupo muscular</option>
+              {CANONICAL_MUSCLE_GROUPS.map((group)=><option key={group} value={group}>{group}</option>)}
+            </select>
+          </label>
           <label className="text-sm">Series<input type="number" min="1" max="20" value={exercise.sets} onChange={(event)=>patchExercise(index,{sets:event.target.value})}/></label>
           <label className="text-sm">Repeticoes<input value={exercise.reps} onChange={(event)=>patchExercise(index,{reps:event.target.value})}/></label>
           <label className="text-sm">Descanso (segundos)<input type="number" min="0" max="600" value={exercise.rest || 0} onChange={(event)=>patchExercise(index,{rest:event.target.value})}/></label>
