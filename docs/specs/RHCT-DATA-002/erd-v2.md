@@ -1,6 +1,6 @@
 # RHCT-DATA-002 — Canonical ERD V2
 
-**Status:** Draft for R4 review
+**Status:** Revised after R4 adversarial review
 
 ```text
 auth.users
@@ -8,129 +8,167 @@ auth.users
    ▼
 app_users
    │
-   │ global role: user | admin
+   ├────────────── global role: user | admin
    │
-   └───────────────┐
-                   │
-                   ▼
-             profile_access
-                   │ N:1
-                   ▼
-                profiles
-                   │
-      ┌────────────┼─────────────────────────────────────────────┐
-      │            │             │            │                 │
-      ▼            ▼             ▼            ▼                 ▼
-workout_plans  workout_sessions exercise_records body_measurements progress_photos
-                   │
-                   ▼
-             workout_exercises
+   └──── normal user only ───► profile_access ◄───1:1───► profiles
+                                                       │
+                     ┌─────────────────────────────────┼───────────────────────────────────┐
+                     │                                 │                                   │
+                     ▼                                 ▼                                   ▼
+              workout_plans                    workout_sessions                    profile_training_state
+                     │                                 │
+                     │                                 ▼
+                     │                          workout_exercises ─────► exercise_catalog
+                     │
+                     └───────────────────────────────► exercise_catalog
 
-profiles
-   │
-   ├───────────────► workout_drafts
-   │
-   └───────────────► program_enrollments ─────► training_programs
-                                                 │
-                                                 ▼
-                                          program_sessions
-                                                 │
-                                                 ▼
-                                          program_exercises
-                                                 │
-                                                 ▼
-                                  program_exercise_substitutions
+profiles ─► exercise_records ─► exercise_catalog
+profiles ─► body_measurements
+profiles ─► progress_photos
+profiles ─► workout_drafts
+profiles ─► program_enrollments ─► training_programs ─► program_sessions ─► program_exercises ─► exercise_catalog
+                                                                                 │
+                                                                                 └──► program_exercise_substitutions
+
+exercise_catalog ─► muscle_groups
+exercise_catalog ─► movement_patterns
+exercise_catalog ─► exercise_categories
 ```
 
 ## Identity and authorization
 
 ### `app_users`
-- `user_id uuid PK -> auth.users(id)`
-- `role: user | admin`
-- `status: active | disabled`
-- timestamps
+- `user_id uuid PK -> auth.users(id)` with deletion protection, not automatic cascade;
+- `role: user | admin`;
+- `status: active | disabled`;
+- timestamps.
 
 ### `profiles`
-- canonical person/training identity
-- NO authorization `user_id`
-- profile attributes only
-- soft-active state
+- canonical person/training identity;
+- no authorization `user_id`;
+- profile attributes only;
+- `is_active` soft lifecycle.
 
 ### `profile_access`
-- `(profile_id, user_id)` unique/PK
-- role `owner | editor`
-- active flag
-- only non-admin source of profile authorization
+Launch model is intentionally one-to-one and role-free:
+
+- `user_id uuid UNIQUE NOT NULL`;
+- `profile_id uuid UNIQUE NOT NULL`;
+- timestamps;
+- no `owner/editor` role;
+- no soft `is_active` flag is required at launch: revocation removes the mapping through an admin-only protected operation;
+- only non-admin source of profile authorization.
+
+This prevents one normal account from resolving to multiple profiles and prevents multiple normal accounts from owning the same profile. Shared/delegated access requires a future Spec/ADR.
+
+## Canonical exercise model
+
+### `exercise_catalog`
+Single source of exercise identity used by plans, programs, records and new sessions.
+
+Representative fields:
+- `id uuid PK`;
+- `code text UNIQUE NOT NULL` — stable machine key/slug;
+- `name text NOT NULL` — current display name;
+- `primary_muscle_group_id`;
+- `movement_pattern_id`;
+- `exercise_category_id`;
+- optional execution-video/reference metadata;
+- `is_active`;
+- timestamps.
+
+Exercise identity is by stable `exercise_catalog.id/code`, never free-text capitalization.
+
+### Historical snapshot rule
+
+`workout_exercises` SHALL reference `exercise_id` and also retain immutable snapshot fields needed to preserve history, including at minimum the executed/display name and semantic fields required by historical statistics. Later catalog edits SHALL NOT rewrite completed workout history.
+
+### Taxonomy lookup tables
+
+`muscle_groups`, `movement_patterns` and `exercise_categories` are canonical lookup tables with stable codes and unique constraints. Free text is not accepted for these structured concepts.
 
 ## Training domain
 
 ### `workout_plans`
-Belongs to one profile. Stores configurable A-F/current plan definitions or references to a canonical exercise catalog as finalized by schema review.
+Belongs to one profile and references `exercise_catalog` for configured A–F workouts.
+
+### `profile_training_state`
+One row per profile for persisted state that must not be inferred ambiguously from history.
+
+Representative responsibilities:
+- current/next workout code in the A–F rotation;
+- active plan/program reference where applicable;
+- last completed workout reference/time when needed;
+- version/timestamps for concurrency.
+
+The exact current Legacy schedule/rotation fields must be mapped during inventory before baseline finalization.
 
 ### `workout_sessions`
-Belongs to one profile. Immutable historical training session after completion except explicitly approved correction paths.
+Belongs to one profile. Completed sessions are historical records and immutable except through an approved correction path.
 
 Representative attributes:
-- profile_id
-- workout_type
-- started_at / completed_at or canonical date fields
-- duration
-- gym/location free text where applicable
-- running metrics when applicable
-- source draft/idempotency reference
+- `profile_id`;
+- canonical workout type/code;
+- started/completed timestamps;
+- duration;
+- gym/location where applicable;
+- running distance/time/pace fields when applicable;
+- `client_operation_id uuid UNIQUE` for idempotent sync/replay protection;
+- environment/schema epoch metadata required by the cutover contract.
 
 ### `workout_exercises`
-Child of a workout session.
-
-Must keep distinct:
-- exercise identity/name
-- muscle_group
-- movement_pattern
-- exercise_category
-- load/repetition/set values required by current product
+Child of a session; references `exercise_catalog` and stores immutable execution snapshots plus sets/load/reps.
 
 ### `exercise_records`
-Derived/persisted progression state for a profile + canonical exercise identity.
-
-Must have a deterministic uniqueness key, not free-form duplicates differing only by capitalization.
+Persisted progression state with deterministic uniqueness on `(profile_id, exercise_id)`.
 
 ### `body_measurements`
 Profile-owned measurement history.
 
 ### `progress_photos`
-Profile-owned photo metadata. Storage object authorization is tied to profile_id.
+Profile-owned photo metadata. Storage object path/metadata is tied to profile ID and migration integrity includes byte-size/hash evidence.
 
 ### `workout_drafts`
-Profile-owned in-progress state for autosave/recovery. One deterministic active draft identity per in-progress workout context.
+Profile-owned autosave/recovery state. One deterministic active draft per workout context. Draft/sync writes use idempotency identifiers and backend epoch checks.
 
 ## Structured programs
 
 ### `training_programs`
-Program definition; not used as an authorization boundary.
+Program definition; not an authorization boundary.
 
 ### `program_sessions`
-Session/workout definitions inside a program.
+Workout/session definitions inside a program.
 
 ### `program_exercises`
-Exercises inside a program session.
-
-Must contain explicit semantic fields rather than overloading muscle group:
-- primary muscle group
-- movement pattern
-- exercise category
+References canonical `exercise_catalog`; program-specific ordering/prescription belongs here rather than duplicating exercise identity taxonomy.
 
 ### `program_exercise_substitutions`
-Allowed alternatives for a program exercise.
+References canonical exercise IDs for permitted alternatives.
 
 ### `program_enrollments`
-Links a profile to the selected/current program state.
+Links a profile to selected/current program state.
 
 ## Audit
 
 ### `event_logs`
-Security/admin/domain audit events as approved by the observability/privacy review.
+Security/admin/domain audit events only.
 
-Audit data must not become a second authorization model.
+Minimum contract:
+- event id/type;
+- actor user id when available;
+- target profile/entity id when applicable;
+- timestamp;
+- request/correlation id where available;
+- minimal structured metadata.
+
+Never store passwords, tokens, secrets, raw authorization headers or unnecessary sensitive payloads. Retention must be defined before production cutover.
+
+## Inactive profile semantics
+
+- normal users cannot read or write an inactive profile or its domain data;
+- admins may inspect inactive profiles through admin-authorized paths;
+- reactivation is admin-only;
+- historical rows are retained when a profile is deactivated.
 
 ## Forbidden V2 relationships
 
@@ -138,7 +176,9 @@ The following SHALL NOT exist:
 - `profiles.user_id` authorization ownership;
 - `family_group_id`;
 - families/family_members/family_invitations;
-- duplicated `user_id` owner columns on every profile-owned domain table;
+- `owner/editor` access roles at launch;
+- multiple profile mappings for one normal account;
+- duplicated `user_id` ownership columns on profile-owned domain tables;
 - authorization based on creator/email/name;
 - per-profile synthetic admin ownership rows;
 - parallel RLS ownership rules.
