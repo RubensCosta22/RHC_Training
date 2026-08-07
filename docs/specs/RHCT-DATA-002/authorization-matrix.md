@@ -1,85 +1,101 @@
 # RHCT-DATA-002 — Authorization Matrix V2
 
-**Status:** Draft for R4 review
+**Status:** Revised after R4 adversarial review
 
-## Roles
+## Actors
 
-- `admin`: global application administrator from `app_users.role = 'admin'` and `status = 'active'`.
-- `owner`: active `profile_access` to one profile; normal self-service profile user.
-- `editor`: optional delegated edit role for a profile. No global rights.
-- `none`: authenticated account without access to the target profile.
-- anonymous: no authenticated session.
+- `admin`: authenticated account with `app_users.role = 'admin'` and `status = 'active'`.
+- `user`: authenticated account with `app_users.role = 'user'`, `status = 'active'` and exactly one `profile_access` mapping.
+- `disabled`: authenticated account with missing/disabled `app_users`.
+- `none`: active authenticated account without a mapping to the target profile.
+- `anonymous`: no authenticated session.
+
+There is no `editor` role in V2 launch.
 
 ## Profile and domain access
 
-| Operation | admin | owner | editor | none | anonymous |
+| Operation | admin | mapped user | none | disabled | anonymous |
 |---|:---:|:---:|:---:|:---:|:---:|
-| List all profiles | ALLOW | DENY* | DENY* | DENY | DENY |
-| Read target profile | ALLOW | ALLOW own | ALLOW assigned | DENY | DENY |
-| Edit target profile | ALLOW | ALLOW own | ALLOW assigned if enabled by contract | DENY | DENY |
+| List all active profiles | ALLOW | DENY* | DENY | DENY | DENY |
+| Inspect inactive profile | ALLOW admin path | DENY | DENY | DENY | DENY |
+| Read active mapped profile | ALLOW | ALLOW | DENY | DENY | DENY |
+| Edit active mapped profile | ALLOW | ALLOW within product contract | DENY | DENY | DENY |
 | Create profile | ALLOW | DENY | DENY | DENY | DENY |
-| Deactivate profile | ALLOW | DENY by default | DENY | DENY | DENY |
-| Read workout sessions | ALLOW | ALLOW own | ALLOW assigned | DENY | DENY |
-| Create workout session | ALLOW | ALLOW own | ALLOW assigned | DENY | DENY |
-| Correct completed workout | ALLOW | ALLOW only through approved correction path | contract-specific | DENY | DENY |
-| Read exercise records | ALLOW | ALLOW own | ALLOW assigned | DENY | DENY |
-| Read/write measurements | ALLOW | ALLOW own | contract-specific | DENY | DENY |
-| Read/write progress photos | ALLOW | ALLOW own | contract-specific | DENY | DENY |
-| Read/write workout draft | ALLOW | ALLOW own | ALLOW assigned when editing workout is allowed | DENY | DENY |
-| Read plan/program enrollment | ALLOW | ALLOW own | ALLOW assigned | DENY | DENY |
-| Modify own plan state | ALLOW | ALLOW own as product permits | contract-specific | DENY | DENY |
+| Deactivate/reactivate profile | ALLOW | DENY | DENY | DENY | DENY |
+| Read workout sessions | ALLOW | ALLOW mapped active profile | DENY | DENY | DENY |
+| Create workout session | ALLOW | ALLOW mapped active profile | DENY | DENY | DENY |
+| Correct completed workout | ALLOW | approved correction path only | DENY | DENY | DENY |
+| Read/write exercise records | ALLOW | ALLOW mapped active profile | DENY | DENY | DENY |
+| Read/write measurements | ALLOW | ALLOW mapped active profile | DENY | DENY | DENY |
+| Read/write progress photos | ALLOW | ALLOW mapped active profile | DENY | DENY | DENY |
+| Read/write workout draft | ALLOW | ALLOW mapped active profile | DENY | DENY | DENY |
+| Read plan/program state | ALLOW | ALLOW mapped active profile | DENY | DENY | DENY |
+| Modify permitted plan/training state | ALLOW | ALLOW mapped active profile | DENY | DENY | DENY |
 
-*Normal users must not receive a cross-profile listing. Queries return only rows explicitly authorized by `profile_access`.
+*Normal users never receive a cross-profile listing; their profile resolution is a single explicit mapping.
 
 ## Access administration
 
-| Operation | admin | owner | editor | none |
-|---|:---:|:---:|:---:|:---:|
-| View `profile_access` for any profile | ALLOW | DENY by default | DENY | DENY |
-| Assign user to profile | ALLOW | DENY | DENY | DENY |
-| Revoke user from profile | ALLOW | DENY | DENY | DENY |
-| Change profile access role | ALLOW | DENY | DENY | DENY |
-| Promote user to admin | ALLOW via protected RPC | DENY | DENY | DENY |
-| Demote admin | ALLOW via protected RPC, cannot remove last active admin | DENY | DENY | DENY |
-| Update own `app_users.role` directly | DENY | DENY | DENY | DENY |
-| Direct client write to protected role/status fields | DENY | DENY | DENY | DENY |
+| Operation | admin | user | none/disabled |
+|---|:---:|:---:|:---:|
+| View mappings | ALLOW | DENY | DENY |
+| Assign account to profile | ALLOW protected operation | DENY | DENY |
+| Revoke mapping | ALLOW protected operation | DENY | DENY |
+| Reassign account/profile | ALLOW protected operation with uniqueness checks | DENY | DENY |
+| Promote user to admin | ALLOW protected RPC | DENY | DENY |
+| Demote/disable admin | ALLOW protected RPC only if another active admin remains | DENY | DENY |
+| Delete Auth identity still referenced by `app_users` | DENY until safe retirement | DENY | DENY |
+| Direct client write to `app_users.role/status` | DENY | DENY | DENY |
+| Direct client write to `profile_access` | DENY | DENY | DENY |
 
-## Canonical authorization helpers
+## Canonical helpers
+
+### `is_active_app_user()`
+True only when `auth.uid()` exists and the matching `app_users.status = 'active'`.
 
 ### `is_admin()`
-Only true if the current `auth.uid()` has one active `app_users` row with `role = 'admin'`.
+True only when `is_active_app_user()` and `app_users.role = 'admin'`.
 
 ### `can_access_profile(profile_id)`
-Only true if:
-1. `is_admin()`; OR
-2. active `profile_access(profile_id, auth.uid())` exists.
+True only when:
 
-### `can_edit_profile(profile_id)`
-Only true if:
-1. `is_admin()`; OR
-2. active profile access exists with a role explicitly authorized for the requested edit operation.
+1. `is_active_app_user()`; AND
+2. target profile is active; AND
+3. (`is_admin()` OR the unique `profile_access(user_id = auth.uid(), profile_id)` row exists).
 
-No helper may fall back to `profiles.user_id`, creator id, email, profile name, legacy owner id, invitation state, or any family relationship.
+### Inactive profiles
 
-## Required negative RLS tests
+Normal users receive DENY for inactive profiles and all profile-owned domain data. Admins may inspect/manage inactive profiles only through admin-authorized policies/RPCs. Reactivation is admin-only.
 
-The automated suite SHALL prove:
+## Required database invariants
+
+- unique `profile_access.user_id`;
+- unique `profile_access.profile_id`;
+- no role column in `profile_access` at launch;
+- admin access does not depend on profile mappings;
+- direct client mutation of authorization state is denied;
+- no authorization fallback to Legacy fields.
+
+## Required adversarial tests
+
+The automated suite SHALL prove at least:
 
 1. User A cannot SELECT User B's profile by known UUID.
 2. User A cannot SELECT User B's workout sessions by direct REST query.
-3. User A cannot INSERT a workout session with User B's `profile_id`.
-4. User A cannot UPDATE/DELETE User B's profile-owned rows.
-5. User A cannot access User B's photo object by manipulating a storage path.
-6. User A cannot call an admin RPC successfully.
-7. User A cannot set `app_users.role = 'admin'` directly.
-8. User with disabled `app_users` status receives no application access.
-9. Disabled `profile_access` grants no profile access.
-10. Guessed/legacy profile UUIDs are denied.
-11. Anonymous requests cannot read profile-owned resources.
-12. Admin may access all profiles without synthetic `profile_access` rows.
+3. User A cannot INSERT/UPDATE rows using User B's `profile_id`.
+4. A second mapping for the same normal user is rejected by constraint.
+5. A second normal account mapping to the same profile is rejected by constraint.
+6. Disabled `app_users` receives DENY even when a mapping exists.
+7. Inactive profile receives DENY for its normal mapped user.
+8. User cannot manipulate another profile's storage path/object.
+9. Non-admin cannot call admin RPCs successfully.
+10. Non-admin cannot mutate `app_users.role/status` or `profile_access` directly.
+11. Guessed/Legacy profile UUIDs are denied.
+12. Anonymous requests cannot read profile-owned resources.
+13. Admin may access active profiles without synthetic mappings.
+14. Admin can inspect inactive profiles only through approved admin paths.
+15. Last active admin cannot be demoted, disabled or retired.
 
 ## Routing invariant
 
-Frontend route guards are defense-in-depth only. Database authorization must deny unauthorized access even when the client bypasses the UI and calls Supabase directly.
-
-A normal account should resolve to exactly the intended active profile access for current product behavior. Ambiguity must fail closed; the frontend must never select an arbitrary profile.
+Frontend guards are defense-in-depth only. Database authorization must fail closed even if the UI is bypassed. A normal account resolves to exactly one intended active profile; no “first profile” selection or ambiguity is permitted.
