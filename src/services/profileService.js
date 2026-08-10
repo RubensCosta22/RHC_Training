@@ -1,16 +1,26 @@
 import { supabase } from '../lib/supabaseClient'
-import { profilesSeed } from '../data/workouts'
 import { validateUuid } from '../utils/validation'
-import { claimFamilyProfile, getFamilyContext } from './familyService'
 import { invokeSecureImageUpload } from './secureUploadService'
 
 const AVATAR_BUCKET = 'progress-photos'
 const ALLOWED_AVATAR_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
+function normalizeProfile(profile) {
+  if (!profile) return profile
+  return {
+    ...profile,
+    avatar_url: profile.avatar_path || null,
+    family_group_id: null,
+    user_id: null,
+    age: profile.age ?? null
+  }
+}
+
 async function attachAvatar(profile) {
-  if (!profile?.avatar_url?.includes('/')) return { ...profile, avatarSignedUrl: null }
-  const { data } = await supabase.storage.from(AVATAR_BUCKET).createSignedUrl(profile.avatar_url, 60 * 60)
-  return { ...profile, avatarSignedUrl: data?.signedUrl || null }
+  const normalized = normalizeProfile(profile)
+  if (!normalized?.avatar_path?.includes('/')) return { ...normalized, avatarSignedUrl: null }
+  const { data } = await supabase.storage.from(AVATAR_BUCKET).createSignedUrl(normalized.avatar_path, 60 * 60)
+  return { ...normalized, avatarSignedUrl: data?.signedUrl || null }
 }
 
 export async function getSessionUser() {
@@ -19,73 +29,45 @@ export async function getSessionUser() {
   return data.user
 }
 
+// V2 profiles are provisioned explicitly by administrators/migration.
+// Never seed or auto-create profiles from the browser.
 export async function ensureDefaultProfiles() {
   const user = await getSessionUser()
   if (!user) return []
 
-  await claimFamilyProfile()
-  const family = await getFamilyContext()
-
-  let existingQuery = supabase
+  const { data, error } = await supabase
     .from('profiles')
     .select('*')
     .order('name')
-  if (family) existingQuery = existingQuery.eq('family_group_id', family.group_id)
-  const { data: existing, error: listError } = await existingQuery
-
-  if (listError) throw listError
-
-  const existingNames = new Set((existing || []).map((profile) => profile.name))
-
-  const missing = family ? [] : profilesSeed.filter((profile) => !existingNames.has(profile.name))
-
-  if (missing.length) {
-    const payload = missing.map((profile) => ({
-      ...profile,
-      user_id: user.id
-    }))
-
-    const { error: upsertError } = await supabase
-      .from('profiles')
-      .upsert(payload, {
-        onConflict: 'user_id,name',
-        ignoreDuplicates: true
-      })
-
-    if (upsertError) throw upsertError
-  }
-
-  let finalQuery = supabase
-    .from('profiles')
-    .select('*')
-    .order('name')
-  if (family) finalQuery = finalQuery.eq('family_group_id', family.group_id)
-  const { data, error } = await finalQuery
 
   if (error) throw error
-  return data || []
+  return Promise.all((data || []).map(attachAvatar))
 }
 
 export async function getProfilesWithLastWorkout() {
   const profiles = await ensureDefaultProfiles()
 
-  const withLast = await Promise.all(
+  return Promise.all(
     profiles.map(async (profile) => {
       const { data } = await supabase
         .from('workout_sessions')
-        .select('workout_type,date,gym_name,created_at')
+        .select('workout_code,workout_date,gym_name,created_at')
         .eq('profile_id', profile.id)
         .is('archived_at', null)
-        .order('date', { ascending: false })
+        .order('workout_date', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
 
-      return attachAvatar({ ...profile, lastWorkout: data })
+      const lastWorkout = data ? {
+        ...data,
+        workout_type: data.workout_code,
+        date: data.workout_date
+      } : null
+
+      return { ...profile, lastWorkout }
     })
   )
-
-  return withLast
 }
 
 export async function getProfile(profileId) {
