@@ -1,5 +1,5 @@
 -- RHCT-DATA-002 — RHC Training Database V2 baseline
--- DRAFT ONLY. Intentionally stored outside supabase/migrations.
+-- FINAL CANDIDATE. Intentionally stored outside supabase/migrations.
 -- DO NOT APPLY TO THE LEGACY/PRODUCTION PROJECT.
 
 begin;
@@ -10,10 +10,7 @@ revoke all on schema private from public;
 revoke all on schema private from anon;
 grant usage on schema private to authenticated;
 
--- -----------------------------------------------------------------------------
 -- Identity
--- -----------------------------------------------------------------------------
-
 create table public.app_users (
   user_id uuid primary key references auth.users(id),
   role text not null check (role in ('user','admin')) default 'user',
@@ -40,10 +37,7 @@ create table public.profile_access (
   created_at timestamptz not null default now()
 );
 
--- -----------------------------------------------------------------------------
 -- Exercise taxonomy/catalog
--- -----------------------------------------------------------------------------
-
 create table public.muscle_groups (
   id uuid primary key default gen_random_uuid(),
   code text not null unique check (code ~ '^[a-z0-9_\-]{2,80}$'),
@@ -81,10 +75,7 @@ create table public.exercise_catalog (
   updated_at timestamptz not null default now()
 );
 
--- -----------------------------------------------------------------------------
 -- Plans
--- -----------------------------------------------------------------------------
-
 create table public.workout_plans (
   id uuid primary key default gen_random_uuid(),
   profile_id uuid not null references public.profiles(id),
@@ -95,10 +86,7 @@ create table public.workout_plans (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
-create unique index workout_plans_one_active_per_code
-  on public.workout_plans(profile_id, workout_code)
-  where is_active;
+create unique index workout_plans_one_active_per_code on public.workout_plans(profile_id, workout_code) where is_active;
 
 create table public.workout_plan_exercises (
   id uuid primary key default gen_random_uuid(),
@@ -122,10 +110,7 @@ create table public.workout_plan_exercise_alternatives (
   unique(workout_plan_exercise_id, sort_order)
 );
 
--- -----------------------------------------------------------------------------
 -- Workout history
--- -----------------------------------------------------------------------------
-
 create table public.workout_sessions (
   id uuid primary key default gen_random_uuid(),
   profile_id uuid not null references public.profiles(id),
@@ -147,15 +132,11 @@ create table public.workout_sessions (
   source_system text check (source_system is null or source_system in ('legacy_v1','v2')),
   source_legacy_id uuid,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  unique(id, profile_id)
 );
-
-create unique index workout_sessions_legacy_source_unique
-  on public.workout_sessions(source_system, source_legacy_id)
-  where source_system is not null and source_legacy_id is not null;
-
-create index workout_sessions_profile_date_idx
-  on public.workout_sessions(profile_id, workout_date desc);
+create unique index workout_sessions_legacy_source_unique on public.workout_sessions(source_system, source_legacy_id) where source_system is not null and source_legacy_id is not null;
+create index workout_sessions_profile_date_idx on public.workout_sessions(profile_id, workout_date desc);
 
 create table public.workout_exercises (
   id uuid primary key default gen_random_uuid(),
@@ -175,10 +156,7 @@ create table public.workout_exercises (
   created_at timestamptz not null default now(),
   unique(session_id, sort_order)
 );
-
-create unique index workout_exercises_legacy_source_unique
-  on public.workout_exercises(source_legacy_id)
-  where source_legacy_id is not null;
+create unique index workout_exercises_legacy_source_unique on public.workout_exercises(source_legacy_id) where source_legacy_id is not null;
 
 create table public.exercise_records (
   profile_id uuid not null references public.profiles(id),
@@ -220,10 +198,7 @@ create table public.progress_photos (
   created_at timestamptz not null default now()
 );
 
--- -----------------------------------------------------------------------------
 -- Programs
--- -----------------------------------------------------------------------------
-
 create table public.training_programs (
   id uuid primary key default gen_random_uuid(),
   slug text not null unique check (slug ~ '^[a-z0-9\-]{3,80}$'),
@@ -262,13 +237,15 @@ create table public.program_sessions (
   is_optional boolean not null default false,
   prescription jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
-  unique(program_id, code)
+  unique(program_id, code),
+  unique(id, program_id)
 );
 
 create table public.program_exercises (
   id uuid primary key default gen_random_uuid(),
   session_id uuid not null references public.program_sessions(id) on delete cascade,
   exercise_id uuid not null references public.exercise_catalog(id),
+  program_id uuid not null references public.training_programs(id),
   exercise_role text not null check (exercise_role in ('principal','secundario','acessorio')),
   sets integer not null check (sets between 1 and 20),
   reps_min integer not null check (reps_min between 1 and 100),
@@ -283,7 +260,9 @@ create table public.program_exercises (
   failures_before_regression integer not null default 2,
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
-  unique(session_id, sort_order)
+  unique(session_id, sort_order),
+  unique(id, program_id),
+  foreign key(session_id,program_id) references public.program_sessions(id,program_id)
 );
 
 create table public.program_exercise_substitutions (
@@ -306,22 +285,25 @@ create table public.program_enrollments (
   archived_at timestamptz,
   source_legacy_id uuid unique,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  unique(id,profile_id),
+  unique(id,program_id),
+  unique(id,profile_id,program_id)
 );
-
-create unique index program_enrollments_one_active_per_profile
-  on public.program_enrollments(profile_id)
-  where status = 'active';
+create unique index program_enrollments_one_active_per_profile on public.program_enrollments(profile_id) where status = 'active';
 
 create table public.program_exercise_baselines (
   id uuid primary key default gen_random_uuid(),
   enrollment_id uuid not null references public.program_enrollments(id) on delete cascade,
   program_exercise_id uuid not null references public.program_exercises(id),
+  program_id uuid not null,
   variation_exercise_id uuid references public.exercise_catalog(id),
   starting_load numeric(10,3) check (starting_load is null or starting_load >= 0),
   load_increment numeric(10,3) check (load_increment is null or load_increment > 0),
   established_at timestamptz not null default now(),
-  unique(enrollment_id, program_exercise_id)
+  unique(enrollment_id, program_exercise_id),
+  foreign key(enrollment_id,program_id) references public.program_enrollments(id,program_id),
+  foreign key(program_exercise_id,program_id) references public.program_exercises(id,program_id)
 );
 
 create table public.program_exercise_exposures (
@@ -329,6 +311,7 @@ create table public.program_exercise_exposures (
   profile_id uuid not null references public.profiles(id),
   enrollment_id uuid not null references public.program_enrollments(id),
   program_exercise_id uuid not null references public.program_exercises(id),
+  program_id uuid not null,
   workout_session_id uuid references public.workout_sessions(id),
   variation_exercise_id uuid references public.exercise_catalog(id),
   variation_name_snapshot text not null,
@@ -341,13 +324,13 @@ create table public.program_exercise_exposures (
   suggestion_reason text,
   accepted_action boolean,
   source_legacy_id uuid unique,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  foreign key(enrollment_id,profile_id,program_id) references public.program_enrollments(id,profile_id,program_id),
+  foreign key(program_exercise_id,program_id) references public.program_exercises(id,program_id),
+  foreign key(workout_session_id,profile_id) references public.workout_sessions(id,profile_id)
 );
 
--- -----------------------------------------------------------------------------
 -- State/autosave/audit
--- -----------------------------------------------------------------------------
-
 create table public.profile_training_state (
   profile_id uuid primary key references public.profiles(id),
   current_workout_code text check (current_workout_code is null or current_workout_code in ('A','B','C','D','E','F')),
@@ -355,7 +338,9 @@ create table public.profile_training_state (
   active_program_enrollment_id uuid references public.program_enrollments(id),
   last_completed_session_id uuid references public.workout_sessions(id),
   version bigint not null default 1 check (version > 0),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  foreign key(active_program_enrollment_id,profile_id) references public.program_enrollments(id,profile_id),
+  foreign key(last_completed_session_id,profile_id) references public.workout_sessions(id,profile_id)
 );
 
 create table public.workout_drafts (
@@ -369,12 +354,11 @@ create table public.workout_drafts (
   client_operation_id uuid not null unique,
   consumed_session_id uuid references public.workout_sessions(id),
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  foreign key(program_enrollment_id,profile_id) references public.program_enrollments(id,profile_id),
+  foreign key(consumed_session_id,profile_id) references public.workout_sessions(id,profile_id)
 );
-
-create unique index workout_drafts_one_open_context
-  on public.workout_drafts(profile_id, workout_code)
-  where consumed_session_id is null;
+create unique index workout_drafts_one_open_context on public.workout_drafts(profile_id, workout_code) where consumed_session_id is null;
 
 create table public.event_logs (
   id uuid primary key default gen_random_uuid(),
@@ -388,82 +372,83 @@ create table public.event_logs (
   created_at timestamptz not null default now()
 );
 
--- -----------------------------------------------------------------------------
--- Authorization helpers: private schema, fail closed
--- -----------------------------------------------------------------------------
-
-create or replace function private.is_active_app_user()
-returns boolean
-language sql
-stable
-security definer
-set search_path = pg_catalog, public, private
-as $$
-  select exists (
-    select 1 from public.app_users au
-    where au.user_id = auth.uid()
-      and au.status = 'active'
-  );
+-- Authorization helpers
+create or replace function private.is_active_app_user() returns boolean language sql stable security definer set search_path = pg_catalog, public, private as $$
+  select exists (select 1 from public.app_users au where au.user_id = auth.uid() and au.status = 'active');
 $$;
-
-create or replace function private.is_admin()
-returns boolean
-language sql
-stable
-security definer
-set search_path = pg_catalog, public, private
-as $$
-  select exists (
-    select 1 from public.app_users au
-    where au.user_id = auth.uid()
-      and au.status = 'active'
-      and au.role = 'admin'
-  );
+create or replace function private.is_admin() returns boolean language sql stable security definer set search_path = pg_catalog, public, private as $$
+  select exists (select 1 from public.app_users au where au.user_id = auth.uid() and au.status = 'active' and au.role = 'admin');
 $$;
-
-create or replace function private.can_access_profile(target_profile_id uuid)
-returns boolean
-language sql
-stable
-security definer
-set search_path = pg_catalog, public, private
-as $$
+create or replace function private.can_access_profile(target_profile_id uuid) returns boolean language sql stable security definer set search_path = pg_catalog, public, private as $$
   select private.is_active_app_user()
-    and exists (
-      select 1 from public.profiles p
-      where p.id = target_profile_id and p.is_active
-    )
-    and (
-      private.is_admin()
-      or exists (
-        select 1 from public.profile_access pa
-        where pa.user_id = auth.uid()
-          and pa.profile_id = target_profile_id
-      )
-    );
+    and exists (select 1 from public.profiles p where p.id = target_profile_id and p.is_active)
+    and (private.is_admin() or exists (select 1 from public.profile_access pa where pa.user_id = auth.uid() and pa.profile_id = target_profile_id));
 $$;
-
-create or replace function private.can_admin_access_profile(target_profile_id uuid)
-returns boolean
-language sql
-stable
-security definer
-set search_path = pg_catalog, public, private
-as $$
-  select private.is_admin()
-    and exists (select 1 from public.profiles p where p.id = target_profile_id);
+create or replace function private.can_admin_access_profile(target_profile_id uuid) returns boolean language sql stable security definer set search_path = pg_catalog, public, private as $$
+  select private.is_admin() and exists (select 1 from public.profiles p where p.id = target_profile_id);
 $$;
-
 revoke execute on all functions in schema private from public, anon;
 grant execute on function private.is_active_app_user() to authenticated;
 grant execute on function private.is_admin() to authenticated;
 grant execute on function private.can_access_profile(uuid) to authenticated;
 grant execute on function private.can_admin_access_profile(uuid) to authenticated;
 
--- -----------------------------------------------------------------------------
--- RLS
--- -----------------------------------------------------------------------------
+-- Admin lifecycle
+create or replace function private.protect_last_active_admin() returns trigger language plpgsql security definer set search_path = pg_catalog, public, private as $$
+declare remaining_admins bigint;
+begin
+  if (tg_op='DELETE' and old.role='admin' and old.status='active') or (tg_op='UPDATE' and old.role='admin' and old.status='active' and (new.role<>'admin' or new.status<>'active')) then
+    select count(*) into remaining_admins from public.app_users where role='admin' and status='active' and user_id<>old.user_id;
+    if remaining_admins=0 then raise exception 'cannot remove, demote or disable the last active admin' using errcode='23514'; end if;
+  end if;
+  if tg_op='DELETE' then return old; end if;
+  return new;
+end; $$;
+revoke execute on function private.protect_last_active_admin() from public, anon, authenticated;
+create trigger app_users_protect_last_admin before update of role,status or delete on public.app_users for each row execute function private.protect_last_active_admin();
 
+create or replace function private.bootstrap_first_admin(target_user_id uuid) returns void language plpgsql security definer set search_path = pg_catalog, public, private as $$
+begin
+  if exists(select 1 from public.app_users where role='admin' and status='active') then raise exception 'an active admin already exists'; end if;
+  if not exists(select 1 from auth.users where id=target_user_id) then raise exception 'auth user does not exist'; end if;
+  insert into public.app_users(user_id,role,status) values(target_user_id,'admin','active') on conflict(user_id) do update set role='admin',status='active',updated_at=now();
+end; $$;
+revoke execute on function private.bootstrap_first_admin(uuid) from public, anon, authenticated;
+grant execute on function private.bootstrap_first_admin(uuid) to service_role;
+
+create or replace function public.admin_set_user_role(target_user_id uuid,target_role text,target_status text default 'active') returns void language plpgsql security definer set search_path=pg_catalog,public,private as $$
+begin
+  if not private.is_admin() then raise exception 'admin required' using errcode='42501'; end if;
+  if target_role not in ('user','admin') or target_status not in ('active','disabled') then raise exception 'invalid role/status'; end if;
+  if not exists(select 1 from auth.users where id=target_user_id) then raise exception 'auth user does not exist'; end if;
+  insert into public.app_users(user_id,role,status) values(target_user_id,target_role,target_status) on conflict(user_id) do update set role=excluded.role,status=excluded.status,updated_at=now();
+  if target_role='admin' then delete from public.profile_access where user_id=target_user_id; end if;
+end; $$;
+create or replace function public.admin_assign_profile_access(target_user_id uuid,target_profile_id uuid) returns void language plpgsql security definer set search_path=pg_catalog,public,private as $$
+declare r text; s text;
+begin
+  if not private.is_admin() then raise exception 'admin required' using errcode='42501'; end if;
+  select role,status into r,s from public.app_users where user_id=target_user_id;
+  if r is null then raise exception 'app user does not exist'; end if;
+  if r<>'user' or s<>'active' then raise exception 'mapping requires an active normal user'; end if;
+  if not exists(select 1 from public.profiles where id=target_profile_id and is_active) then raise exception 'active profile does not exist'; end if;
+  if exists(select 1 from public.profile_access where user_id=target_user_id) then raise exception 'user already mapped'; end if;
+  if exists(select 1 from public.profile_access where profile_id=target_profile_id) then raise exception 'profile already mapped'; end if;
+  insert into public.profile_access(user_id,profile_id) values(target_user_id,target_profile_id);
+end; $$;
+create or replace function public.admin_revoke_profile_access(target_user_id uuid) returns void language plpgsql security definer set search_path=pg_catalog,public,private as $$
+begin
+  if not private.is_admin() then raise exception 'admin required' using errcode='42501'; end if;
+  delete from public.profile_access where user_id=target_user_id;
+end; $$;
+revoke all on function public.admin_set_user_role(uuid,text,text) from public,anon;
+revoke all on function public.admin_assign_profile_access(uuid,uuid) from public,anon;
+revoke all on function public.admin_revoke_profile_access(uuid) from public,anon;
+grant execute on function public.admin_set_user_role(uuid,text,text) to authenticated;
+grant execute on function public.admin_assign_profile_access(uuid,uuid) to authenticated;
+grant execute on function public.admin_revoke_profile_access(uuid) to authenticated;
+
+-- RLS enablement
 alter table public.app_users enable row level security;
 alter table public.profiles enable row level security;
 alter table public.profile_access enable row level security;
@@ -491,101 +476,72 @@ alter table public.profile_training_state enable row level security;
 alter table public.workout_drafts enable row level security;
 alter table public.event_logs enable row level security;
 
--- App user can read only its own status/role; admin mutation occurs outside generic table API.
-create policy app_users_read_self on public.app_users
-for select to authenticated
-using (user_id = auth.uid() and private.is_active_app_user());
-
--- Profiles
-create policy profiles_select on public.profiles
-for select to authenticated
-using (private.can_access_profile(id) or private.can_admin_access_profile(id));
-
-create policy profiles_update_active on public.profiles
-for update to authenticated
-using (private.can_access_profile(id))
-with check (private.can_access_profile(id));
-
--- Catalog/reference data: authenticated active users may read; no client writes.
+-- RLS policies
+create policy app_users_read_self on public.app_users for select to authenticated using (user_id = auth.uid() and private.is_active_app_user());
+create policy profiles_select on public.profiles for select to authenticated using (private.can_access_profile(id) or private.can_admin_access_profile(id));
+create policy profiles_update_active on public.profiles for update to authenticated using (private.can_access_profile(id)) with check (private.can_access_profile(id));
 create policy muscle_groups_read on public.muscle_groups for select to authenticated using (private.is_active_app_user());
 create policy movement_patterns_read on public.movement_patterns for select to authenticated using (private.is_active_app_user());
 create policy exercise_categories_read on public.exercise_categories for select to authenticated using (private.is_active_app_user());
 create policy exercise_catalog_read on public.exercise_catalog for select to authenticated using (private.is_active_app_user());
-
--- Profile-owned direct tables
 create policy workout_plans_read on public.workout_plans for select to authenticated using (private.can_access_profile(profile_id));
 create policy workout_plans_write on public.workout_plans for all to authenticated using (private.can_access_profile(profile_id)) with check (private.can_access_profile(profile_id));
-
 create policy workout_sessions_read on public.workout_sessions for select to authenticated using (private.can_access_profile(profile_id));
 create policy workout_sessions_insert on public.workout_sessions for insert to authenticated with check (private.can_access_profile(profile_id));
--- Completed-session correction is intentionally not granted as a generic user UPDATE/DELETE policy.
-
 create policy exercise_records_read on public.exercise_records for select to authenticated using (private.can_access_profile(profile_id));
 create policy exercise_records_write on public.exercise_records for all to authenticated using (private.can_access_profile(profile_id)) with check (private.can_access_profile(profile_id));
-
 create policy body_measurements_read on public.body_measurements for select to authenticated using (private.can_access_profile(profile_id));
 create policy body_measurements_write on public.body_measurements for all to authenticated using (private.can_access_profile(profile_id)) with check (private.can_access_profile(profile_id));
-
 create policy progress_photos_read on public.progress_photos for select to authenticated using (private.can_access_profile(profile_id));
 create policy progress_photos_write on public.progress_photos for all to authenticated using (private.can_access_profile(profile_id)) with check (private.can_access_profile(profile_id));
-
 create policy program_enrollments_read on public.program_enrollments for select to authenticated using (private.can_access_profile(profile_id));
 create policy program_enrollments_write on public.program_enrollments for all to authenticated using (private.can_access_profile(profile_id)) with check (private.can_access_profile(profile_id));
-
 create policy program_exposures_read on public.program_exercise_exposures for select to authenticated using (private.can_access_profile(profile_id));
 create policy program_exposures_insert on public.program_exercise_exposures for insert to authenticated with check (private.can_access_profile(profile_id));
-
 create policy training_state_read on public.profile_training_state for select to authenticated using (private.can_access_profile(profile_id));
 create policy training_state_write on public.profile_training_state for all to authenticated using (private.can_access_profile(profile_id)) with check (private.can_access_profile(profile_id));
-
 create policy drafts_read on public.workout_drafts for select to authenticated using (private.can_access_profile(profile_id));
 create policy drafts_write on public.workout_drafts for all to authenticated using (private.can_access_profile(profile_id)) with check (private.can_access_profile(profile_id));
-
--- Child tables authorize through parents.
-create policy workout_plan_exercises_read on public.workout_plan_exercises
-for select to authenticated using (exists (select 1 from public.workout_plans p where p.id=workout_plan_id and private.can_access_profile(p.profile_id)));
-create policy workout_plan_exercises_write on public.workout_plan_exercises
-for all to authenticated using (exists (select 1 from public.workout_plans p where p.id=workout_plan_id and private.can_access_profile(p.profile_id)))
-with check (exists (select 1 from public.workout_plans p where p.id=workout_plan_id and private.can_access_profile(p.profile_id)));
-
-create policy plan_alternatives_read on public.workout_plan_exercise_alternatives
-for select to authenticated using (exists (select 1 from public.workout_plan_exercises pe join public.workout_plans p on p.id=pe.workout_plan_id where pe.id=workout_plan_exercise_id and private.can_access_profile(p.profile_id)));
-create policy plan_alternatives_write on public.workout_plan_exercise_alternatives
-for all to authenticated using (exists (select 1 from public.workout_plan_exercises pe join public.workout_plans p on p.id=pe.workout_plan_id where pe.id=workout_plan_exercise_id and private.can_access_profile(p.profile_id)))
-with check (exists (select 1 from public.workout_plan_exercises pe join public.workout_plans p on p.id=pe.workout_plan_id where pe.id=workout_plan_exercise_id and private.can_access_profile(p.profile_id)));
-
-create policy workout_exercises_read on public.workout_exercises
-for select to authenticated using (exists (select 1 from public.workout_sessions s where s.id=session_id and private.can_access_profile(s.profile_id)));
-create policy workout_exercises_insert on public.workout_exercises
-for insert to authenticated with check (exists (select 1 from public.workout_sessions s where s.id=session_id and private.can_access_profile(s.profile_id)));
-
--- Published program definitions are reference data for active users.
+create policy workout_plan_exercises_read on public.workout_plan_exercises for select to authenticated using (exists (select 1 from public.workout_plans p where p.id=workout_plan_id and private.can_access_profile(p.profile_id)));
+create policy workout_plan_exercises_write on public.workout_plan_exercises for all to authenticated using (exists (select 1 from public.workout_plans p where p.id=workout_plan_id and private.can_access_profile(p.profile_id))) with check (exists (select 1 from public.workout_plans p where p.id=workout_plan_id and private.can_access_profile(p.profile_id)));
+create policy plan_alternatives_read on public.workout_plan_exercise_alternatives for select to authenticated using (exists (select 1 from public.workout_plan_exercises pe join public.workout_plans p on p.id=pe.workout_plan_id where pe.id=workout_plan_exercise_id and private.can_access_profile(p.profile_id)));
+create policy plan_alternatives_write on public.workout_plan_exercise_alternatives for all to authenticated using (exists (select 1 from public.workout_plan_exercises pe join public.workout_plans p on p.id=pe.workout_plan_id where pe.id=workout_plan_exercise_id and private.can_access_profile(p.profile_id))) with check (exists (select 1 from public.workout_plan_exercises pe join public.workout_plans p on p.id=pe.workout_plan_id where pe.id=workout_plan_exercise_id and private.can_access_profile(p.profile_id)));
+create policy workout_exercises_read on public.workout_exercises for select to authenticated using (exists (select 1 from public.workout_sessions s where s.id=session_id and private.can_access_profile(s.profile_id)));
+create policy workout_exercises_insert on public.workout_exercises for insert to authenticated with check (exists (select 1 from public.workout_sessions s where s.id=session_id and private.can_access_profile(s.profile_id)));
 create policy training_programs_read on public.training_programs for select to authenticated using (private.is_active_app_user() and status='published');
 create policy program_phases_read on public.program_phases for select to authenticated using (private.is_active_app_user() and exists(select 1 from public.training_programs p where p.id=program_id and p.status='published'));
 create policy program_sessions_read on public.program_sessions for select to authenticated using (private.is_active_app_user() and exists(select 1 from public.training_programs p where p.id=program_id and p.status='published'));
 create policy program_exercises_read on public.program_exercises for select to authenticated using (private.is_active_app_user() and exists(select 1 from public.program_sessions s join public.training_programs p on p.id=s.program_id where s.id=session_id and p.status='published'));
 create policy program_substitutions_read on public.program_exercise_substitutions for select to authenticated using (private.is_active_app_user() and exists(select 1 from public.program_exercises pe join public.program_sessions s on s.id=pe.session_id join public.training_programs p on p.id=s.program_id where pe.id=program_exercise_id and p.status='published'));
+create policy program_baselines_read on public.program_exercise_baselines for select to authenticated using (exists(select 1 from public.program_enrollments e where e.id=enrollment_id and private.can_access_profile(e.profile_id)));
+create policy program_baselines_write on public.program_exercise_baselines for all to authenticated using (exists(select 1 from public.program_enrollments e where e.id=enrollment_id and private.can_access_profile(e.profile_id))) with check (exists(select 1 from public.program_enrollments e where e.id=enrollment_id and private.can_access_profile(e.profile_id)));
 
-create policy program_baselines_read on public.program_exercise_baselines
-for select to authenticated using (exists(select 1 from public.program_enrollments e where e.id=enrollment_id and private.can_access_profile(e.profile_id)));
-create policy program_baselines_write on public.program_exercise_baselines
-for all to authenticated using (exists(select 1 from public.program_enrollments e where e.id=enrollment_id and private.can_access_profile(e.profile_id)))
-with check (exists(select 1 from public.program_enrollments e where e.id=enrollment_id and private.can_access_profile(e.profile_id)));
-
--- Audit: users do not get broad read/write access. Admin/security paths own audit emission.
-
--- profile_access intentionally has no authenticated table policy; access mutations and inspection are protected admin operations.
-
--- -----------------------------------------------------------------------------
--- Storage bucket. Object policies will be validated in the V2 project because
--- Storage schema/version is Supabase-managed. No Legacy path ownership is copied.
--- -----------------------------------------------------------------------------
-
+-- Storage
 insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
 values ('progress-photos','progress-photos',false,6291456,array['image/jpeg','image/png','image/webp','image/heic','image/heif'])
-on conflict (id) do update
-set public=false,
-    file_size_limit=excluded.file_size_limit,
-    allowed_mime_types=excluded.allowed_mime_types;
+on conflict (id) do update set public=false,file_size_limit=excluded.file_size_limit,allowed_mime_types=excluded.allowed_mime_types;
+
+create or replace function private.storage_profile_id(object_name text) returns uuid language plpgsql immutable security definer set search_path=pg_catalog,storage,private as $$
+declare parts text[];
+begin
+  parts:=storage.foldername(object_name);
+  if coalesce(array_length(parts,1),0)<2 or parts[1]<>'profiles' then return null; end if;
+  begin return parts[2]::uuid; exception when invalid_text_representation then return null; end;
+end; $$;
+revoke execute on function private.storage_profile_id(text) from public,anon;
+grant execute on function private.storage_profile_id(text) to authenticated;
+create policy v2_progress_photos_select on storage.objects for select to authenticated using(bucket_id='progress-photos' and private.can_access_profile(private.storage_profile_id(name)));
+create policy v2_progress_photos_insert on storage.objects for insert to authenticated with check(bucket_id='progress-photos' and private.can_access_profile(private.storage_profile_id(name)));
+create policy v2_progress_photos_update on storage.objects for update to authenticated using(bucket_id='progress-photos' and private.can_access_profile(private.storage_profile_id(name))) with check(bucket_id='progress-photos' and private.can_access_profile(private.storage_profile_id(name)));
+create policy v2_progress_photos_delete on storage.objects for delete to authenticated using(bucket_id='progress-photos' and private.can_access_profile(private.storage_profile_id(name)));
+
+-- Least-privilege grants
+revoke all on all tables in schema public from anon, authenticated;
+revoke all on all sequences in schema public from anon, authenticated;
+grant select on public.app_users to authenticated;
+grant select, update on public.profiles to authenticated;
+grant select on public.muscle_groups, public.movement_patterns, public.exercise_categories, public.exercise_catalog, public.training_programs, public.program_phases, public.program_sessions, public.program_exercises, public.program_exercise_substitutions to authenticated;
+grant select, insert, update, delete on public.workout_plans, public.workout_plan_exercises, public.workout_plan_exercise_alternatives, public.exercise_records, public.body_measurements, public.progress_photos, public.program_enrollments, public.program_exercise_baselines, public.profile_training_state, public.workout_drafts to authenticated;
+grant select, insert on public.workout_sessions, public.workout_exercises, public.program_exercise_exposures to authenticated;
 
 commit;
