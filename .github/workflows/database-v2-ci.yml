@@ -31,6 +31,7 @@ jobs:
           mkdir .tmp-rhct-v2
           cd .tmp-rhct-v2
           supabase init
+          mkdir -p supabase/migrations
           cp ../database-v2/baseline/*.sql supabase/migrations/
 
       - name: Start clean local Supabase and apply V2 SQL
