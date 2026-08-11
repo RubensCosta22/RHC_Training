@@ -18,7 +18,7 @@ const Measurements = lazy(() => import('./pages/Measurements'))
 const Photos = lazy(() => import('./pages/Photos'))
 const Plans = lazy(() => import('./pages/Plans'))
 const Schedule = lazy(() => import('./pages/Schedule'))
-const Family = lazy(() => import('./pages/Family'))
+const Access = lazy(() => import('./pages/Access'))
 const Profiles = lazy(() => import('./pages/Profiles'))
 const Progress = lazy(() => import('./pages/Progress'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
@@ -26,16 +26,12 @@ const Settings = lazy(() => import('./pages/Settings'))
 const Workout = lazy(() => import('./pages/Workout'))
 
 function PageFallback() {
-  return (
-    <div className="flex min-h-screen items-center justify-center text-slate-300">
-      Carregando...
-    </div>
-  )
+  return <div className="flex min-h-screen items-center justify-center text-slate-300">Carregando...</div>
 }
 
 function AppShell({ children }) {
   const { pathname } = useLocation()
-  const wide = ['/admin', '/admin/stats', '/family', '/plans', '/schedule'].includes(pathname)
+  const wide = ['/admin', '/admin/stats', '/access', '/plans', '/schedule'].includes(pathname)
   const profileArea = /^\/(dashboard|workout|history|progress|measurements|photos|settings|archived)\//.test(pathname)
   return (
     <main className={`mx-auto min-h-screen max-w-[1440px] px-5 pb-32 sm:px-8 ${profileArea?'lg:pl-[244px] lg:pr-10':'lg:px-12'} ${wide?'2xl:max-w-[1560px]':''}`}>
@@ -50,10 +46,7 @@ export default function App() {
   useEffect(() => {
     const syncRequestId = createRequestId()
     const runSync = () => syncPendingWorkoutsV2().catch((error) => {
-      logger.error('offline_sync.failed', {
-        requestId: syncRequestId,
-        error
-      })
+      logger.error('offline_sync.failed', { requestId: syncRequestId, error })
     })
 
     const handleWindowError = (event) => {
@@ -95,7 +88,8 @@ export default function App() {
             <Route path="/profiles" element={<AppShell><Profiles /></AppShell>} />
             <Route path="/admin" element={<AppShell><Admin /></AppShell>} />
             <Route path="/admin/stats" element={<AppShell><AdminStats /></AppShell>} />
-            <Route path="/family" element={<AppShell><Family /></AppShell>} />
+            <Route path="/access" element={<AppShell><Access /></AppShell>} />
+            <Route path="/family" element={<Navigate to="/access" replace />} />
             <Route path="/plans" element={<AppShell><Plans /></AppShell>} />
             <Route path="/schedule" element={<AppShell><Schedule /></AppShell>} />
             <Route element={<ProfileRouteGuard />}>
