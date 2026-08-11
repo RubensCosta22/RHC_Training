@@ -5,6 +5,20 @@ import { archiveWorkoutSession, getWorkoutSessions } from '../services/workoutSe
 import { friendlyError } from '../utils/validation'
 import PageHeader from '../components/ui/PageHeader'
 
+function historyStatus(session) {
+  const exercises = session.workout_exercises || []
+  const isRunning = session.workout_type === 'E'
+  const completedExercises = exercises.filter((exercise) => exercise.completed).length
+
+  return {
+    exercises,
+    completionPercentage: 100,
+    badge: isRunning
+      ? 'Corrida concluída'
+      : `${completedExercises}/${exercises.length} exercícios registrados`
+  }
+}
+
 export default function History() {
   const { profileId } = useParams()
   const [sessions, setSessions] = useState([])
@@ -51,6 +65,7 @@ export default function History() {
             <option value="C">Treino C</option>
             <option value="D">Treino D</option>
             <option value="E">Treino E</option>
+            <option value="F">Treino F</option>
           </select>
         </label>
         <label>
@@ -73,8 +88,7 @@ export default function History() {
 
       <div className="grid gap-4">
         {sessions.map((session) => {
-          const exercises = session.workout_exercises || []
-          const completed = exercises.filter((exercise) => exercise.completed).length
+          const { exercises, completionPercentage, badge } = historyStatus(session)
           return (
             <article key={session.id} className="card">
               <div className="flex items-start justify-between gap-3">
@@ -82,12 +96,12 @@ export default function History() {
                   <h2 className="text-xl font-black">Treino {session.workout_type}</h2>
                   <p className="text-slate-400">{session.date} • {session.gym_name}</p>
                 </div>
-                <span className="badge">{completed}/{exercises.length} exercícios</span>
+                <span className="badge">{badge}</span>
               </div>
               <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
                 <p><span className="text-slate-500">Duração:</span> {session.duration_minutes} min</p>
                 <p><span className="text-slate-500">Volume:</span> {Math.round(session.total_volume || 0)} kg</p>
-                <p><span className="text-slate-500">Conclusão:</span> {session.completion_percentage}%</p>
+                <p><span className="text-slate-500">Conclusão:</span> {completionPercentage}%</p>
                 <p><span className="text-slate-500">Obs:</span> {session.notes || '-'}</p>
               </div>
               <button onClick={() => setOpen(open === session.id ? null : session.id)} className="mt-4 flex items-center gap-2 text-sm font-bold text-emerald-300"><Filter size={16} /> Detalhes do treino</button>
@@ -101,6 +115,11 @@ export default function History() {
               </button>
               {open === session.id && (
                 <div className="mt-3 space-y-2">
+                  {session.workout_type === 'E' && !exercises.length && (
+                    <div className="rounded-2xl bg-slate-950/60 p-3 text-sm text-slate-400">
+                      Sessão de corrida concluída. Este treino não possui exercícios de musculação.
+                    </div>
+                  )}
                   {exercises.map((exercise) => (
                     <div key={exercise.id} className="rounded-2xl bg-slate-950/60 p-3 text-sm">
                       <p className="font-bold">{exercise.exercise_name} {exercise.completed ? '✅' : '—'}</p>
