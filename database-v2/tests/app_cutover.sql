@@ -22,18 +22,34 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub','11000000-0000-0000-0000-000000000002',true);
 select set_config('request.jwt.claims','{"sub":"11000000-0000-0000-0000-000000000002","email":"invitee-cutover@test.local","role":"authenticated"}',true);
 
--- A valid invite lets the authenticated owner provision only their own app-user mapping.
-insert into public.app_users(user_id,role,status)
-values('11000000-0000-0000-0000-000000000002','user','active');
-insert into public.profile_access(user_id,profile_id)
-values('11000000-0000-0000-0000-000000000002','21000000-0000-0000-0000-000000000001');
-update public.profile_invitations
-set status='claimed',claimed_by='11000000-0000-0000-0000-000000000002',claimed_at=now()
-where profile_id='21000000-0000-0000-0000-000000000001';
+-- Direct provisioning must remain denied even when an invite exists.
+do $$ begin
+  begin
+    insert into public.app_users(user_id,role,status)
+    values('11000000-0000-0000-0000-000000000002','user','active');
+    raise exception 'expected direct app_users provisioning denial';
+  exception when insufficient_privilege then null; end;
+end $$;
+
+-- The atomic RPC provisions app_user + 1:1 access + claimed invitation together.
+do $$ declare claimed uuid; begin
+  select public.claim_profile_invitation() into claimed;
+  if claimed <> '21000000-0000-0000-0000-000000000001'::uuid then
+    raise exception 'unexpected claimed profile: %', claimed;
+  end if;
+end $$;
 
 do $$ declare n bigint; begin
   select count(*) into n from public.profiles;
   if n<>1 then raise exception 'invitee must see exactly one profile, got %',n; end if;
+end $$;
+
+-- Repeated claim is idempotent: no pending invite returns null and creates nothing else.
+do $$ declare claimed uuid; n bigint; begin
+  select public.claim_profile_invitation() into claimed;
+  if claimed is not null then raise exception 'repeat claim must return null'; end if;
+  select count(*) into n from public.profile_access where user_id='11000000-0000-0000-0000-000000000002';
+  if n<>1 then raise exception 'repeat claim changed access cardinality'; end if;
 end $$;
 
 -- Normal user cannot create arbitrary profiles.
