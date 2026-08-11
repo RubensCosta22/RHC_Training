@@ -3,6 +3,8 @@ import { logger } from '../lib/observability/logger'
 const PREFIX = 'rhc_workout_draft_v1'
 const MAX_DRAFT_BYTES = 256 * 1024
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000
+const REMOTE_DEBOUNCE_MS = 1200
+const remoteSyncTimers = new Map()
 
 function requirePart(value, label) {
   const text = String(value || '').trim()
@@ -34,6 +36,45 @@ export function createWorkoutDraftIdentity(input) {
   }
 }
 
+function scheduleRemoteDraftSync(record, key) {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined' || !navigator.onLine) return
+
+  const existing = remoteSyncTimers.get(key)
+  if (existing) window.clearTimeout(existing)
+
+  const timer = window.setTimeout(async () => {
+    remoteSyncTimers.delete(key)
+    try {
+      const latestRaw = localStorage.getItem(key)
+      if (!latestRaw) return
+      const latest = JSON.parse(latestRaw)
+      if (!latest?.draftId || latest.draftId !== record.draftId) return
+
+      const { upsertRemoteWorkoutDraft } = await import('./workoutDraftService')
+      const remote = await upsertRemoteWorkoutDraft(latest, latest.remoteVersion ?? null)
+
+      const currentRaw = localStorage.getItem(key)
+      if (!currentRaw) return
+      const current = JSON.parse(currentRaw)
+      if (current?.draftId !== latest.draftId) return
+
+      localStorage.setItem(key, JSON.stringify({
+        ...current,
+        remoteVersion: Number(remote.version || current.remoteVersion || 1),
+        version: Number(remote.version || current.version || 1)
+      }))
+    } catch (error) {
+      logger.warn('workout_draft.remote_debounced_sync_failed', {
+        profileId: record.profileId,
+        workoutType: record.workoutType,
+        error
+      })
+    }
+  }, REMOTE_DEBOUNCE_MS)
+
+  remoteSyncTimers.set(key, timer)
+}
+
 export function saveLocalWorkoutDraft(draft) {
   const identity = createWorkoutDraftIdentity(draft)
   const record = { ...draft, ...identity, updatedAt: new Date().toISOString() }
@@ -51,6 +92,7 @@ export function saveLocalWorkoutDraft(draft) {
 
   const key = buildWorkoutDraftKey(identity)
   localStorage.setItem(key, serialized)
+  scheduleRemoteDraftSync(record, key)
   return record
 }
 
@@ -80,7 +122,13 @@ export function loadLocalWorkoutDraft(identity) {
 }
 
 export function removeLocalWorkoutDraft(identity) {
-  localStorage.removeItem(buildWorkoutDraftKey(identity))
+  const key = buildWorkoutDraftKey(identity)
+  const timer = remoteSyncTimers.get(key)
+  if (timer) {
+    window.clearTimeout(timer)
+    remoteSyncTimers.delete(key)
+  }
+  localStorage.removeItem(key)
 }
 
 export function isWorkoutDraftExpired(draft, now = Date.now()) {
@@ -98,10 +146,20 @@ export function purgeExpiredWorkoutDrafts({ userId, now = Date.now() }) {
     try {
       const draft = JSON.parse(localStorage.getItem(key) || 'null')
       if (isWorkoutDraftExpired(draft, now)) {
+        const timer = remoteSyncTimers.get(key)
+        if (timer) {
+          window.clearTimeout(timer)
+          remoteSyncTimers.delete(key)
+        }
         localStorage.removeItem(key)
         removed.push(key)
       }
     } catch {
+      const timer = remoteSyncTimers.get(key)
+      if (timer) {
+        window.clearTimeout(timer)
+        remoteSyncTimers.delete(key)
+      }
       localStorage.removeItem(key)
       removed.push(key)
     }
