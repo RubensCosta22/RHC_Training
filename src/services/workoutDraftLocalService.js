@@ -61,7 +61,7 @@ function scheduleRemoteDraftSync(record, key) {
       localStorage.setItem(key, JSON.stringify({
         ...current,
         remoteVersion: Number(remote.version || current.remoteVersion || 1),
-        version: Number(remote.version || current.version || 1)
+        version: Math.max(Number(current.version || 1), Number(remote.version || 1))
       }))
     } catch (error) {
       logger.warn('workout_draft.remote_debounced_sync_failed', {
@@ -77,7 +77,31 @@ function scheduleRemoteDraftSync(record, key) {
 
 export function saveLocalWorkoutDraft(draft) {
   const identity = createWorkoutDraftIdentity(draft)
-  const record = { ...draft, ...identity, updatedAt: new Date().toISOString() }
+  const key = buildWorkoutDraftKey(identity)
+
+  let existing = null
+  try {
+    const existingRaw = localStorage.getItem(key)
+    if (existingRaw) existing = JSON.parse(existingRaw)
+  } catch {
+    existing = null
+  }
+
+  const sameDraft = existing?.draftId === identity.draftId
+  const preservedRemoteVersion = draft.remoteVersion ?? (sameDraft ? existing?.remoteVersion : null) ?? null
+  const preservedVersion = Math.max(
+    Number(identity.version || 1),
+    sameDraft ? Number(existing?.version || 1) : 1,
+    preservedRemoteVersion != null ? Number(preservedRemoteVersion) : 1
+  )
+
+  const record = {
+    ...draft,
+    ...identity,
+    version: preservedVersion,
+    ...(preservedRemoteVersion != null ? { remoteVersion: Number(preservedRemoteVersion) } : {}),
+    updatedAt: new Date().toISOString()
+  }
   const serialized = JSON.stringify(record)
 
   if (serialized.length > MAX_DRAFT_BYTES) {
@@ -90,7 +114,6 @@ export function saveLocalWorkoutDraft(draft) {
     throw new Error('O rascunho do treino excedeu o limite seguro deste dispositivo.')
   }
 
-  const key = buildWorkoutDraftKey(identity)
   localStorage.setItem(key, serialized)
   scheduleRemoteDraftSync(record, key)
   return record
