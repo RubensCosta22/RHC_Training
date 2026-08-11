@@ -3,9 +3,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import PageHeader from '../components/ui/PageHeader'
 import { secureSignOut } from '../services/authService'
-import { getFamilyContext } from '../services/familyService'
+import { getAccessContext } from '../services/accessService'
 import { getProfilesWithLastWorkout } from '../services/profileService'
-import { createFamilyProfile } from '../services/scheduleService'
+import { createProfileWithInvite } from '../services/scheduleService'
 import { friendlyError } from '../utils/validation'
 
 const initialProfile = { name: '', birthDate: '', gender: 'mulher', goal: '', email: '' }
@@ -23,7 +23,7 @@ export default function Admin() {
   async function loadProfiles() { setProfiles(await getProfilesWithLastWorkout()) }
 
   useEffect(() => {
-    getFamilyContext().then(async (context) => {
+    getAccessContext().then(async (context) => {
       if (context?.role !== 'admin') { navigate('/profiles', { replace: true }); return }
       await loadProfiles()
     }).catch((err) => setError(friendlyError(err))).finally(() => setLoading(false))
@@ -35,7 +35,7 @@ export default function Admin() {
   async function createProfile(event) {
     event.preventDefault(); setMessage(''); setCreating(true)
     try {
-      await createFamilyProfile(newProfile)
+      await createProfileWithInvite(newProfile)
       await loadProfiles()
       setNewProfile(initialProfile)
       setShowCreate(false)
@@ -52,13 +52,13 @@ export default function Admin() {
     </section>
 
     <section className="mb-14 grid gap-px overflow-hidden rounded-[18px] bg-[#272a2f] sm:grid-cols-2 xl:grid-cols-4">
-      {[{to:'/admin/stats',icon:Activity,title:'Centro de estatisticas',text:'Visao geral e comparativo de performance'},{to:'/family',icon:UsersRound,title:'Pessoas e acesso',text:'Perfis, convites e permissoes'},{to:'/plans',icon:Settings2,title:'Planos de treino',text:'Exercicios e configuracoes'},{to:'/schedule',icon:CalendarDays,title:'Agenda semanal',text:'Treinos e descansos por dia'}].map(({to,icon:Icon,title,text})=><Link to={to} key={to} className="group bg-[#0d0f11] p-5 transition hover:bg-[#141619]"><div className="mb-8 flex items-start justify-between"><Icon size={20} className="text-[#92979f]"/><ArrowUpRight size={17} className="text-[#62676f] transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-[#c8ff3d]"/></div><strong className="block text-lg">{title}</strong><p className="mt-1 text-sm text-[#62676f]">{text}</p></Link>)}
+      {[{to:'/admin/stats',icon:Activity,title:'Centro de estatisticas',text:'Visao geral e comparativo de performance'},{to:'/access',icon:UsersRound,title:'Pessoas e acesso',text:'Perfis, convites e permissoes'},{to:'/plans',icon:Settings2,title:'Planos de treino',text:'Exercicios e configuracoes'},{to:'/schedule',icon:CalendarDays,title:'Agenda semanal',text:'Treinos e descansos por dia'}].map(({to,icon:Icon,title,text})=><Link to={to} key={to} className="group bg-[#0d0f11] p-5 transition hover:bg-[#141619]"><div className="mb-8 flex items-start justify-between"><Icon size={20} className="text-[#92979f]"/><ArrowUpRight size={17} className="text-[#62676f] transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-[#c8ff3d]"/></div><strong className="block text-lg">{title}</strong><p className="mt-1 text-sm text-[#62676f]">{text}</p></Link>)}
     </section>
 
     <div className="mb-5 flex items-end justify-between gap-3 border-b border-[#272a2f] pb-4"><div><p className="rhc-kicker mb-2">Perfis</p><h2 className="text-2xl font-[700] tracking-[-.04em]">Perfis supervisionados</h2></div><button className="btn-secondary flex items-center gap-2 px-4" onClick={()=>setShowCreate((value)=>!value)}>{showCreate?<X size={17}/>:<Plus size={17}/>}<span className="hidden sm:inline">{showCreate?'Cancelar':'Novo perfil'}</span></button></div>
 
     {showCreate && <form className="mb-8 grid gap-4 border-b border-[#272a2f] bg-[#0d0f11] p-5 sm:grid-cols-2" onSubmit={createProfile}>
-      <div className="sm:col-span-2"><h3 className="text-lg font-black">Adicionar perfil</h3><p className="text-sm text-slate-400">O titular recebera acesso ao entrar com o e-mail associado. Nenhum grupo familiar e criado no V2.</p></div>
+      <div className="sm:col-span-2"><h3 className="text-lg font-black">Adicionar perfil</h3><p className="text-sm text-slate-400">O titular recebera acesso ao entrar com o e-mail associado. O V2 usa vinculo individual 1:1 entre conta e perfil.</p></div>
       <label className="text-sm text-slate-300">Nome<input required value={newProfile.name} onChange={(e)=>setNewProfile({...newProfile,name:e.target.value})}/></label>
       <label className="text-sm text-slate-300">Data de nascimento<input type="date" value={newProfile.birthDate} onChange={(e)=>setNewProfile({...newProfile,birthDate:e.target.value})}/></label>
       <label className="text-sm text-slate-300">Genero<select value={newProfile.gender} onChange={(e)=>setNewProfile({...newProfile,gender:e.target.value})}><option value="mulher">Mulher</option><option value="homem">Homem</option><option value="outro">Outro</option></select></label>
