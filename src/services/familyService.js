@@ -7,44 +7,9 @@ export async function claimFamilyProfile() {
   const user = userData.user
   if (!user?.id || !user.email) return 0
 
-  const email = normalizeEmail(user.email)
-  const { data: invitation, error: invitationError } = await supabase
-    .from('profile_invitations')
-    .select('id,profile_id,email,status')
-    .eq('email', email)
-    .eq('status', 'pending')
-    .maybeSingle()
-
-  if (invitationError) throw invitationError
-  if (!invitation) return 0
-
-  const { data: existingAppUser, error: appUserReadError } = await supabase
-    .from('app_users')
-    .select('user_id,role,status')
-    .eq('user_id', user.id)
-    .maybeSingle()
-  if (appUserReadError) throw appUserReadError
-
-  if (!existingAppUser) {
-    const { error: appUserInsertError } = await supabase
-      .from('app_users')
-      .insert({ user_id: user.id, role: 'user', status: 'active' })
-    if (appUserInsertError && appUserInsertError.code !== '23505') throw appUserInsertError
-  }
-
-  const { error: accessError } = await supabase
-    .from('profile_access')
-    .insert({ user_id: user.id, profile_id: invitation.profile_id })
-  if (accessError && accessError.code !== '23505') throw accessError
-
-  const { error: claimError } = await supabase
-    .from('profile_invitations')
-    .update({ status: 'claimed', claimed_by: user.id, claimed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-    .eq('id', invitation.id)
-    .eq('status', 'pending')
-  if (claimError) throw claimError
-
-  return 1
+  const { data, error } = await supabase.rpc('claim_profile_invitation')
+  if (error) throw error
+  return data ? 1 : 0
 }
 
 export async function getFamilyContext() {
