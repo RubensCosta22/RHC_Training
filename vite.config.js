@@ -3,6 +3,9 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  preview: {
+    allowedHosts: ['rhc-training-v2-preview.onrender.com']
+  },
   plugins: [
     react(),
     VitePWA({
