@@ -2,10 +2,10 @@ import { ShieldCheck, UserRoundCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import PageHeader from '../components/ui/PageHeader'
-import { associateProfileEmail, getFamilyContext, listProfileAssociations } from '../services/familyService'
+import { associateProfileEmail, getAccessContext, listProfileAssociations } from '../services/accessService'
 import { friendlyError } from '../utils/validation'
 
-export default function Family() {
+export default function Access() {
   const [context, setContext] = useState(null)
   const [profiles, setProfiles] = useState([])
   const [emails, setEmails] = useState({})
@@ -13,7 +13,7 @@ export default function Family() {
   const [message, setMessage] = useState('')
 
   async function load() {
-    const current = await getFamilyContext()
+    const current = await getAccessContext()
     setContext(current)
     setProfiles(current?.role === 'admin' ? await listProfileAssociations() : [])
   }
