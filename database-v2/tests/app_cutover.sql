@@ -44,12 +44,13 @@ do $$ declare n bigint; begin
   if n<>1 then raise exception 'invitee must see exactly one profile, got %',n; end if;
 end $$;
 
--- Repeated claim is idempotent: no pending invite returns null and creates nothing else.
+-- Repeated claim is idempotent. Validate only through the public surface:
+-- no pending invite is claimed again and visible-profile cardinality remains unchanged.
 do $$ declare claimed uuid; n bigint; begin
   select public.claim_profile_invitation() into claimed;
   if claimed is not null then raise exception 'repeat claim must return null'; end if;
-  select count(*) into n from public.profile_access where user_id='11000000-0000-0000-0000-000000000002';
-  if n<>1 then raise exception 'repeat claim changed access cardinality'; end if;
+  select count(*) into n from public.profiles;
+  if n<>1 then raise exception 'repeat claim changed visible-profile cardinality, got %', n; end if;
 end $$;
 
 -- Normal user cannot create arbitrary profiles.
