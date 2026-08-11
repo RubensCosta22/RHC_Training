@@ -5,6 +5,18 @@ function average(values = []) {
   return values.reduce((sum, value) => sum + Number(value || 0), 0) / values.length
 }
 
+function dateParts(value) {
+  const [year, month, day] = String(value || '').slice(0, 10).split('-').map(Number)
+  return { year, month, day }
+}
+
+function diffDays(fromDate, toDate = new Date()) {
+  const from = dateParts(fromDate)
+  const fromUtc = Date.UTC(from.year, from.month - 1, from.day)
+  const toUtc = Date.UTC(toDate.getFullYear(), toDate.getMonth(), toDate.getDate())
+  return Math.max(0, Math.floor((toUtc - fromUtc) / 86400000))
+}
+
 export async function getProgramStats(profileId) {
   const { data: enrollment, error: enrollmentError } = await supabase
     .from('program_enrollments')
@@ -18,19 +30,60 @@ export async function getProgramStats(profileId) {
   if (!enrollment) return null
 
   const durationWeeks = Number(enrollment.training_programs?.duration_weeks || 12)
-  const week = Math.max(1, Math.min(durationWeeks, Number(enrollment.current_week || 1)))
+  const elapsedDays = diffDays(enrollment.start_date)
+  const week = Math.max(1, Math.min(durationWeeks, Math.floor(elapsedDays / 7) + 1))
+  const dayInWeek = (elapsedDays % 7) + 1
 
-  const { data: phase, error: phaseError } = await supabase
-    .from('program_phases')
-    .select('*')
-    .eq('program_id', enrollment.program_id)
-    .lte('week_start', week)
-    .gte('week_end', week)
-    .order('sort_order')
-    .limit(1)
-    .maybeSingle()
+  const [{ data: phase, error: phaseError }, { data: programSessions, error: sessionsError }] = await Promise.all([
+    supabase
+      .from('program_phases')
+      .select('*')
+      .eq('program_id', enrollment.program_id)
+      .lte('week_start', week)
+      .gte('week_end', week)
+      .order('sort_order')
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('program_sessions')
+      .select('code,session_type,day_order,is_optional')
+      .eq('program_id', enrollment.program_id)
+      .order('day_order')
+  ])
 
   if (phaseError) throw phaseError
+  if (sessionsError) throw sessionsError
+
+  const requiredSessions = (programSessions || []).filter((item) => item.is_optional !== true)
+  const requiredCodes = requiredSessions.map((item) => item.code)
+  const strengthSessions = requiredSessions.filter((item) => item.session_type === 'strength')
+
+  let completedProgramSessions = []
+  if (requiredCodes.length) {
+    const { data, error } = await supabase
+      .from('workout_sessions')
+      .select('id,workout_code,workout_date')
+      .eq('profile_id', profileId)
+      .is('archived_at', null)
+      .gte('workout_date', enrollment.start_date)
+      .in('workout_code', requiredCodes)
+      .order('workout_date', { ascending: true })
+    if (error) throw error
+    completedProgramSessions = data || []
+  }
+
+  const completedWeeks = Math.max(0, week - 1)
+  const expectedThisWeek = requiredSessions.filter((item) => Number(item.day_order || 0) <= dayInWeek).length
+  const expectedSessions = (completedWeeks * requiredSessions.length) + expectedThisWeek
+  const completedSessions = completedProgramSessions.length
+  const adherence = expectedSessions > 0
+    ? Math.min(100, Math.round((completedSessions / expectedSessions) * 100))
+    : 0
+
+  const strengthCodes = new Set(strengthSessions.map((item) => item.code))
+  const completedStrengthSessions = completedProgramSessions.filter((item) => strengthCodes.has(item.workout_code)).length
+  const expectedStrengthThisWeek = strengthSessions.filter((item) => Number(item.day_order || 0) <= dayInWeek).length
+  const expectedStrengthSessions = (completedWeeks * strengthSessions.length) + expectedStrengthThisWeek
 
   const { data: exposures, error: exposureError } = await supabase
     .from('program_exercise_exposures')
@@ -80,15 +133,8 @@ export async function getProgramStats(profileId) {
     }))
     .sort((a, b) => b.exposures - a.exposures)
 
-  const expectedStrengthSessions = Math.min(week, 12) * 4
-  const sessionIds = new Set(normalized.map((item) => item.workout_session_id).filter(Boolean))
-  const completedStrengthSessions = sessionIds.size
-  const adherence = expectedStrengthSessions > 0
-    ? Math.min(100, Math.round((completedStrengthSessions / expectedStrengthSessions) * 100))
-    : 0
-
   return {
-    enrollment,
+    enrollment: { ...enrollment, current_week: week },
     program: enrollment.training_programs,
     phase,
     week,
@@ -96,6 +142,8 @@ export async function getProgramStats(profileId) {
     baseline: enrollment.running_baseline || {},
     summary: {
       exposures: normalized.length,
+      completedSessions,
+      expectedSessions,
       completedStrengthSessions,
       expectedStrengthSessions,
       adherence,
