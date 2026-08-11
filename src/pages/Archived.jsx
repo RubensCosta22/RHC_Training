@@ -1,5 +1,5 @@
-import { Archive, RotateCcw } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { Archive, RotateCcw, Search } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import EmptyState from '../components/ui/EmptyState'
 import PageHeader from '../components/ui/PageHeader'
@@ -21,6 +21,8 @@ function itemTitle(section, item) {
 export default function Archived() {
   const { profileId } = useParams()
   const [items, setItems] = useState({ workouts: [], measurements: [], photos: [] })
+  const [query, setQuery] = useState('')
+  const [category, setCategory] = useState('all')
   const [loading, setLoading] = useState(true)
   const [restoring, setRestoring] = useState(null)
   const [message, setMessage] = useState('')
@@ -49,7 +51,23 @@ export default function Archived() {
     }
   }
 
-  const total = sections.reduce((sum, section) => sum + items[section.key].length, 0)
+  const filteredSections = useMemo(() => {
+    const term = query.trim().toLocaleLowerCase('pt-BR')
+    return sections.map((section) => {
+      if (category !== 'all' && category !== section.key) return { ...section, items: [] }
+      const sectionItems = items[section.key].filter((item) => {
+        if (!term) return true
+        const searchable = [itemTitle(section, item), item.date, item.gym_name, item.photo_type, item.notes]
+          .filter(Boolean)
+          .join(' ')
+          .toLocaleLowerCase('pt-BR')
+        return searchable.includes(term)
+      })
+      return { ...section, items: sectionItems }
+    })
+  }, [items, query, category])
+
+  const total = filteredSections.reduce((sum, section) => sum + section.items.length, 0)
 
   return (
     <div>
@@ -59,16 +77,35 @@ export default function Archived() {
         subtitle="Restaure itens sem perder o historico."
       />
 
+      <section className="card mb-4 grid gap-3 sm:grid-cols-[1fr_180px]">
+        <label>
+          <span className="mb-1 block text-sm text-slate-400">Buscar arquivados</span>
+          <div className="relative">
+            <Search size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            <input className="pl-10" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Treino, data, academia..." maxLength={80} />
+          </div>
+        </label>
+        <label>
+          <span className="mb-1 block text-sm text-slate-400">Categoria</span>
+          <select value={category} onChange={(event) => setCategory(event.target.value)}>
+            <option value="all">Tudo</option>
+            <option value="workouts">Treinos</option>
+            <option value="measurements">Medidas</option>
+            <option value="photos">Fotos</option>
+          </select>
+        </label>
+      </section>
+
       {message && <p aria-live="polite" className="mb-4 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-sm text-emerald-100">{message}</p>}
       {loading && <p className="text-slate-400">Carregando itens arquivados...</p>}
-      {!loading && total === 0 && <EmptyState title="Nenhum item arquivado" description="Treinos, medidas e fotos arquivados aparecerao aqui." icon={Archive} />}
+      {!loading && total === 0 && <EmptyState title="Nenhum item encontrado" description="Ajuste a busca ou os filtros para localizar itens arquivados." icon={Archive} />}
 
-      {!loading && sections.map((section) => (
-        items[section.key].length > 0 && (
+      {!loading && filteredSections.map((section) => (
+        section.items.length > 0 && (
           <section key={section.key} className="mb-5">
-            <h2 className="mb-3 text-xl font-black">{section.title}</h2>
+            <h2 className="mb-3 text-xl font-black">{section.title} <span className="text-sm font-medium text-slate-500">({section.items.length})</span></h2>
             <div className="grid gap-3">
-              {items[section.key].map((item) => (
+              {section.items.map((item) => (
                 <article key={item.id} className="card flex items-center justify-between gap-4">
                   <div>
                     <h3 className="font-black">{itemTitle(section, item)}</h3>

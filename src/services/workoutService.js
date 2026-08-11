@@ -73,6 +73,15 @@ export async function saveWorkoutSession(payload) {
   return { ...normalizeSessionRow(session), personalRecords }
 }
 
+function applyWorkoutSessionFilters(query, filters = {}) {
+  let filtered = query
+  if (filters.type) filtered = filtered.eq('workout_code', filters.type)
+  if (filters.gymName) filtered = filtered.ilike('gym_name', `%${String(filters.gymName).trim().slice(0, 80)}%`)
+  if (filters.from) filtered = filtered.gte('workout_date', filters.from)
+  if (filters.to) filtered = filtered.lte('workout_date', filters.to)
+  return filtered
+}
+
 export async function getWorkoutSessions(profileId, filters = {}) {
   let query = supabase
     .from('workout_sessions')
@@ -82,14 +91,40 @@ export async function getWorkoutSessions(profileId, filters = {}) {
     .order('workout_date', { ascending: false })
     .order('created_at', { ascending: false })
 
-  if (filters.type) query = query.eq('workout_code', filters.type)
-  if (filters.gymName) query = query.ilike('gym_name', `%${String(filters.gymName).slice(0, 80)}%`)
-  if (filters.from) query = query.gte('workout_date', filters.from)
-  if (filters.to) query = query.lte('workout_date', filters.to)
+  query = applyWorkoutSessionFilters(query, filters)
 
   const { data, error } = await query
   if (error) throw error
   return (data || []).map(normalizeSessionRow)
+}
+
+export async function getWorkoutSessionsPage(profileId, filters = {}, options = {}) {
+  const pageSize = Math.min(50, Math.max(5, Number(options.pageSize || 10)))
+  const page = Math.max(1, Number(options.page || 1))
+  const from = (page - 1) * pageSize
+  const to = from + pageSize - 1
+
+  let query = supabase
+    .from('workout_sessions')
+    .select('*, workout_exercises(*)', { count: 'exact' })
+    .eq('profile_id', profileId)
+    .is('archived_at', null)
+    .order('workout_date', { ascending: false })
+    .order('created_at', { ascending: false })
+
+  query = applyWorkoutSessionFilters(query, filters).range(from, to)
+
+  const { data, error, count } = await query
+  if (error) throw error
+
+  const total = Number(count || 0)
+  return {
+    items: (data || []).map(normalizeSessionRow),
+    total,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize))
+  }
 }
 
 export async function getDashboardSummary(profileId) {

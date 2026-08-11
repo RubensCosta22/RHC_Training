@@ -1,9 +1,11 @@
-import { Archive, Filter, Search } from 'lucide-react'
+import { Archive, ChevronLeft, ChevronRight, Filter, Search } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { archiveWorkoutSession, getWorkoutSessions } from '../services/workoutService'
+import { archiveWorkoutSession, getWorkoutSessionsPage } from '../services/workoutService'
 import { friendlyError } from '../utils/validation'
 import PageHeader from '../components/ui/PageHeader'
+
+const PAGE_SIZE = 10
 
 function historyStatus(session) {
   const exercises = session.workout_exercises || []
@@ -23,15 +25,53 @@ export default function History() {
   const { profileId } = useParams()
   const [sessions, setSessions] = useState([])
   const [filters, setFilters] = useState({ type: '', gymName: '', from: '', to: '' })
+  const [appliedFilters, setAppliedFilters] = useState(filters)
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [open, setOpen] = useState(null)
   const [archiving, setArchiving] = useState(null)
 
-  function load() {
-    getWorkoutSessions(profileId, filters).then(setSessions).catch((err) => setError(friendlyError(err)))
+  function load(targetPage = page, targetFilters = appliedFilters) {
+    setLoading(true)
+    setError('')
+    getWorkoutSessionsPage(profileId, targetFilters, { page: targetPage, pageSize: PAGE_SIZE })
+      .then((result) => {
+        setSessions(result.items)
+        setTotal(result.total)
+        setTotalPages(result.totalPages)
+        setPage(result.page)
+      })
+      .catch((err) => setError(friendlyError(err)))
+      .finally(() => setLoading(false))
   }
 
-  useEffect(() => { load() }, [profileId])
+  useEffect(() => { load(1, appliedFilters) }, [profileId])
+
+  function applyFilters(event) {
+    event?.preventDefault()
+    const next = { ...filters, gymName: filters.gymName.trim() }
+    setAppliedFilters(next)
+    setPage(1)
+    load(1, next)
+  }
+
+  function clearFilters() {
+    const empty = { type: '', gymName: '', from: '', to: '' }
+    setFilters(empty)
+    setAppliedFilters(empty)
+    setPage(1)
+    load(1, empty)
+  }
+
+  function goToPage(nextPage) {
+    if (nextPage < 1 || nextPage > totalPages || nextPage === page) return
+    setOpen(null)
+    setPage(nextPage)
+    load(nextPage, appliedFilters)
+  }
 
   async function archiveSession(session) {
     const confirmed = window.confirm(
@@ -43,7 +83,8 @@ export default function History() {
     setError('')
     try {
       await archiveWorkoutSession(session.id)
-      load()
+      const nextPage = sessions.length === 1 && page > 1 ? page - 1 : page
+      load(nextPage, appliedFilters)
     } catch (err) {
       setError(friendlyError(err))
     } finally {
@@ -51,11 +92,14 @@ export default function History() {
     }
   }
 
+  const firstResult = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
+  const lastResult = Math.min(page * PAGE_SIZE, total)
+
   return (
     <div>
       <PageHeader eyebrow="Historico" title="Treinos feitos" subtitle="Sua trajetoria, sessao por sessao." />
 
-      <section className="card mb-4 grid gap-3 md:grid-cols-4">
+      <form onSubmit={applyFilters} className="card mb-4 grid gap-3 md:grid-cols-4">
         <label>
           <span className="mb-1 block text-sm text-slate-400">Tipo</span>
           <select value={filters.type} onChange={(e) => setFilters({ ...filters, type: e.target.value })}>
@@ -69,8 +113,8 @@ export default function History() {
           </select>
         </label>
         <label>
-          <span className="mb-1 block text-sm text-slate-400">Academia</span>
-          <input value={filters.gymName} onChange={(e) => setFilters({ ...filters, gymName: e.target.value })} placeholder="Nome" />
+          <span className="mb-1 block text-sm text-slate-400">Buscar academia</span>
+          <input value={filters.gymName} onChange={(e) => setFilters({ ...filters, gymName: e.target.value })} placeholder="Ex.: Gaviao" maxLength={80} />
         </label>
         <label>
           <span className="mb-1 block text-sm text-slate-400">De</span>
@@ -80,14 +124,25 @@ export default function History() {
           <span className="mb-1 block text-sm text-slate-400">Até</span>
           <input type="date" value={filters.to} onChange={(e) => setFilters({ ...filters, to: e.target.value })} />
         </label>
-        <button className="btn-secondary md:col-span-4 flex items-center justify-center gap-2" onClick={load}><Search size={18} /> Filtrar</button>
-      </section>
+        <div className="flex gap-2 md:col-span-4">
+          <button className="btn-secondary flex flex-1 items-center justify-center gap-2" type="submit"><Search size={18} /> Buscar e filtrar</button>
+          <button className="btn-secondary px-4" type="button" onClick={clearFilters}>Limpar</button>
+        </div>
+      </form>
 
+      {!loading && !error && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-400">
+          <span>{total === 0 ? 'Nenhum resultado' : `${firstResult}-${lastResult} de ${total} treinos`}</span>
+          <span>Página {page} de {totalPages}</span>
+        </div>
+      )}
+
+      {loading && <p className="text-slate-400">Carregando historico...</p>}
       {error && <p className="rounded-2xl border border-red-400/30 bg-red-400/10 p-3 text-red-100">{error}</p>}
-      {!sessions.length && <p className="text-slate-400">Nenhum treino encontrado.</p>}
+      {!loading && !sessions.length && <p className="text-slate-400">Nenhum treino encontrado.</p>}
 
       <div className="grid gap-4">
-        {sessions.map((session) => {
+        {!loading && sessions.map((session) => {
           const { exercises, completionPercentage, badge } = historyStatus(session)
           return (
             <article key={session.id} className="card">
@@ -132,6 +187,14 @@ export default function History() {
           )
         })}
       </div>
+
+      {!loading && totalPages > 1 && (
+        <nav className="mt-6 flex items-center justify-between gap-3" aria-label="Paginação do histórico">
+          <button type="button" className="btn-secondary flex items-center gap-2" disabled={page === 1} onClick={() => goToPage(page - 1)}><ChevronLeft size={17} /> Anterior</button>
+          <span className="text-sm text-slate-400">{page} / {totalPages}</span>
+          <button type="button" className="btn-secondary flex items-center gap-2" disabled={page === totalPages} onClick={() => goToPage(page + 1)}>Próxima <ChevronRight size={17} /></button>
+        </nav>
+      )}
     </div>
   )
 }
