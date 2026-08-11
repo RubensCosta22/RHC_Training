@@ -1,5 +1,4 @@
 import { supabase } from '../lib/supabaseClient'
-import { getProgramWeek } from '../domain/programEngine'
 
 function average(values = []) {
   if (!values.length) return 0
@@ -8,19 +7,18 @@ function average(values = []) {
 
 export async function getProgramStats(profileId) {
   const { data: enrollment, error: enrollmentError } = await supabase
-    .from('profile_program_enrollments')
+    .from('program_enrollments')
     .select('*, training_programs(*)')
     .eq('profile_id', profileId)
     .eq('status', 'active')
+    .is('archived_at', null)
     .maybeSingle()
 
   if (enrollmentError) throw enrollmentError
   if (!enrollment) return null
 
-  const week = Math.min(
-    Number(enrollment.training_programs?.duration_weeks || 52),
-    getProgramWeek(enrollment.start_date)
-  )
+  const durationWeeks = Number(enrollment.training_programs?.duration_weeks || 12)
+  const week = Math.max(1, Math.min(durationWeeks, Number(enrollment.current_week || 1)))
 
   const { data: phase, error: phaseError } = await supabase
     .from('program_phases')
@@ -52,7 +50,7 @@ export async function getProgramStats(profileId) {
 
   const variations = {}
   normalized.forEach((item) => {
-    const key = item.variation_name
+    const key = item.variation_name_snapshot || 'Exercício'
     variations[key] = variations[key] || {
       name: key,
       firstLoad: null,
@@ -94,7 +92,7 @@ export async function getProgramStats(profileId) {
     program: enrollment.training_programs,
     phase,
     week,
-    durationWeeks: Number(enrollment.training_programs?.duration_weeks || 12),
+    durationWeeks,
     baseline: enrollment.running_baseline || {},
     summary: {
       exposures: normalized.length,
