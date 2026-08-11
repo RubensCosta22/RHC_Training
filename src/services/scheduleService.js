@@ -1,10 +1,10 @@
 import { supabase } from '../lib/supabaseClient'
 import { requestedPlans } from '../data/requestedPlans'
 import { sanitizeText } from '../utils/validation'
-import { associateProfileEmail } from './familyService'
+import { associateProfileEmail } from './accessService'
 import { savePlan } from './planService'
 
-export async function createFamilyProfile(values) {
+export async function createProfileWithInvite(values) {
   const name = sanitizeText(values.name, 80)
   const goal = sanitizeText(values.goal, 200)
   if (!name) throw new Error('Informe o nome do perfil.')
