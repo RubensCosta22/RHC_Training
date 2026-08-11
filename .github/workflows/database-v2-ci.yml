@@ -48,7 +48,10 @@ jobs:
           set -euo pipefail
           cd .tmp-rhct-v2
           eval "$(supabase status -o env | sed 's/^/export /')"
-          psql "$DB_URL" -v ON_ERROR_STOP=1 -f ../database-v2/tests/rls_and_integrity.sql
+          for test_file in ../database-v2/tests/*.sql; do
+            echo "Running ${test_file}"
+            psql "$DB_URL" -v ON_ERROR_STOP=1 -f "$test_file"
+          done
 
       - name: Stop local Supabase
         if: always()
