@@ -6,7 +6,7 @@ import { getActiveProgramWorkout } from './programExecutionService'
 
 function normalizeExercise(exercise, index) {
   const name = sanitizeText(exercise.name, 120)
-  if (!name) throw new Error(`Informe o nome do exercicio ${index + 1}.`)
+  if (!name) throw new Error(`Informe o nome do exercício ${index + 1}.`)
   return {
     id: exercise.id || crypto.randomUUID(),
     name,
@@ -106,7 +106,7 @@ export async function getWorkoutPlan(profile, type) {
   return getWorkout(profile.name, type)
 }
 
-export async function getAvailablePlanTypes(profile) {
+export async function getAvailablePlanOptions(profile) {
   let activeEnrollment = null
   const { data, error: enrollmentError } = await supabase
     .from('program_enrollments')
@@ -118,16 +118,34 @@ export async function getAvailablePlanTypes(profile) {
   if (!enrollmentError) activeEnrollment = data
 
   if (activeEnrollment) {
-    const { data: sessions, error: sessionsError } = await supabase.from('program_sessions').select('code').eq('program_id', activeEnrollment.program_id).order('day_order')
+    const { data: sessions, error: sessionsError } = await supabase.from('program_sessions').select('code,name').eq('program_id', activeEnrollment.program_id).order('day_order')
     if (sessionsError && !isProgramFeatureUnavailable(sessionsError)) throw sessionsError
-    if (!sessionsError) return normalizeWorkoutTypes((sessions || []).map((item) => item.code))
+    if (!sessionsError) {
+      const sessionByCode = new Map((sessions || []).map((item) => [item.code, item]))
+      return normalizeWorkoutTypes((sessions || []).map((item) => item.code)).map((code) => ({
+        code,
+        title: sessionByCode.get(code)?.name || `Treino ${code}`
+      }))
+    }
   }
 
-  const { data: plans, error } = await supabase.from('workout_plans').select('workout_code,is_active').eq('profile_id', profile.id).order('workout_code')
+  const { data: plans, error } = await supabase.from('workout_plans').select('workout_code,title,description,is_active').eq('profile_id', profile.id).order('workout_code')
   if (error) throw error
   const types = new Set(getWorkoutTypes(profile.name))
   ;(plans || []).forEach((item) => item.is_active ? types.add(item.workout_code) : types.delete(item.workout_code))
-  return normalizeWorkoutTypes([...types])
+  const planByCode = new Map((plans || []).map((item) => [item.workout_code, item]))
+  return normalizeWorkoutTypes([...types]).map((code) => {
+    const plan = planByCode.get(code)
+    const fallback = getWorkout(profile.name, code)
+    return {
+      code,
+      title: plan?.title || fallback?.title || `Treino ${code}`
+    }
+  })
+}
+
+export async function getAvailablePlanTypes(profile) {
+  return (await getAvailablePlanOptions(profile)).map((item) => item.code)
 }
 
 export async function listPlansForAdmin(profile) {
@@ -140,7 +158,7 @@ export async function listPlansForAdmin(profile) {
       workout_code: type,
       title: fallback?.title || `Treino ${type}`,
       description: fallback?.description || '',
-      exercises: fallback?.exercises || [normalizeExercise({ name: 'Novo exercicio', muscleGroup: 'Geral', sets: 3, reps: '8-12', rest: 60 }, 0)],
+      exercises: fallback?.exercises || [normalizeExercise({ name: 'Novo exercício', muscleGroup: 'Geral', sets: 3, reps: '8-12', rest: 60 }, 0)],
       active: Boolean(fallback),
       fallback: true
     }

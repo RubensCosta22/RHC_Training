@@ -7,7 +7,7 @@ import RunningSessionPanel from '../components/RunningSessionPanel'
 import SmartExecutionPanel from '../components/SmartExecutionPanel'
 import { classifyWorkoutDraftCompatibility, mapDraftExerciseValues } from '../domain/workoutDraftCompatibility'
 import { supabase } from '../lib/supabaseClient'
-import { calculatePaceSecondsPerKm, getElapsedSeconds, resetTimer } from '../lib/runningSession'
+import { calculatePaceSecondsPerKm, formatDuration, getElapsedSeconds, pauseTimer, resetTimer, startTimer } from '../lib/runningSession'
 import { getProfile } from '../services/profileService'
 import { getWorkoutPlan } from '../services/planService'
 import { calculateProgramSuggestion, getRecentProgramExposures, saveProgramExposure } from '../services/programExecutionService'
@@ -32,6 +32,12 @@ import { toLocalDateKey } from '../utils/date'
 
 const today = () => toLocalDateKey()
 const emptyRunning = () => ({ mode: 'manual', distanceMeters: 0, durationSeconds: 0, averagePaceSecondsPerKm: null, timer: resetTimer(), gpsStatus: 'idle', status: 'idle' })
+const activeWorkoutTimer = (savedTimer) => {
+  const safeTimer = savedTimer?.status === 'running' && !Number.isFinite(Date.parse(savedTimer.startedAt || ''))
+    ? resetTimer()
+    : (savedTimer || resetTimer())
+  return startTimer(safeTimer)
+}
 
 function resolveExerciseRecord(exercise, selectedName, records) {
   const exact = records[selectedName]
@@ -89,7 +95,9 @@ export default function Workout() {
   const [userId, setUserId] = useState(null)
   const [gymName, setGymName] = useState('')
   const [date, setDate] = useState(today())
-  const [durationMinutes, setDurationMinutes] = useState('60')
+  const [durationMinutes, setDurationMinutes] = useState('0')
+  const [workoutTimer, setWorkoutTimer] = useState(resetTimer())
+  const [timerNow, setTimerNow] = useState(Date.now())
   const [notes, setNotes] = useState('')
   const [exerciseValues, setExerciseValues] = useState({})
   const [running, setRunning] = useState(emptyRunning())
@@ -119,6 +127,13 @@ export default function Workout() {
   }, [])
 
   useEffect(() => {
+    if (workoutTimer.status !== 'running') return undefined
+    setTimerNow(Date.now())
+    const interval = window.setInterval(() => setTimerNow(Date.now()), 1000)
+    return () => window.clearInterval(interval)
+  }, [workoutTimer.status, workoutTimer.startedAt])
+
+  useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || null)).catch(() => setMessage('Faça login novamente para continuar.'))
     getProfile(profileId).then(async (value) => {
       setProfile(value)
@@ -141,7 +156,8 @@ export default function Workout() {
     const restored = mergeDraftExercises(workout, payload.exerciseValues || {})
     setGymName(payload.gymName || '')
     setDate(payload.date || today())
-    setDurationMinutes(String(payload.durationMinutes ?? '60'))
+    setDurationMinutes(String(payload.durationMinutes ?? '0'))
+    setWorkoutTimer(activeWorkoutTimer(payload.workoutTimer))
     setNotes(payload.notes || '')
     setExerciseValues(restored.values)
     setRunning({ ...emptyRunning(), ...(payload.running || {}) })
@@ -187,6 +203,7 @@ export default function Workout() {
         applyDraftSnapshot(reconciled, 'Rascunho restaurado deste dispositivo.')
       } else {
         setExerciseValues(buildInitialExerciseValues(workout))
+        setWorkoutTimer(activeWorkoutTimer())
         setDraft(freshDraft)
         setPendingPlanDraft(null)
         setPendingRemoteDraft(null)
@@ -229,7 +246,8 @@ export default function Workout() {
     const restored = mergeDraftExercises(workout, payload.exerciseValues || {})
     setGymName(payload.gymName || '')
     setDate(payload.date || today())
-    setDurationMinutes(String(payload.durationMinutes ?? '60'))
+    setDurationMinutes(String(payload.durationMinutes ?? '0'))
+    setWorkoutTimer(activeWorkoutTimer(payload.workoutTimer))
     setNotes(payload.notes || '')
     setExerciseValues(restored.values)
     setRunning({ ...emptyRunning(), ...(payload.running || {}) })
@@ -245,14 +263,15 @@ export default function Workout() {
     setRunning(emptyRunning())
     setGymName('')
     setDate(today())
-    setDurationMinutes('60')
+    setDurationMinutes('0')
+    setWorkoutTimer(activeWorkoutTimer())
     setNotes('')
     setDraft(createWorkoutDraftIdentity({ userId, profileId, workoutType: type, programEnrollmentId: enrollmentId, planFingerprint }))
     setDraftStatus('Rascunho anterior descartado neste dispositivo.')
   }
 
   function draftPayload(nextExercises = exerciseValues, nextRunning = running, overrides = {}) {
-    return { gymName, date, durationMinutes, notes, exerciseValues: nextExercises, running: nextRunning, ...overrides }
+    return { gymName, date, durationMinutes, workoutTimer, notes, exerciseValues: nextExercises, running: nextRunning, ...overrides }
   }
 
   function persistLocal(nextExercises = exerciseValues, nextRunning = running, overrides = {}) {
@@ -305,13 +324,22 @@ export default function Workout() {
     savingRef.current = true
     setSaving(true)
     setMessage('')
+    let stoppedWorkoutTimer = null
     try {
-      const local = persistLocal()
+      stoppedWorkoutTimer = pauseTimer(workoutTimer)
+      const elapsedWorkoutSeconds = getElapsedSeconds(stoppedWorkoutTimer)
+      const automaticDurationMinutes = Math.max(1, Math.ceil(elapsedWorkoutSeconds / 60))
+      setWorkoutTimer(stoppedWorkoutTimer)
+      setDurationMinutes(String(automaticDurationMinutes))
+      const local = persistLocal(exerciseValues, running, {
+        workoutTimer: stoppedWorkoutTimer,
+        durationMinutes: String(automaticDurationMinutes)
+      })
       const exercises = workout.exercises.map((exercise) => {
         const values = exerciseValues[exercise.id] || {}
         return { ...exercise, ...values, name: values.selectedName || exercise.name, originalName: exercise.name }
       })
-      const payload = { profileId, workoutType: type, date, gymName: sanitizeText(gymName, 80), durationMinutes, notes, exercises, draftId: local?.draftId || draft?.draftId, running: type === 'E' ? running : null }
+      const payload = { profileId, workoutType: type, date, gymName: sanitizeText(gymName, 80), durationMinutes: automaticDurationMinutes, notes, exercises, draftId: local?.draftId || draft?.draftId, running: type === 'E' ? running : null }
       if (!isOnline()) {
         addPendingWorkout(payload, userId)
         setMessage('Você está offline. Treino salvo no aparelho e será sincronizado quando a internet voltar.')
@@ -329,6 +357,7 @@ export default function Workout() {
       setMessage('Treino salvo com sucesso.')
       setTimeout(() => navigate(`/dashboard/${profileId}`), 700)
     } catch (error) {
+      if (stoppedWorkoutTimer) setWorkoutTimer(activeWorkoutTimer(stoppedWorkoutTimer))
       setMessage(friendlyError(error))
       setDraftStatus('Falha ao finalizar; rascunho preservado.')
     } finally {
@@ -342,6 +371,7 @@ export default function Workout() {
   const total = workout.exercises.length
   const pendingExercises = workout.exercises.filter((exercise) => !exerciseValues[exercise.id]?.completed)
   const completedExercises = workout.exercises.filter((exercise) => exerciseValues[exercise.id]?.completed)
+  const elapsedWorkoutSeconds = getElapsedSeconds(workoutTimer, timerNow)
 
   const renderExercise = (exercise) => {
     const value = exerciseValues[exercise.id] || {}
@@ -359,13 +389,13 @@ export default function Workout() {
     <div className="mx-auto max-w-3xl pb-28">
       <div className="mb-7 flex items-center justify-between">
         <Link to={`/dashboard/${profileId}`} className="grid h-10 w-10 place-items-center text-[#8E8E93]" aria-label="Voltar"><ArrowLeft size={22} /></Link>
-        <div className="text-center"><p className="text-xs uppercase tracking-[.16em] text-[#8E8E93]">Treino {type}</p><p className="text-sm font-semibold text-[#F5F5F7]">{done} de {total}</p></div>
+        <div className="text-center"><p className="text-xs uppercase tracking-[.16em] text-[#8E8E93]">Treino {type} · {done} de {total}</p><p className="mt-1 font-mono text-sm font-semibold tabular-nums text-[#F5F5F7]" aria-label={`Tempo de treino ${formatDuration(elapsedWorkoutSeconds)}`}>{formatDuration(elapsedWorkoutSeconds)}</p></div>
         <span className={`h-2 w-2 rounded-full ${online ? 'bg-[#C8FF3D]' : 'bg-amber-400'}`} title={online ? 'Online' : 'Offline'} />
       </div>
 
       <header className="mb-6">
         <h1 className="text-3xl font-semibold tracking-tight text-[#F5F5F7]">{workout.title}</h1>
-        {workout.description && <p className="mt-2 text-sm text-[#8E8E93]">{workout.description}</p>}
+        {workout.description && !workout.enrollment && <p className="mt-2 text-sm text-[#8E8E93]">{workout.description}</p>}
         {workout.enrollment && <p className="mt-2 text-xs font-semibold uppercase tracking-[.12em] text-[#C8FF3D]">{workout.program?.name} · Semana {workout.enrollment?.current_week || workout.phase?.week_start || 1}{workout.phase?.name ? ` · ${workout.phase.name}` : ''}</p>}
         {draftStatus && <p className="mt-3 text-xs text-[#8E8E93]" role="status">{draftStatus}</p>}
       </header>
@@ -398,11 +428,10 @@ export default function Workout() {
         Detalhes do treino {showDetails ? <ChevronUp size={18} /> : <ChevronDown size={18} className="text-[#8E8E93]" />}
       </button>
       {showDetails && (
-        <div className="mb-6 grid gap-3 bg-[#141416] p-4 md:grid-cols-3">
+        <div className="mb-6 grid gap-3 bg-[#141416] p-4 md:grid-cols-2">
           <label><span className="mb-1 block text-xs text-[#8E8E93]">Academia</span><input value={gymName} onChange={(event) => { const value = event.target.value; setGymName(value); persistLocal(exerciseValues, running, { gymName: value }) }} maxLength={80} placeholder="Ex: Smart Fit Centro" /></label>
           <label><span className="mb-1 block text-xs text-[#8E8E93]">Data</span><input type="date" value={date} onChange={(event) => { const value = event.target.value; setDate(value); persistLocal(exerciseValues, running, { date: value }) }} /></label>
-          <label><span className="mb-1 block text-xs text-[#8E8E93]">Duração</span><input type="number" min="0" value={durationMinutes} onChange={(event) => { const value = event.target.value; setDurationMinutes(value); persistLocal(exerciseValues, running, { durationMinutes: value }) }} /></label>
-          <label className="md:col-span-3"><span className="mb-1 block text-xs text-[#8E8E93]">Observação geral</span><textarea rows="2" maxLength={500} value={notes} onChange={(event) => { const value = event.target.value; setNotes(value); persistLocal(exerciseValues, running, { notes: value }) }} placeholder="Como foi o treino?" /></label>
+          <label className="md:col-span-2"><span className="mb-1 block text-xs text-[#8E8E93]">Observação geral</span><textarea rows="2" maxLength={500} value={notes} onChange={(event) => { const value = event.target.value; setNotes(value); persistLocal(exerciseValues, running, { notes: value }) }} placeholder="Como foi o treino?" /></label>
         </div>
       )}
 

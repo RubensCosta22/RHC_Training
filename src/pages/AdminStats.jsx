@@ -58,9 +58,9 @@ export default function AdminStats() {
   return (
     <div className="page-enter pb-10">
       <PageHeader
-        eyebrow="Administracao · Performance"
+        eyebrow="Administração · Performance"
         title="Centro geral."
-        subtitle="Uma leitura unica da consistencia, volume e atividade de todos os perfis supervisionados."
+        subtitle="Uma leitura única da consistência, volume e atividade de todos os perfis supervisionados."
         action={<Link to="/admin" className="btn-secondary inline-flex items-center gap-2"><ArrowLeft size={16}/> Central RHC</Link>}
       />
 
@@ -72,7 +72,7 @@ export default function AdminStats() {
         <div className="pr-4"><Metric icon={Dumbbell} label="Treinos" value={summary.totalWorkouts} detail="no periodo selecionado"/></div>
         <div className="pl-4 lg:px-4"><Metric icon={UsersRound} label="Perfis ativos" value={`${summary.activeProfiles}/${summary.profiles}`} detail={`${summary.inactiveProfiles} sem atividade no periodo`}/></div>
         <div className="pr-4 lg:px-4"><Metric icon={Activity} label="Volume total" value={`${formatNumber(summary.totalVolume)} kg`} detail="somando todos os perfis"/></div>
-        <div className="pl-4"><Metric icon={Timer} label="Duracao media" value={`${summary.averageDuration} min`} detail="por sessao registrada"/></div>
+        <div className="pl-4"><Metric icon={Timer} label="Duração média" value={`${summary.averageDuration} min`} detail="por sessão registrada"/></div>
       </section>
 
       {!summary.totalWorkouts ? <EmptyState title="Nenhum treino neste periodo" description="Troque o filtro ou aguarde novos registros para visualizar a atividade geral." icon={Dumbbell}/> : <>

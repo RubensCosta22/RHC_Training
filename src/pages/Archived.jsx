@@ -74,7 +74,7 @@ export default function Archived() {
       <PageHeader
         eyebrow="Seguranca dos dados"
         title="Arquivados"
-        subtitle="Restaure itens sem perder o historico."
+        subtitle="Restaure itens sem perder o histórico."
       />
 
       <section className="card mb-4 grid gap-3 sm:grid-cols-[1fr_180px]">

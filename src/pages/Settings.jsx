@@ -32,7 +32,7 @@ export default function Settings() {
     try {
       const result = await uploadProfileAvatar(profileId, avatarFile)
       setProfile((current)=>({ ...current, avatarSignedUrl:result.signedUrl, avatar_url:result.path }))
-      setAvatarFile(null); setAvatarPreview(''); setMessage('Foto de perfil atualizada com seguranca.')
+      setAvatarFile(null); setAvatarPreview(''); setMessage('Foto de perfil atualizada com segurança.')
     } catch (error) { setMessage(friendlyError(error)) } finally { setUploadingAvatar(false) }
   }
 
@@ -59,14 +59,14 @@ export default function Settings() {
 
   return (
     <div>
-      <PageHeader eyebrow="Configuracoes" title="Dados e seguranca" subtitle="Controle, protecao e portabilidade do seu historico." />
+      <PageHeader eyebrow="Configurações" title="Dados e segurança" subtitle="Controle, proteção e portabilidade do seu histórico." />
 
       <section className="mb-8 flex flex-col gap-5 border-y border-[#272a2f] py-6 sm:flex-row sm:items-center">
         <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-full bg-[#141619]">
           {(avatarPreview||profile?.avatarSignedUrl)?<img src={avatarPreview||profile.avatarSignedUrl} alt={`Foto de ${profile?.name||'perfil'}`} className="h-full w-full object-cover"/>:<span className="grid h-full w-full place-items-center text-3xl font-black text-[#c8ff3d]">{profile?.name?.[0]||'R'}</span>}
           <span className="absolute bottom-1 right-1 grid h-7 w-7 place-items-center rounded-full bg-[#c8ff3d] text-[#111400]"><Camera size={14}/></span>
         </div>
-        <div className="flex-1"><p className="rhc-kicker mb-2">Identidade</p><h2 className="text-xl font-[680]">Foto de perfil</h2><p className="mt-1 text-sm text-[#92979f]">Imagem privada, JPG, PNG ou WebP de ate 3 MB.</p></div>
+        <div className="flex-1"><p className="rhc-kicker mb-2">Identidade</p><h2 className="text-xl font-[680]">Foto de perfil</h2><p className="mt-1 text-sm text-[#92979f]">Imagem privada, JPG, PNG ou WebP de até 3 MB.</p></div>
         <div className="flex flex-wrap gap-2"><label className="btn-secondary inline-flex cursor-pointer items-center gap-2"><Camera size={17}/> Escolher foto<input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={chooseAvatar}/></label>{avatarFile&&<button type="button" className="btn-primary" disabled={uploadingAvatar} onClick={saveAvatar}>{uploadingAvatar?'Enviando...':'Salvar foto'}</button>}</div>
       </section>
 
@@ -75,7 +75,7 @@ export default function Settings() {
           <UsersRound size={18} /> Grupo familiar
         </Link>
         <Link to={`/archived/${profileId}`} className="btn-secondary flex w-full items-center justify-center gap-2">
-          <Archive size={18} /> Arquivados e restauracao
+          <Archive size={18} /> Arquivados e restauração
         </Link>
         <button onClick={() => run(() => exportHistoryCsv(profileId))} className="btn-secondary flex w-full items-center justify-center gap-2"><Download size={18} /> Exportar CSV</button>
         <button onClick={() => run(() => exportHistoryJson(profileId))} className="btn-secondary flex w-full items-center justify-center gap-2"><FileJson size={18} /> Exportar JSON</button>

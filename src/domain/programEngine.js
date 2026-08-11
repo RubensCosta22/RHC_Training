@@ -28,8 +28,8 @@ export function evaluateLoadProgression({
       action: loadIncrement ? 'increase' : 'hold',
       suggestedLoad,
       reason: loadIncrement
-        ? 'Meta concluida dentro da faixa de repeticoes e do RPE alvo.'
-        : 'Meta concluida; incremento da maquina ainda nao foi configurado.'
+        ? 'Meta concluída dentro da faixa de repetições e do RPE alvo.'
+        : 'Meta concluída; incremento da máquina ainda não foi configurado.'
     }
   }
 
@@ -38,7 +38,7 @@ export function evaluateLoadProgression({
     return {
       action: 'regress',
       suggestedLoad: roundLoad(reduced, loadIncrement),
-      reason: 'Meta nao atingida em exposicoes consecutivas; regressao sugerida.'
+      reason: 'Meta não atingida em exposições consecutivas; regressão sugerida.'
     }
   }
 
@@ -66,14 +66,14 @@ export function evaluateDoubleProgression({
     return {
       action: 'increase',
       suggestedLoad: roundLoad(load + Number(loadIncrement), loadIncrement),
-      reason: 'Topo da faixa atingido em todas as series com RPE controlado.'
+      reason: 'Topo da faixa atingido em todas as séries com RPE controlado.'
     }
   }
 
   return {
     action: 'hold',
     suggestedLoad: load,
-    reason: 'Permaneça na carga atual ate atingir o topo da faixa em todas as series.'
+    reason: 'Permaneça na carga atual até atingir o topo da faixa em todas as séries.'
   }
 }
 

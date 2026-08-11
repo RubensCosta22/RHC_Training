@@ -70,7 +70,7 @@ export default function ResetPassword() {
         {!hasRecoverySession ? (
           <div className="text-center">
             <p className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-100">
-              Este link e invalido ou expirou. Solicite um novo link de recuperacao.
+              Este link é inválido ou expirou. Solicite um novo link de recuperação.
             </p>
             <Link to="/login" className="btn-secondary mt-4 inline-flex">Voltar ao login</Link>
           </div>

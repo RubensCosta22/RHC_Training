@@ -40,7 +40,7 @@ export default function Photos() {
   }
 
   async function archiveItem(photo) {
-    if (!window.confirm(`Arquivar esta foto de ${photo.date}? O arquivo nao sera apagado.`)) return
+    if (!window.confirm(`Arquivar esta foto de ${photo.date}? O arquivo não será apagado.`)) return
 
     setMessage('')
     try {
@@ -54,7 +54,7 @@ export default function Photos() {
 
   return (
     <div>
-      <PageHeader eyebrow="Registro visual" title="Evolucao visual" subtitle="Compare sua jornada com privacidade e perspectiva." />
+      <PageHeader eyebrow="Registro visual" title="Evolução visual" subtitle="Compare sua jornada com privacidade e perspectiva." />
 
       <form onSubmit={submit} className="card mb-5 grid gap-3 md:grid-cols-3">
         <label><span className="mb-1 block text-sm text-slate-400">Data</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>

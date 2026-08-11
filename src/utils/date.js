@@ -14,3 +14,15 @@ export function parseLocalDate(value) {
 
   return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
 }
+
+export function formatShortDate(value, fallback = 'sem registro') {
+  if (!value) return fallback
+
+  const date = parseLocalDate(value)
+  if (Number.isNaN(date.getTime())) return fallback
+
+  return new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit',
+    month: 'short'
+  }).format(date).replace('.', '')
+}

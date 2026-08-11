@@ -57,7 +57,7 @@ export async function getPostLoginPath() {
   const profiles = data || []
   if (profiles.length === 1) return `/dashboard/${profiles[0].id}`
   if (profiles.length === 0) throw new Error('Nenhum perfil foi associado a esta conta. Entre em contato com o administrador.')
-  throw new Error('Mais de um perfil foi associado a esta conta. O acesso foi bloqueado por seguranca; entre em contato com o administrador.')
+  throw new Error('Mais de um perfil foi associado a esta conta. O acesso foi bloqueado por segurança; entre em contato com o administrador.')
 }
 
 export async function associateProfileEmail(profileId, email) {

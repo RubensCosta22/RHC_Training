@@ -27,7 +27,7 @@ export function normalizeEmail(value = '') {
 
 export function validateUuid(value, fieldLabel = 'identificador') {
   const id = String(value || '').trim()
-  if (!UUID_PATTERN.test(id)) throw new Error(`${fieldLabel} invalido.`)
+  if (!UUID_PATTERN.test(id)) throw new Error(`${fieldLabel} inválido.`)
   return id
 }
 
@@ -89,7 +89,7 @@ export function validateNewPassword(password, confirmation) {
     throw new Error('Use ao menos uma letra maiuscula, uma minuscula e um numero.')
   }
   if (value !== confirmation) {
-    throw new Error('As senhas nao coincidem.')
+    throw new Error('As senhas não coincidem.')
   }
 
   return value
