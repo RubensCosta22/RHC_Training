@@ -1,6 +1,10 @@
 import { supabase } from '../lib/supabaseClient'
 import { validateMeasurementInput, validateUuid } from '../utils/validation'
 
+function normalizeMeasurement(row) {
+  return row ? { ...row, date: row.measured_on } : row
+}
+
 export async function listMeasurements(profileId) {
   const cleanProfileId = validateUuid(profileId, 'Perfil')
   const { data, error } = await supabase
@@ -8,26 +12,19 @@ export async function listMeasurements(profileId) {
     .select('*')
     .eq('profile_id', cleanProfileId)
     .is('archived_at', null)
-    .order('date', { ascending: false })
+    .order('measured_on', { ascending: false })
   if (error) throw error
-  return data || []
+  return (data || []).map(normalizeMeasurement)
 }
 
 export async function saveMeasurement(profileId, values) {
   const cleanProfileId = validateUuid(profileId, 'Perfil')
-  const { data: userData, error: userError } = await supabase.auth.getUser()
-  if (userError) throw userError
-  if (!userData.user?.id) throw new Error('Faça login novamente para salvar medidas.')
-  const { data: profile, error: profileError } = await supabase.from('profiles').select('user_id').eq('id', cleanProfileId).single()
-  if (profileError) throw profileError
   const clean = validateMeasurementInput(values)
-
   const { data, error } = await supabase
     .from('body_measurements')
     .insert({
-      user_id: profile.user_id,
       profile_id: cleanProfileId,
-      date: clean.date,
+      measured_on: clean.date,
       weight: clean.weight,
       waist: clean.waist,
       chest: clean.chest,
@@ -38,9 +35,8 @@ export async function saveMeasurement(profileId, values) {
     })
     .select('*')
     .single()
-
   if (error) throw error
-  return data
+  return normalizeMeasurement(data)
 }
 
 export async function archiveMeasurement(measurementId) {
@@ -49,6 +45,5 @@ export async function archiveMeasurement(measurementId) {
     .from('body_measurements')
     .update({ archived_at: new Date().toISOString() })
     .eq('id', cleanMeasurementId)
-
   if (error) throw error
 }
