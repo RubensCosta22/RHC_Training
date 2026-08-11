@@ -11,12 +11,6 @@ function sanitizeDraftPayload(payload) {
   return safe
 }
 
-function createConflictError() {
-  const conflict = new Error('O treino foi atualizado em outro dispositivo.')
-  conflict.code = 'DRAFT_CONFLICT'
-  return conflict
-}
-
 export function remoteRecordToWorkoutDraft(record) {
   if (!record) return null
   return {
@@ -66,58 +60,23 @@ export async function getLatestRemoteWorkoutDraft({ profileId, workoutType, prog
   return data || null
 }
 
-export async function upsertRemoteWorkoutDraft(draft, expectedVersion = null) {
+export async function upsertRemoteWorkoutDraft(draft) {
   const requestId = createRequestId()
   const { data: authData, error: authError } = await supabase.auth.getUser()
   if (authError) throw authError
   const userId = authData.user?.id
   if (!userId) throw new Error('Faça login novamente para sincronizar o treino.')
 
-  const record = {
-    id: draft.draftId,
-    profile_id: draft.profileId,
-    workout_code: draft.workoutType,
-    program_enrollment_id: draft.programEnrollmentId || null,
-    plan_fingerprint: draft.planFingerprint || null,
-    payload: sanitizeDraftPayload(draft.payload),
-    version: Math.max(1, Number(draft.version || 1)),
-    client_operation_id: draft.draftId,
-    updated_at: new Date().toISOString()
-  }
-
-  if (expectedVersion != null) {
-    const nextVersion = Number(expectedVersion) + 1
-    const { data, error } = await supabase
-      .from('workout_drafts')
-      .update({
-        profile_id: record.profile_id,
-        workout_code: record.workout_code,
-        program_enrollment_id: record.program_enrollment_id,
-        plan_fingerprint: record.plan_fingerprint,
-        payload: record.payload,
-        version: nextVersion,
-        updated_at: record.updated_at
-      })
-      .eq('id', draft.draftId)
-      .eq('profile_id', draft.profileId)
-      .eq('version', expectedVersion)
-      .is('consumed_session_id', null)
-      .select('*')
-      .maybeSingle()
-
-    if (error) throw error
-    if (!data) throw createConflictError()
-    return data
-  }
-
-  const { data, error } = await supabase
-    .from('workout_drafts')
-    .insert(record)
-    .select('*')
-    .single()
+  const { data, error } = await supabase.rpc('save_workout_draft_v2', {
+    p_draft_id: draft.draftId,
+    p_profile_id: draft.profileId,
+    p_workout_code: draft.workoutType,
+    p_program_enrollment_id: draft.programEnrollmentId || null,
+    p_plan_fingerprint: draft.planFingerprint || null,
+    p_payload: sanitizeDraftPayload(draft.payload)
+  })
 
   if (error) {
-    if (error.code === '23505') throw createConflictError()
     logger.warn('workout_draft.remote_save_failed', {
       requestId,
       userId,
@@ -133,7 +92,7 @@ export async function upsertRemoteWorkoutDraft(draft, expectedVersion = null) {
     userId,
     profileId: draft.profileId,
     workoutType: draft.workoutType,
-    version: data.version
+    version: data?.version
   })
   return data
 }
