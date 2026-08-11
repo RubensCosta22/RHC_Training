@@ -32,7 +32,7 @@ export function createWorkoutDraftIdentity(input) {
     planFingerprint: input.planFingerprint || null,
     version: Number(input.version || 1),
     createdAt: input.createdAt || new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    updatedAt: input.updatedAt || new Date().toISOString()
   }
 }
 
@@ -51,7 +51,7 @@ function scheduleRemoteDraftSync(record, key) {
       if (!latest?.draftId || latest.draftId !== record.draftId) return
 
       const { upsertRemoteWorkoutDraft } = await import('./workoutDraftService')
-      const remote = await upsertRemoteWorkoutDraft(latest, latest.remoteVersion ?? null)
+      const remote = await upsertRemoteWorkoutDraft(latest)
 
       const currentRaw = localStorage.getItem(key)
       if (!currentRaw) return
@@ -61,7 +61,8 @@ function scheduleRemoteDraftSync(record, key) {
       localStorage.setItem(key, JSON.stringify({
         ...current,
         remoteVersion: Number(remote.version || current.remoteVersion || 1),
-        version: Math.max(Number(current.version || 1), Number(remote.version || 1))
+        version: Math.max(Number(current.version || 1), Number(remote.version || 1)),
+        updatedAt: remote.updated_at || current.updatedAt
       }))
     } catch (error) {
       logger.warn('workout_draft.remote_debounced_sync_failed', {
