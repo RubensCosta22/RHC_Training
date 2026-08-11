@@ -31,45 +31,19 @@ alter table public.profile_weekly_schedule enable row level security;
 revoke all on public.profile_invitations, public.profile_weekly_schedule from anon, authenticated;
 grant select,insert,update,delete on public.profile_invitations to authenticated;
 grant select,insert,update,delete on public.profile_weekly_schedule to authenticated;
-grant insert on public.app_users to authenticated;
-grant insert on public.profile_access to authenticated;
 grant insert on public.profiles to authenticated;
 
+-- Invitation administration remains direct but admin-only through RLS.
 create policy profile_invitations_admin_all on public.profile_invitations
 for all to authenticated
 using (private.is_admin())
 with check (private.is_admin());
 
+-- A prospective owner may only see their own pending invite. Claiming is done
+-- atomically through claim_profile_invitation(), never by direct table writes.
 create policy profile_invitations_self_read on public.profile_invitations
 for select to authenticated
 using (status='pending' and email = lower(trim(coalesce(auth.jwt()->>'email',''))));
-
-create policy profile_invitations_self_claim on public.profile_invitations
-for update to authenticated
-using (status='pending' and email = lower(trim(coalesce(auth.jwt()->>'email',''))))
-with check (status='claimed' and claimed_by = auth.uid() and email = lower(trim(coalesce(auth.jwt()->>'email',''))));
-
-create policy app_users_claim_invite on public.app_users
-for insert to authenticated
-with check (
-  user_id = auth.uid() and role='user' and status='active'
-  and exists (
-    select 1 from public.profile_invitations i
-    where i.status='pending' and i.email = lower(trim(coalesce(auth.jwt()->>'email','')))
-  )
-);
-
-create policy profile_access_claim_invite on public.profile_access
-for insert to authenticated
-with check (
-  user_id = auth.uid()
-  and exists (
-    select 1 from public.profile_invitations i
-    where i.profile_id=profile_access.profile_id
-      and i.status='pending'
-      and i.email=lower(trim(coalesce(auth.jwt()->>'email','')))
-  )
-);
 
 create policy profiles_admin_insert on public.profiles
 for insert to authenticated with check (private.is_admin());
@@ -78,6 +52,98 @@ create policy weekly_schedule_rw on public.profile_weekly_schedule
 for all to authenticated
 using (private.can_access_profile(profile_id) or private.can_admin_access_profile(profile_id))
 with check (private.can_access_profile(profile_id) or private.can_admin_access_profile(profile_id));
+
+-- Atomic, fail-closed invitation claim. The private implementation is not
+-- exposed through PostgREST; the public wrapper is SECURITY INVOKER.
+create or replace function private.claim_profile_invitation_impl()
+returns uuid
+language plpgsql
+security definer
+set search_path=pg_catalog,public,private
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_email text := lower(trim(coalesce(auth.jwt()->>'email','')));
+  v_invite public.profile_invitations;
+  v_existing public.app_users;
+  v_existing_profile uuid;
+  v_pending_count integer;
+begin
+  if v_uid is null or v_email = '' then
+    raise exception 'authenticated user with email required' using errcode='42501';
+  end if;
+
+  select count(*) into v_pending_count
+  from public.profile_invitations
+  where status='pending' and email=v_email;
+
+  if v_pending_count = 0 then
+    return null;
+  end if;
+  if v_pending_count > 1 then
+    raise exception 'multiple pending invitations for this email';
+  end if;
+
+  select * into v_invite
+  from public.profile_invitations
+  where status='pending' and email=v_email
+  for update;
+
+  select * into v_existing from public.app_users where user_id=v_uid;
+  if found then
+    if v_existing.role <> 'user' or v_existing.status <> 'active' then
+      raise exception 'invitation requires an active normal user' using errcode='42501';
+    end if;
+  else
+    insert into public.app_users(user_id,role,status)
+    values(v_uid,'user','active');
+  end if;
+
+  select profile_id into v_existing_profile
+  from public.profile_access
+  where user_id=v_uid;
+
+  if v_existing_profile is not null and v_existing_profile <> v_invite.profile_id then
+    raise exception 'user already mapped to another profile' using errcode='23505';
+  end if;
+
+  if exists (
+    select 1 from public.profile_access
+    where profile_id=v_invite.profile_id and user_id<>v_uid
+  ) then
+    raise exception 'profile already mapped to another user' using errcode='23505';
+  end if;
+
+  insert into public.profile_access(user_id,profile_id)
+  values(v_uid,v_invite.profile_id)
+  on conflict(user_id) do nothing;
+
+  update public.profile_invitations
+  set status='claimed',claimed_by=v_uid,claimed_at=now(),updated_at=now()
+  where id=v_invite.id and status='pending';
+
+  return v_invite.profile_id;
+end;
+$$;
+
+revoke all on function private.claim_profile_invitation_impl() from public,anon;
+grant execute on function private.claim_profile_invitation_impl() to authenticated;
+
+create or replace function public.claim_profile_invitation()
+returns uuid
+language sql
+security invoker
+set search_path=pg_catalog,public,private
+as $$
+  select private.claim_profile_invitation_impl();
+$$;
+
+revoke all on function public.claim_profile_invitation() from public,anon;
+grant execute on function public.claim_profile_invitation() to authenticated;
+
+-- Explicitly keep direct identity/access provisioning unavailable to normal clients.
+revoke insert on public.app_users from authenticated;
+revoke insert on public.profile_access from authenticated;
 
 create unique index if not exists program_exposures_one_per_session_exercise
 on public.program_exercise_exposures(workout_session_id, program_exercise_id)
