@@ -3,6 +3,7 @@ import { logger, createRequestId } from '../lib/observability/logger'
 import { calculateVolume, getProgressionStatus } from '../utils/progression'
 import { getPendingWorkouts, replacePendingWorkouts } from '../utils/storage'
 import { parseLocalDate, toLocalDateKey } from '../utils/date'
+import { calculateRollingVolumeMetrics } from '../utils/rollingMetrics'
 import { saveWorkoutSessionV2 } from './workoutCompletionV2Service'
 
 let pendingSyncPromise = null
@@ -147,6 +148,7 @@ export async function getDashboardSummary(profileId) {
   const weekCount = normalized.filter((session) => parseLocalDate(session.date) >= startOfWeek).length
   const monthCount = normalized.filter((session) => parseLocalDate(session.date) >= startOfMonth).length
   const totalVolume = normalized.reduce((acc, session) => acc + Number(session.total_volume || 0), 0)
+  const rollingVolume = calculateRollingVolumeMetrics(normalized, today)
   const streak = calculateStreak(normalized.map((session) => session.date))
   const bestStreak = calculateBestStreak(normalized.map((session) => session.date))
 
@@ -165,7 +167,18 @@ export async function getDashboardSummary(profileId) {
   }
   const lastMeasurement = lastMeasurementRow ? { ...lastMeasurementRow, date: lastMeasurementRow.measured_on } : null
 
-  return { lastWorkout, weekCount, monthCount, totalVolume, currentStreak: streak, bestStreak, lastMeasurement }
+  return {
+    lastWorkout,
+    weekCount,
+    monthCount,
+    totalVolume,
+    volumeLast30Days: rollingVolume.currentVolume,
+    volumePrevious30Days: rollingVolume.previousVolume,
+    volumeChangePercent: rollingVolume.changePercent,
+    currentStreak: streak,
+    bestStreak,
+    lastMeasurement
+  }
 }
 
 function dayKey(date) {

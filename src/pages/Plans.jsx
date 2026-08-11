@@ -51,7 +51,7 @@ export default function Plans() {
 
   async function save() {
     setSaving(true); setMessage('')
-    try { const saved=await savePlan(profile.id, plan); setPlans((items)=>items.map((item)=>item.workout_type===selectedType?saved:item)); setMessage('Plano salvo. A mudanca vale para os proximos treinos.') }
+    try { const saved=await savePlan(profile.id, plan); setPlans((items)=>items.map((item)=>item.workout_type===selectedType?saved:item)); setMessage('Plano salvo. A mudança vale para os próximos treinos.') }
     catch(error){ setMessage(friendlyError(error)) } finally { setSaving(false) }
   }
 
@@ -59,7 +59,7 @@ export default function Plans() {
 
   async function publishStrengthProgram() {
     if (!profile || !strengthProgram) return
-    const confirmed = window.confirm(`Aplicar ${strengthProgram.name} ao perfil ${profile.name}? O ciclo anterior sera preservado no historico.`)
+    const confirmed = window.confirm(`Aplicar ${strengthProgram.name} ao perfil ${profile.name}? O ciclo anterior será preservado no histórico.`)
     if (!confirmed) return
 
     setPublishing(true)
@@ -68,7 +68,7 @@ export default function Plans() {
       await applyProgramToProfile(profile.id, strengthProgram.slug)
       const activeProgram = await getProfileProgramState(profile.id)
       setProgramState(activeProgram)
-      setMessage(`${strengthProgram.name} aplicado a ${profile.name}. O usuario ja pode atualizar o app para usar o novo programa.`)
+      setMessage(`${strengthProgram.name} aplicado a ${profile.name}. O usuário já pode atualizar o app para usar o novo programa.`)
     } catch (error) {
       setMessage(friendlyError(error))
     } finally {
@@ -77,7 +77,7 @@ export default function Plans() {
   }
 
   return <div>
-    <PageHeader eyebrow="Administracao" title="Planos de treino" subtitle="Edite ou publique os proximos treinos sem alterar o historico concluido." />
+    <PageHeader eyebrow="Administração" title="Planos de treino" subtitle="Edite ou publique os próximos treinos sem alterar o histórico concluído." />
     <section className="card mb-4">
       <label className="text-sm text-slate-300">Perfil
         <select className="mt-1" value={profile?.id || ''} onChange={(event)=>setProfile(profiles.find((item)=>item.id===event.target.value))}>{profiles.map((item)=><option value={item.id} key={item.id}>{item.name}</option>)}</select>
@@ -97,7 +97,7 @@ export default function Plans() {
           {publishing ? 'Aplicando...' : isStrengthActive ? 'Reaplicar programa' : 'Aplicar programa'}
         </button>
       </div>
-      <p className="mt-4 border-t border-[#272a2f] pt-4 text-xs text-[#62676f]">A publicacao preserva sessoes, cargas, recordes, medidas e fotos do ciclo anterior.</p>
+      <p className="mt-4 border-t border-[#272a2f] pt-4 text-xs text-[#62676f]">A publicação preserva sessões, cargas, recordes, medidas e fotos do ciclo anterior.</p>
     </section>}
 
     {plan && <>
@@ -120,7 +120,7 @@ export default function Plans() {
         </div>
         <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={exercise.active!==false} onChange={(event)=>patchExercise(index,{active:event.target.checked})}/> Exercicio ativo</label>
       </section>)}
-      <button className="btn-secondary mb-3 flex w-full items-center justify-center gap-2" onClick={()=>patchPlan({exercises:[...plan.exercises,emptyExercise()]})}><Plus size={18}/> Adicionar exercicio</button>
+      <button className="btn-secondary mb-3 flex w-full items-center justify-center gap-2" onClick={()=>patchPlan({exercises:[...plan.exercises,emptyExercise()]})}><Plus size={18}/> Adicionar exercício</button>
       <button className="btn-primary flex w-full items-center justify-center gap-2" disabled={saving} onClick={save}><Save size={18}/>{saving?'Salvando...':'Salvar plano'}</button>
     </>}
     {message && <p className="mt-4 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-sm">{message}</p>}

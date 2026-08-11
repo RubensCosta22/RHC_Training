@@ -70,7 +70,7 @@ export async function uploadProfileAvatar(profileId, file) {
   const cleanProfileId = validateUuid(profileId, 'Perfil')
   if (!file) throw new Error('Selecione uma foto.')
   if (!ALLOWED_AVATAR_TYPES.has(file.type)) throw new Error('Use uma imagem JPG, PNG ou WebP.')
-  if (file.size > 3 * 1024 * 1024) throw new Error('Use uma imagem de ate 3 MB.')
+  if (file.size > 3 * 1024 * 1024) throw new Error('Use uma imagem de até 3 MB.')
 
   const { data: current, error: currentError } = await supabase
     .from('profiles')

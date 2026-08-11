@@ -19,7 +19,7 @@ describe('validation', () => {
 
   it('valida UUIDs usados em RPCs sensiveis', () => {
     expect(validateUuid('550e8400-e29b-41d4-a716-446655440000')).toBe('550e8400-e29b-41d4-a716-446655440000')
-    expect(() => validateUuid("' OR 1=1 --", 'Perfil')).toThrow('Perfil invalido')
+    expect(() => validateUuid("' OR 1=1 --", 'Perfil')).toThrow('Perfil inválido')
   })
 
   it('mantem academia obrigatoria', () => {
@@ -30,7 +30,7 @@ describe('validation', () => {
   it('valida uma nova senha forte e confirmada', () => {
     expect(validateNewPassword('Treino2026', 'Treino2026')).toBe('Treino2026')
     expect(() => validateNewPassword('fraca', 'fraca')).toThrow('8 caracteres')
-    expect(() => validateNewPassword('Treino2026', 'Outra2026')).toThrow('nao coincidem')
+    expect(() => validateNewPassword('Treino2026', 'Outra2026')).toThrow('não coincidem')
   })
 
   it('traduz bloqueio por excesso de tentativas', () => {

@@ -50,7 +50,7 @@ export async function listArchivedItems(profileId) {
 const allowedTables = new Set(['workout_sessions', 'body_measurements', 'progress_photos'])
 
 export async function restoreArchivedItem(table, itemId) {
-  if (!allowedTables.has(table)) throw new Error('Tipo de item invalido.')
+  if (!allowedTables.has(table)) throw new Error('Tipo de item inválido.')
   const payload = table === 'workout_sessions'
     ? { archived_at: null, updated_at: new Date().toISOString() }
     : { archived_at: null }

@@ -9,7 +9,7 @@ const MAX_BACKUP_DEPTH = 12
 const FORBIDDEN_JSON_KEYS = new Set(['__proto__', 'prototype', 'constructor'])
 
 function assertSafeJsonTree(value, depth = 0) {
-  if (depth > MAX_BACKUP_DEPTH) throw new Error('Backup invalido: estrutura muito profunda.')
+  if (depth > MAX_BACKUP_DEPTH) throw new Error('Backup inválido: estrutura muito profunda.')
   if (value === null || typeof value !== 'object') return
 
   if (Array.isArray(value)) {
@@ -18,7 +18,7 @@ function assertSafeJsonTree(value, depth = 0) {
   }
 
   for (const [key, item] of Object.entries(value)) {
-    if (FORBIDDEN_JSON_KEYS.has(key)) throw new Error('Backup invalido: estrutura nao permitida.')
+    if (FORBIDDEN_JSON_KEYS.has(key)) throw new Error('Backup inválido: estrutura não permitida.')
     assertSafeJsonTree(item, depth + 1)
   }
 }
@@ -64,16 +64,16 @@ export async function exportHistoryJson(profileId) {
 export async function importBackupJson(profileId, file) {
   assertJsonFile(file)
   if (file.size > MAX_BACKUP_BYTES) {
-    throw new Error('Backup muito grande. Use um arquivo de ate 10 MB.')
+    throw new Error('Backup muito grande. Use um arquivo de até 10 MB.')
   }
 
   const text = await file.text()
   const backup = JSON.parse(text)
   assertSafeJsonTree(backup)
 
-  if (!backup || ![1, 2].includes(backup.version)) throw new Error('Backup invalido.')
+  if (!backup || ![1, 2].includes(backup.version)) throw new Error('Backup inválido.')
   if (!Array.isArray(backup.sessions) || !Array.isArray(backup.measurements)) {
-    throw new Error('Backup invalido: listas de dados ausentes.')
+    throw new Error('Backup inválido: listas de dados ausentes.')
   }
   if (backup.sessions.length > MAX_BACKUP_RECORDS || backup.measurements.length > MAX_BACKUP_RECORDS) {
     throw new Error('Backup excede o limite seguro de registros.')

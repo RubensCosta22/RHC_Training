@@ -169,7 +169,7 @@ export function calculateProgramSuggestion(exercise, value, previousFailures = 0
     failuresBeforeRegression: exercise.failuresBeforeRegression,
     regressionPercent: exercise.regressionPercent
   })
-  return { action: 'manual', suggestedLoad: Number(value.weight || 0), reason: 'Progressao manual configurada para este exercicio.' }
+  return { action: 'manual', suggestedLoad: Number(value.weight || 0), reason: 'Progressão manual configurada para este exercício.' }
 }
 
 export async function saveProgramExposure({ profileId, workoutSessionId, exercise, value, suggestion }) {

@@ -136,10 +136,6 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
           <div className="mt-3"><RestTimer seconds={Number(exercise.rest || 60)} autoStartKey={value.restTimerKey} /></div>
 
           <div className="mt-4 divide-y divide-[#2A2A2E] border-y border-[#2A2A2E]">
-            <button type="button" className="flex w-full items-center justify-between py-3 text-left text-sm font-semibold text-[#F5F5F7]" onClick={() => update({ showProgression: !value.showProgression })}>Evolução de carga <ChevronDown size={18} className="text-[#8E8E93]" /></button>
-            {value.showProgression && <div className="pb-3 text-sm text-[#8E8E93]">{hasPreviousLoad ? `Última carga: ${record.last_weight} kg` : 'Sem carga anterior'}{hasBestLoad ? ` · Melhor: ${record.best_weight} kg` : ''}</div>}
-            <button type="button" className="flex w-full items-center justify-between py-3 text-left text-sm font-semibold text-[#F5F5F7]" onClick={() => update({ showNotes: !value.showNotes })}>Minhas anotações <ChevronDown size={18} className="text-[#8E8E93]" /></button>
-            {value.showNotes && <textarea rows="2" value={value.notes || ''} onChange={(event) => update({ notes: event.target.value })} placeholder="Anotação deste exercício" className="mb-3 w-full" />}
             {alternatives.length > 0 && (
               <>
                 <button type="button" onClick={() => setShowSwapOptions((current) => !current)} className="flex w-full items-center justify-between py-3 text-left text-sm font-semibold text-[#F5F5F7]">

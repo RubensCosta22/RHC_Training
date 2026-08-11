@@ -75,7 +75,7 @@ export default function History() {
 
   async function archiveSession(session) {
     const confirmed = window.confirm(
-      `Arquivar o treino ${session.workout_type} de ${session.date}? Voce podera restaura-lo depois.`
+      `Arquivar o treino ${session.workout_type} de ${session.date}? Você poderá restaurá-lo depois.`
     )
     if (!confirmed) return
 
@@ -97,7 +97,7 @@ export default function History() {
 
   return (
     <div>
-      <PageHeader eyebrow="Historico" title="Treinos feitos" subtitle="Sua trajetoria, sessao por sessao." />
+      <PageHeader eyebrow="Histórico" title="Treinos feitos" subtitle="Sua trajetória, sessão por sessão." />
 
       <form onSubmit={applyFilters} className="card mb-4 grid gap-3 md:grid-cols-4">
         <label>
@@ -137,7 +137,7 @@ export default function History() {
         </div>
       )}
 
-      {loading && <p className="text-slate-400">Carregando historico...</p>}
+      {loading && <p className="text-slate-400">Carregando histórico...</p>}
       {error && <p className="rounded-2xl border border-red-400/30 bg-red-400/10 p-3 text-red-100">{error}</p>}
       {!loading && !sessions.length && <p className="text-slate-400">Nenhum treino encontrado.</p>}
 

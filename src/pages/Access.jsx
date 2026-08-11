@@ -27,23 +27,23 @@ export default function Access() {
     try {
       await associateProfileEmail(profile.id, emails[profile.id] ?? profile.invitation_email ?? '')
       await load()
-      setMessage(`${profile.name}: convite salvo. O vinculo 1:1 sera ativado quando o titular entrar com esse e-mail.`)
+      setMessage(`${profile.name}: convite salvo. O vínculo 1:1 será ativado quando o titular entrar com esse e-mail.`)
     } catch (error) { setMessage(friendlyError(error)) }
   }
 
   return (
     <div>
-      <PageHeader eyebrow="Administracao" title="Pessoas e acesso" subtitle="Cada usuario comum pode acessar exatamente um perfil. Administradores acessam todos." />
+      <PageHeader eyebrow="Administração" title="Pessoas e acesso" subtitle="Cada usuário comum pode acessar exatamente um perfil. Administradores acessam todos." />
       {loading && <section className="card">Carregando...</section>}
 
       {!loading && !context && (
         <section className="card text-center">
-          <p className="text-sm text-slate-300">Esta conta ainda nao esta registrada no RHC Training V2.</p>
+          <p className="text-sm text-slate-300">Esta conta ainda não está registrada no RHC Training V2.</p>
         </section>
       )}
 
       {!loading && context && context.role !== 'admin' && (
-        <section className="card flex gap-3"><UserRoundCheck className="text-emerald-300" /><p>Conta vinculada. Voce acessa somente o seu perfil.</p></section>
+        <section className="card flex gap-3"><UserRoundCheck className="text-emerald-300" /><p>Conta vinculada. Você acessa somente o seu perfil.</p></section>
       )}
 
       {context?.role === 'admin' && profiles.map((profile) => {

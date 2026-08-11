@@ -65,7 +65,7 @@ export default function Schedule() {
   }
 
   return <div>
-    <PageHeader eyebrow="Administracao" title="Agenda semanal" subtitle="Organize os proximos treinos sem alterar o historico realizado." />
+    <PageHeader eyebrow="Administração" title="Agenda semanal" subtitle="Organize os próximos treinos sem alterar o histórico realizado." />
 
     <section className="card-glow mb-4">
       <label className="text-sm text-slate-300">Perfil

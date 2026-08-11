@@ -33,7 +33,7 @@ export function getPendingWorkouts() {
 export function addPendingWorkout(payload, ownerUserId) {
   if (!ownerUserId) {
     logger.warn('offline_storage.pending_workout_owner_missing')
-    throw new Error('Nao foi possivel identificar a conta para o salvamento offline.')
+    throw new Error('Não foi possível identificar a conta para o salvamento offline.')
   }
 
   const item = { ...payload, ownerUserId, offlineId: crypto.randomUUID() }

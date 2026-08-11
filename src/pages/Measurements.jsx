@@ -47,7 +47,7 @@ export default function Measurements() {
     try {
       await archiveMeasurement(item.id)
       load()
-      setMessage('Medidas arquivadas. Voce pode restaura-las nas configuracoes.')
+      setMessage('Medidas arquivadas. Você pode restaurá-las nas configurações.')
     } catch (error) {
       setMessage(friendlyError(error))
     }
@@ -55,7 +55,7 @@ export default function Measurements() {
 
   return (
     <div>
-      <PageHeader eyebrow="Medidas" title="Corpo e peso" subtitle="Registre mudancas. Observe tendencias, nao dias isolados." />
+      <PageHeader eyebrow="Medidas" title="Corpo e peso" subtitle="Registre mudanças. Observe tendências, não dias isolados." />
 
       <form onSubmit={submit} className="card mb-5 grid gap-3 md:grid-cols-3">
         <label><span className="mb-1 block text-sm text-slate-400">Data</span><input type="date" value={form.date} onChange={(e) => change('date', e.target.value)} /></label>

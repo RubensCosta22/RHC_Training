@@ -71,7 +71,7 @@ export async function listWeeklySchedules(profileIds) {
 
 export async function applyRequestedPlan(profile) {
   const preset = requestedPlans[profile.name]
-  if (!preset) throw new Error('Nao existe cronograma preparado para este perfil.')
+  if (!preset) throw new Error('Não existe cronograma preparado para este perfil.')
   for (const plan of preset.plans) await savePlan(profile.id, { ...plan, active: true, description: 'Cronograma semanal personalizado' })
   await saveWeeklySchedule(profile.id, preset.schedule)
 }
