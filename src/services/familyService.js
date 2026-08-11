@@ -1,12 +1,15 @@
 import { supabase } from '../lib/supabaseClient'
-import { normalizeEmail, sanitizeText, validateUuid } from '../utils/validation'
+import { normalizeEmail, validateUuid } from '../utils/validation'
 
 export async function claimFamilyProfile() {
-  const { data, error } = await supabase.rpc('claim_family_profile')
-  if (error && error.code !== 'PGRST202') throw error
-  const { error: normalizeError } = await supabase.rpc('normalize_my_family_access')
-  if (normalizeError && normalizeError.code !== 'PGRST202') throw normalizeError
-  return Number(data || 0)
+  const { data: userData, error: userError } = await supabase.auth.getUser()
+  if (userError) throw userError
+  const user = userData.user
+  if (!user?.id || !user.email) return 0
+
+  const { data, error } = await supabase.rpc('claim_profile_invitation')
+  if (error) throw error
+  return data ? 1 : 0
 }
 
 export async function getFamilyContext() {
@@ -17,65 +20,80 @@ export async function getFamilyContext() {
 
   await claimFamilyProfile()
 
-  const { data, error } = await supabase.rpc('get_my_family_context')
+  const { data: appUser, error: appUserError } = await supabase
+    .from('app_users')
+    .select('user_id,role,status')
+    .eq('user_id', userId)
+    .maybeSingle()
 
-  if (error) throw error
-  return data || null
+  if (appUserError) throw appUserError
+  if (!appUser || appUser.status !== 'active') return null
+
+  if (appUser.role === 'admin') {
+    return { role: 'admin', status: appUser.status, user_id: appUser.user_id, group_id: null, family_group_id: null }
+  }
+
+  const { data: profiles, error: profileError } = await supabase
+    .from('profiles')
+    .select('id,name')
+    .order('id')
+    .limit(2)
+  if (profileError) throw profileError
+
+  return {
+    role: 'member',
+    status: appUser.status,
+    user_id: appUser.user_id,
+    profile_id: profiles?.length === 1 ? profiles[0].id : null,
+    group_id: null,
+    family_group_id: null
+  }
 }
 
 export async function getPostLoginPath() {
   const context = await getFamilyContext()
   if (context?.role === 'admin') return '/admin'
 
-  // Fail closed: uma conta familiar comum deve possuir exatamente um perfil
-  // acessivel. Nunca escolha silenciosamente o primeiro perfil retornado pelo RLS.
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('id,name')
-    .order('name')
-    .limit(2)
-
+  const { data, error } = await supabase.from('profiles').select('id,name').order('name').limit(2)
   if (error) throw error
-
   const profiles = data || []
   if (profiles.length === 1) return `/dashboard/${profiles[0].id}`
-
-  if (profiles.length === 0) {
-    throw new Error('Nenhum perfil foi associado a esta conta. Entre em contato com o administrador.')
-  }
-
+  if (profiles.length === 0) throw new Error('Nenhum perfil foi associado a esta conta. Entre em contato com o administrador.')
   throw new Error('Mais de um perfil foi associado a esta conta. O acesso foi bloqueado por seguranca; entre em contato com o administrador.')
 }
 
-export async function createFamilyGroup(name, adminEmail) {
-  const cleanName = sanitizeText(name || 'Familia RHC', 80) || 'Familia RHC'
-  const cleanAdminEmail = normalizeEmail(adminEmail)
-  const { data, error } = await supabase.rpc('create_family_group', {
-    p_name: cleanName,
-    p_admin_email: cleanAdminEmail
-  })
-  if (error) throw error
-  return data
+export async function createFamilyGroup() {
+  throw new Error('Grupos familiares foram removidos no banco V2.')
 }
 
 export async function associateProfileEmail(profileId, email) {
   const cleanProfileId = validateUuid(profileId, 'Perfil')
   const cleanEmail = normalizeEmail(email)
-  const { error } = await supabase.rpc('invite_profile_user', {
-    p_profile_id: cleanProfileId,
-    p_email: cleanEmail
-  })
+  const { data, error } = await supabase
+    .from('profile_invitations')
+    .upsert({ profile_id: cleanProfileId, email: cleanEmail, status: 'pending', claimed_by: null, claimed_at: null, updated_at: new Date().toISOString() }, { onConflict: 'profile_id' })
+    .select('*')
+    .single()
   if (error) throw error
+  return data
 }
 
 export async function listProfileAssociations() {
-  const { data, error } = await supabase.rpc('get_family_profile_associations')
-  if (error) throw error
-  return (data || []).map((profile) => ({
-    ...profile,
-    invitation: profile.invitation_email ? {
-      email: profile.invitation_email,
-      accepted_at: profile.invitation_accepted_at
-    } : null
-  }))
+  const { data: profiles, error: profileError } = await supabase.from('profiles').select('id,name,is_active,created_at').order('name')
+  if (profileError) throw profileError
+  const profileIds = (profiles || []).map((profile) => profile.id)
+  const { data: invites, error: invitesError } = profileIds.length
+    ? await supabase.from('profile_invitations').select('*').in('profile_id', profileIds)
+    : { data: [], error: null }
+  if (invitesError) throw invitesError
+  const inviteByProfile = new Map((invites || []).map((invite) => [invite.profile_id, invite]))
+  return (profiles || []).map((profile) => {
+    const invitation = inviteByProfile.get(profile.id) || null
+    return {
+      ...profile,
+      invitation,
+      invitation_email: invitation?.email || null,
+      invitation_accepted_at: invitation?.claimed_at || null
+    }
+  })
 }

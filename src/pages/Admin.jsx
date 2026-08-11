@@ -8,7 +8,7 @@ import { getProfilesWithLastWorkout } from '../services/profileService'
 import { createFamilyProfile } from '../services/scheduleService'
 import { friendlyError } from '../utils/validation'
 
-const initialProfile = { name: '', age: 25, gender: 'mulher', goal: '', email: '' }
+const initialProfile = { name: '', birthDate: '', gender: 'mulher', goal: '', email: '' }
 
 export default function Admin() {
   const navigate = useNavigate()
@@ -34,12 +34,17 @@ export default function Admin() {
   async function logout() { await secureSignOut(); navigate('/login', { replace: true }) }
   async function createProfile(event) {
     event.preventDefault(); setMessage(''); setCreating(true)
-    try { await createFamilyProfile(newProfile); await loadProfiles(); setNewProfile(initialProfile); setShowCreate(false); setMessage('Perfil criado e convite associado com sucesso.') }
-    catch (err) { setMessage(friendlyError(err)) } finally { setCreating(false) }
+    try {
+      await createFamilyProfile(newProfile)
+      await loadProfiles()
+      setNewProfile(initialProfile)
+      setShowCreate(false)
+      setMessage('Perfil criado. O acesso será vinculado quando o titular entrar com o e-mail convidado.')
+    } catch (err) { setMessage(friendlyError(err)) } finally { setCreating(false) }
   }
 
   return <div>
-    <PageHeader eyebrow="Administracao familiar" title="Central RHC" subtitle="Pessoas, performance e acesso em uma unica visao." action={<button onClick={logout} type="button" aria-label="Sair" className="grid h-11 w-11 place-items-center rounded-full border border-[#272a2f] text-[#92979f] transition hover:border-[#ff6b70]/40 hover:text-[#ff6b70]"><LogOut size={18}/></button>} />
+    <PageHeader eyebrow="Administracao" title="Central RHC" subtitle="Pessoas, performance e acesso em uma unica visao." action={<button onClick={logout} type="button" aria-label="Sair" className="grid h-11 w-11 place-items-center rounded-full border border-[#272a2f] text-[#92979f] transition hover:border-[#ff6b70]/40 hover:text-[#ff6b70]"><LogOut size={18}/></button>} />
 
     <section className="mb-14 grid gap-8 border-y border-[#272a2f] py-8 sm:grid-cols-[1fr_auto] sm:items-end">
       <div><p className="rhc-kicker mb-3">Visao geral</p><div className="flex items-baseline gap-4"><span className="tabular-nums text-7xl font-[760] tracking-[-.065em]">{profiles.length}</span><span className="max-w-32 text-sm leading-snug text-[#62676f]">perfis sob sua supervisao</span></div></div>
@@ -47,19 +52,19 @@ export default function Admin() {
     </section>
 
     <section className="mb-14 grid gap-px overflow-hidden rounded-[18px] bg-[#272a2f] sm:grid-cols-2 xl:grid-cols-4">
-      {[{to:'/admin/stats',icon:Activity,title:'Centro de estatisticas',text:'Visao geral e comparativo de performance'},{to:'/family',icon:UsersRound,title:'Pessoas e acesso',text:'Titulares, convites e permissoes'},{to:'/plans',icon:Settings2,title:'Planos de treino',text:'Exercicios e configuracoes'},{to:'/schedule',icon:CalendarDays,title:'Agenda semanal',text:'Treinos e descansos por dia'}].map(({to,icon:Icon,title,text})=><Link to={to} key={to} className="group bg-[#0d0f11] p-5 transition hover:bg-[#141619]"><div className="mb-8 flex items-start justify-between"><Icon size={20} className="text-[#92979f]"/><ArrowUpRight size={17} className="text-[#62676f] transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-[#c8ff3d]"/></div><strong className="block text-lg">{title}</strong><p className="mt-1 text-sm text-[#62676f]">{text}</p></Link>)}
+      {[{to:'/admin/stats',icon:Activity,title:'Centro de estatisticas',text:'Visao geral e comparativo de performance'},{to:'/family',icon:UsersRound,title:'Pessoas e acesso',text:'Perfis, convites e permissoes'},{to:'/plans',icon:Settings2,title:'Planos de treino',text:'Exercicios e configuracoes'},{to:'/schedule',icon:CalendarDays,title:'Agenda semanal',text:'Treinos e descansos por dia'}].map(({to,icon:Icon,title,text})=><Link to={to} key={to} className="group bg-[#0d0f11] p-5 transition hover:bg-[#141619]"><div className="mb-8 flex items-start justify-between"><Icon size={20} className="text-[#92979f]"/><ArrowUpRight size={17} className="text-[#62676f] transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-[#c8ff3d]"/></div><strong className="block text-lg">{title}</strong><p className="mt-1 text-sm text-[#62676f]">{text}</p></Link>)}
     </section>
 
-    <div className="mb-5 flex items-end justify-between gap-3 border-b border-[#272a2f] pb-4"><div><p className="rhc-kicker mb-2">Equipe</p><h2 className="text-2xl font-[700] tracking-[-.04em]">Perfis supervisionados</h2></div><button className="btn-secondary flex items-center gap-2 px-4" onClick={()=>setShowCreate((value)=>!value)}>{showCreate?<X size={17}/>:<Plus size={17}/>}<span className="hidden sm:inline">{showCreate?'Cancelar':'Novo perfil'}</span></button></div>
+    <div className="mb-5 flex items-end justify-between gap-3 border-b border-[#272a2f] pb-4"><div><p className="rhc-kicker mb-2">Perfis</p><h2 className="text-2xl font-[700] tracking-[-.04em]">Perfis supervisionados</h2></div><button className="btn-secondary flex items-center gap-2 px-4" onClick={()=>setShowCreate((value)=>!value)}>{showCreate?<X size={17}/>:<Plus size={17}/>}<span className="hidden sm:inline">{showCreate?'Cancelar':'Novo perfil'}</span></button></div>
 
     {showCreate && <form className="mb-8 grid gap-4 border-b border-[#272a2f] bg-[#0d0f11] p-5 sm:grid-cols-2" onSubmit={createProfile}>
-      <div className="sm:col-span-2"><h3 className="text-lg font-black">Adicionar perfil familiar</h3><p className="text-sm text-slate-400">O titular recebera acesso ao entrar com o e-mail associado.</p></div>
+      <div className="sm:col-span-2"><h3 className="text-lg font-black">Adicionar perfil</h3><p className="text-sm text-slate-400">O titular recebera acesso ao entrar com o e-mail associado. Nenhum grupo familiar e criado no V2.</p></div>
       <label className="text-sm text-slate-300">Nome<input required value={newProfile.name} onChange={(e)=>setNewProfile({...newProfile,name:e.target.value})}/></label>
-      <label className="text-sm text-slate-300">Idade<input required min="1" max="120" type="number" value={newProfile.age} onChange={(e)=>setNewProfile({...newProfile,age:e.target.value})}/></label>
+      <label className="text-sm text-slate-300">Data de nascimento<input type="date" value={newProfile.birthDate} onChange={(e)=>setNewProfile({...newProfile,birthDate:e.target.value})}/></label>
       <label className="text-sm text-slate-300">Genero<select value={newProfile.gender} onChange={(e)=>setNewProfile({...newProfile,gender:e.target.value})}><option value="mulher">Mulher</option><option value="homem">Homem</option><option value="outro">Outro</option></select></label>
       <label className="text-sm text-slate-300">E-mail titular<input required type="email" value={newProfile.email} onChange={(e)=>setNewProfile({...newProfile,email:e.target.value})}/></label>
       <label className="text-sm text-slate-300 sm:col-span-2">Objetivo<input required value={newProfile.goal} onChange={(e)=>setNewProfile({...newProfile,goal:e.target.value})}/></label>
-      <button disabled={creating} className="btn-primary sm:col-span-2">{creating?'Criando perfil...':'Criar e associar perfil'}</button>
+      <button disabled={creating} className="btn-primary sm:col-span-2">{creating?'Criando perfil...':'Criar perfil e convite'}</button>
     </form>}
 
     {message&&<p className="mb-4 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-sm text-emerald-100">{message}</p>}

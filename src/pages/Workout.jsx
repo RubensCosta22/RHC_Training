@@ -22,10 +22,8 @@ import {
 } from '../services/workoutDraftLocalService'
 import {
   getLatestRemoteWorkoutDraft,
-  getRemoteWorkoutDraft,
   remoteRecordToWorkoutDraft,
-  removeRemoteWorkoutDraft,
-  upsertRemoteWorkoutDraft
+  removeRemoteWorkoutDraft
 } from '../services/workoutDraftService'
 import { getExerciseRecords } from '../services/workoutService'
 import { addPendingWorkout, isOnline } from '../utils/storage'
@@ -270,43 +268,13 @@ export default function Workout() {
     }
   }
 
-  async function syncImportant(nextExercises = exerciseValues, nextRunning = running) {
-    const local = persistLocal(nextExercises, nextRunning)
-    if (!local || !online) return
-    try {
-      const remote = await upsertRemoteWorkoutDraft(local, local.remoteVersion ?? null)
-      const synced = saveLocalWorkoutDraft({
-        ...local,
-        remoteVersion: remote.version,
-        version: remote.version
-      })
-      setDraft(synced)
-      setDraftStatus('Rascunho sincronizado.')
-    } catch (error) {
-      if (error?.code === 'DRAFT_CONFLICT') {
-        try {
-          const remoteRecord = await getRemoteWorkoutDraft({ draftId: local.draftId, profileId })
-          const remote = remoteRecordToWorkoutDraft(remoteRecord)
-          if (remote) setPendingRemoteDraft({ remote, local })
-        } catch {
-          // O rascunho local permanece íntegro mesmo se a leitura remota falhar.
-        }
-        setDraftStatus('Há uma versão mais recente em outro dispositivo. Escolha qual versão continuar.')
-      } else {
-        setDraftStatus('Salvo no aparelho; sincronização pendente.')
-      }
-    }
-  }
-
   function updateExercise(id, value) {
-    const previous = exerciseValues[id]
     const next = { ...exerciseValues, [id]: { ...value, originalName: workout.exercises.find((item) => item.id === id)?.name } }
     setExerciseValues(next)
     persistLocal(next, running)
-    if (!previous?.completed && value.completed) syncImportant(next, running)
   }
 
-  function updateRunning(nextRunning, important = false) {
+  function updateRunning(nextRunning) {
     const durationSeconds = nextRunning.timer?.status === 'running'
       ? getElapsedSeconds(nextRunning.timer)
       : Number(nextRunning.durationSeconds || nextRunning.timer?.accumulatedSeconds || 0)
@@ -317,7 +285,6 @@ export default function Workout() {
     }
     setRunning(normalized)
     persistLocal(exerciseValues, normalized)
-    if (important) syncImportant(exerciseValues, normalized)
   }
 
   async function buildProgramExposure(exercise, values, workoutSessionId) {
@@ -425,7 +392,7 @@ export default function Workout() {
         </section>
       )}
 
-      {type === 'E' && <RunningSessionPanel value={running} onChange={(next) => updateRunning(next, false)} onImportantEvent={(next) => updateRunning(next, true)} />}
+      {type === 'E' && <RunningSessionPanel value={running} onChange={(next) => updateRunning(next)} onImportantEvent={(next) => updateRunning(next)} />}
 
       <button type="button" onClick={() => setShowDetails((current) => !current)} className="mb-3 flex w-full items-center justify-between border-y border-[#2A2A2E] py-3 text-left text-sm font-semibold text-[#F5F5F7]">
         Detalhes do treino {showDetails ? <ChevronUp size={18} /> : <ChevronDown size={18} className="text-[#8E8E93]" />}

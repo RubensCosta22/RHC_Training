@@ -28,8 +28,8 @@ export default function ProgramPerformancePanel({ stats }) {
 
       <div className="mt-5 grid grid-cols-3 divide-x divide-[#2A2A2E]">
         <div className="pr-3">
-          <p className="text-xs text-[#8E8E93]">Aderência</p>
-          <p className="mt-1 text-xl font-semibold text-[#F5F5F7]">{summary.adherence}%</p>
+          <p className="text-xs text-[#8E8E93]">Sessões no programa</p>
+          <p className="mt-1 text-xl font-semibold text-[#F5F5F7]">{summary.completedSessions}</p>
         </div>
         <div className="px-3">
           <p className="text-xs text-[#8E8E93]">RPE médio</p>
@@ -50,7 +50,7 @@ export default function ProgramPerformancePanel({ stats }) {
         <div className="mt-4 grid gap-6 md:grid-cols-2">
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold text-[#F5F5F7]"><Target size={16} className="text-[#C8FF3D]" /> Sessões de força</div>
-            <p className="mt-2 text-sm text-[#8E8E93]">{summary.completedStrengthSessions}/{summary.expectedStrengthSessions} concluídas · {summary.accepted} sugestões aceitas</p>
+            <p className="mt-2 text-sm text-[#8E8E93]">{summary.completedStrengthSessions} concluídas · {summary.accepted} sugestões aceitas</p>
             <div className="mt-4 flex items-center gap-2 text-sm font-semibold text-[#F5F5F7]"><Gauge size={16} className="text-[#8E8E93]" /> Baseline de corrida</div>
             <p className="mt-2 text-sm text-[#8E8E93]">{baseline.distance_km || 10} km · {baseline.time_minutes || 50} min · {baseline.pace_min_km || 5}:00 min/km</p>
           </div>
