@@ -53,7 +53,7 @@ function buildInitialExerciseValues(workout) {
   const initial = {}
   workout.exercises.forEach((exercise) => {
     initial[exercise.id] = {
-      weight: '', actualReps: '', setReps: Array(Number(exercise.sets || 0)).fill(''), rpe: '',
+      weight: '', actualReps: '', setReps: Array(Number(exercise.sets || 0)).fill(String(exercise.repsMin || String(exercise.reps || '').match(/\\d+/)?.[0] || '')), rpe: '',
       progressionAccepted: null, notes: '', completed: false,
       completedSets: Array(Number(exercise.sets || 0)).fill(false), difficulty: 'normal',
       selectedName: exercise.name, expanded: true, detailsOpen: false, restTimerKey: null
