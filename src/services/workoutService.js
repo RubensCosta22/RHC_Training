@@ -20,11 +20,21 @@ function normalizeExerciseRow(row) {
 
 function normalizeSessionRow(row) {
   if (!row) return row
+  const exposuresByName = new Map(
+    (row.program_exercise_exposures || []).map((item) => [
+      String(item.variation_name_snapshot || '').trim().toLowerCase(),
+      Array.isArray(item.reps) ? item.reps.join('/') : ''
+    ])
+  )
   return {
     ...row,
     date: row.workout_date,
     workout_type: row.workout_code,
-    workout_exercises: (row.workout_exercises || []).map(normalizeExerciseRow)
+    workout_exercises: (row.workout_exercises || []).map((exercise) => {
+      const normalized = normalizeExerciseRow(exercise)
+      const key = String(normalized.exercise_name || '').trim().toLowerCase()
+      return { ...normalized, actual_reps: normalized.actual_reps || exposuresByName.get(key) || null }
+    })
   }
 }
 
@@ -86,7 +96,7 @@ function applyWorkoutSessionFilters(query, filters = {}) {
 export async function getWorkoutSessions(profileId, filters = {}) {
   let query = supabase
     .from('workout_sessions')
-    .select('*, workout_exercises(*)')
+    .select('*, workout_exercises(*), program_exercise_exposures(*)')
     .eq('profile_id', profileId)
     .is('archived_at', null)
     .order('workout_date', { ascending: false })
@@ -107,7 +117,7 @@ export async function getWorkoutSessionsPage(profileId, filters = {}, options = 
 
   let query = supabase
     .from('workout_sessions')
-    .select('*, workout_exercises(*)', { count: 'exact' })
+    .select('*, workout_exercises(*), program_exercise_exposures(*)', { count: 'exact' })
     .eq('profile_id', profileId)
     .is('archived_at', null)
     .order('workout_date', { ascending: false })
