@@ -4,12 +4,14 @@ import { calculateVolume } from '../utils/progression'
 import { parsePositiveNumber, sanitizeText, validateWorkoutInput } from '../utils/validation'
 
 function normalizeExercise(item) {
+  const setReps = Array.isArray(item.setReps) ? item.setReps.map((value) => String(value).trim()).filter(Boolean) : []
+  const actualReps = sanitizeText(item.actualReps || item.actual_reps || setReps.join('/'), 40)
   return {
     exercise_name: sanitizeText(item.name || item.exercise_name, 120),
     muscle_group: sanitizeText(item.muscleGroup || item.muscle_group, 80),
     sets: Number(item.sets || 0),
     reps: sanitizeText(item.reps || '', 40),
-    actual_reps: sanitizeText(item.actualReps || item.actual_reps || '', 40),
+    actual_reps: actualReps,
     weight: parsePositiveNumber(item.weight || 0, 'Carga') || 0,
     completed: Boolean(item.completed),
     notes: sanitizeText(item.notes || '', 500)
