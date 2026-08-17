@@ -96,7 +96,7 @@ function applyWorkoutSessionFilters(query, filters = {}) {
 export async function getWorkoutSessions(profileId, filters = {}) {
   let query = supabase
     .from('workout_sessions')
-    .select('*, workout_exercises(*), program_exercise_exposures(*)')
+    .select('*, workout_exercises(*), program_exercise_exposures!program_exercise_exposures_workout_session_id_fkey(*)')
     .eq('profile_id', profileId)
     .is('archived_at', null)
     .order('workout_date', { ascending: false })
@@ -117,7 +117,7 @@ export async function getWorkoutSessionsPage(profileId, filters = {}, options = 
 
   let query = supabase
     .from('workout_sessions')
-    .select('*, workout_exercises(*), program_exercise_exposures(*)', { count: 'exact' })
+    .select('*, workout_exercises(*), program_exercise_exposures!program_exercise_exposures_workout_session_id_fkey(*)', { count: 'exact' })
     .eq('profile_id', profileId)
     .is('archived_at', null)
     .order('workout_date', { ascending: false })
