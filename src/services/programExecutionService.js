@@ -193,7 +193,7 @@ export async function saveProgramExposure({ profileId, workoutSessionId, exercis
     variation_exercise_id: variation.id,
     variation_name_snapshot: variationName,
     load: Number(value.weight || 0),
-    reps: Array.isArray(value.setReps) ? value.setReps.map((item) => Number(item || 0)) : [],
+    reps: Array.isArray(value.setReps) ? value.setReps.map((item) => Number(item)) : [],
     completed_sets: (value.completedSets || []).filter(Boolean).length,
     observed_rpe: value.rpe === '' || value.rpe == null ? null : Number(value.rpe),
     progression_action: suggestion?.action || 'manual',
