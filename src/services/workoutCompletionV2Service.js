@@ -30,7 +30,11 @@ export async function saveWorkoutSessionV2({
   running = null
 }) {
   const requestId = createRequestId()
-  const cleanWorkout = validateWorkoutInput({ gymName, durationMinutes, notes })
+  const runningDurationSeconds = running?.durationSeconds > 0 ? Math.round(Number(running.durationSeconds)) : null
+  const effectiveDurationMinutes = workoutType === 'E' && runningDurationSeconds
+    ? Math.max(1, Math.round(runningDurationSeconds / 60))
+    : durationMinutes
+  const cleanWorkout = validateWorkoutInput({ gymName, durationMinutes: effectiveDurationMinutes, notes })
   const cleanExercises = exercises.map(normalizeExercise)
   const completedCount = cleanExercises.filter((item) => item.completed).length
   const completionPercentage = cleanExercises.length
@@ -38,7 +42,7 @@ export async function saveWorkoutSessionV2({
     : 0
   const totalVolume = calculateVolume(cleanExercises.map((item) => ({ ...item, name: item.exercise_name })))
   const distanceMeters = running?.distanceMeters > 0 ? Math.round(Number(running.distanceMeters)) : null
-  const durationSeconds = running?.durationSeconds > 0 ? Math.round(Number(running.durationSeconds)) : null
+  const durationSeconds = runningDurationSeconds
   const pace = running?.averagePaceSecondsPerKm > 0 ? Math.round(Number(running.averagePaceSecondsPerKm)) : null
   const activityMode = ['manual', 'stopwatch', 'gps'].includes(running?.mode) ? running.mode : null
 
