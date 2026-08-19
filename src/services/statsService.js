@@ -1,6 +1,37 @@
 import { getProgressData } from './workoutService'
 import { parseLocalDate, toLocalDateKey } from '../utils/date'
 
+const EXERCISE_NAME_ALIASES = new Map([
+  ['leg press', 'Leg Press'],
+  ['abdomen', 'Abdominal máquina'],
+  ['abdominal maquina', 'Abdominal máquina'],
+  ['hip thrust', 'Elevação pélvica'],
+  ['hack machine', 'Hack Machine'],
+  ['face pull', 'Puxada para o rosto (Face Pull)'],
+  ['farmer walk', 'Caminhada do fazendeiro'],
+  ['kettlebell swing', 'Balanço com kettlebell'],
+  ['pallof press', 'Press anti-rotação (Pallof Press)'],
+  ['reverse fly maquina', 'Crucifixo inverso na máquina'],
+  ['smith machine', 'Máquina Smith'],
+  ['step-up no banco', 'Subida no banco'],
+  ['tibial raise', 'Elevação tibial']
+])
+
+function exerciseNameKey(name) {
+  return String(name || '')
+    .trim()
+    .toLocaleLowerCase('pt-BR')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+}
+
+function canonicalExerciseName(name) {
+  const trimmed = String(name || '').trim()
+  if (!trimmed) return 'Exercício'
+  return EXERCISE_NAME_ALIASES.get(exerciseNameKey(trimmed)) || trimmed
+}
+
 function getWeekKey(date) {
   const current = parseLocalDate(date)
   const start = new Date(current)
@@ -61,7 +92,10 @@ export async function getStatsCenter(profileId) {
   const data = await getProgressData(profileId)
 
   const sessions = data.sessions || []
-  const exercises = data.exercises || []
+  const exercises = (data.exercises || []).map((item) => ({
+    ...item,
+    exercise_name: canonicalExerciseName(item.exercise_name)
+  }))
   const measurements = data.measurements || []
 
   const totalWorkouts = sessions.length
@@ -138,10 +172,7 @@ export async function getStatsCenter(profileId) {
     weekdayMap[day] = (weekdayMap[day] || 0) + 1
   })
 
-  const weekdayFrequency = Object.entries(weekdayMap).map(([day, total]) => ({
-    day,
-    total
-  }))
+  const weekdayFrequency = Object.entries(weekdayMap).map(([day, total]) => ({ day, total }))
 
   const weeklyVolumeChart = Object.values(
     sessions.reduce((acc, item) => {
@@ -179,7 +210,7 @@ export async function getStatsCenter(profileId) {
   ]
 
   return {
-    raw: data,
+    raw: { ...data, exercises },
     summary: {
       totalWorkouts,
       totalVolume,
@@ -196,15 +227,8 @@ export async function getStatsCenter(profileId) {
         weeklyWorkouts: percentageChange(weeklyWorkouts, previousWeeklyWorkouts)
       }
     },
-    charts: {
-      weeklyVolumeChart,
-      monthlyVolumeChart,
-      weekdayFrequency
-    },
-    rankings: {
-      exerciseRanking,
-      personalRecords
-    },
+    charts: { weeklyVolumeChart, monthlyVolumeChart, weekdayFrequency },
+    rankings: { exerciseRanking, personalRecords },
     achievements,
     measurements
   }
