@@ -11,6 +11,38 @@ function sanitizeDraftPayload(payload) {
   return safe
 }
 
+async function discardDraftAlreadyUsedBySession(record, profileId) {
+  if (!record?.id) return record || null
+
+  const { data: session, error: sessionError } = await supabase
+    .from('workout_sessions')
+    .select('id')
+    .eq('profile_id', profileId)
+    .eq('client_operation_id', record.id)
+    .limit(1)
+    .maybeSingle()
+
+  if (sessionError) throw sessionError
+  if (!session) return record
+
+  const { error: deleteError } = await supabase
+    .from('workout_drafts')
+    .delete()
+    .eq('id', record.id)
+    .eq('profile_id', profileId)
+    .is('consumed_session_id', null)
+
+  if (deleteError) throw deleteError
+
+  logger.warn('workout_draft.stale_completed_operation_removed', {
+    profileId,
+    workoutType: record.workout_code,
+    draftId: record.id,
+    sessionId: session.id
+  })
+  return null
+}
+
 export function remoteRecordToWorkoutDraft(record) {
   if (!record) return null
   return {
@@ -38,7 +70,7 @@ export async function getRemoteWorkoutDraft({ draftId, profileId }) {
     .maybeSingle()
 
   if (error) throw error
-  return data || null
+  return discardDraftAlreadyUsedBySession(data, profileId)
 }
 
 export async function getLatestRemoteWorkoutDraft({ profileId, workoutType, programEnrollmentId = null }) {
@@ -57,7 +89,7 @@ export async function getLatestRemoteWorkoutDraft({ profileId, workoutType, prog
 
   const { data, error } = await query.maybeSingle()
   if (error) throw error
-  return data || null
+  return discardDraftAlreadyUsedBySession(data, profileId)
 }
 
 export async function upsertRemoteWorkoutDraft(draft) {
