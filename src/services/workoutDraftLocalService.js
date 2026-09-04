@@ -40,7 +40,16 @@ function scheduleRemoteDraftSync(record, key) {
   if (typeof window === 'undefined' || typeof navigator === 'undefined' || !navigator.onLine) return
 
   const existing = remoteSyncTimers.get(key)
-  if (existing) window.clearTimeout(existing)
+  if (existing) {
+    window.clearTimeout(existing)
+    remoteSyncTimers.delete(key)
+  }
+
+  // A paused workout timer is written immediately before finalization. At this
+  // point the local draft must remain available for recovery, but scheduling a
+  // new remote autosave can race with save_workout_session_v2 and recreate the
+  // just-consumed draft with the same operation id.
+  if (record?.payload?.workoutTimer?.status === 'paused') return
 
   const timer = window.setTimeout(async () => {
     remoteSyncTimers.delete(key)
