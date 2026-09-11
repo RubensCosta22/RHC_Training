@@ -21,6 +21,11 @@ function recommendationLabel(action) {
   return null
 }
 
+function formatRpe(value) {
+  if (value == null || value === '') return null
+  return Number(value).toLocaleString('pt-BR', { maximumFractionDigits: 1 })
+}
+
 export default function ExerciseCard({ exercise, value = {}, record, onChange }) {
   const [showSwapOptions, setShowSwapOptions] = useState(false)
   const [recommendation, setRecommendation] = useState(null)
@@ -36,6 +41,11 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
   const hasBestLoad = record?.best_weight != null && Number(record.best_weight) > 0
   const recommendationAction = recommendationLabel(recommendation?.progression_action)
   const hasRecommendation = recommendationAction && recommendation?.suggested_load != null
+  const targetRpeMin = formatRpe(exercise.targetRpeMin)
+  const targetRpeMax = formatRpe(exercise.targetRpeMax)
+  const targetRpeLabel = targetRpeMin && targetRpeMax
+    ? `${targetRpeMin}–${targetRpeMax}`
+    : (targetRpeMax || targetRpeMin)
 
   useEffect(() => {
     let active = true
@@ -105,7 +115,7 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
         </button>
         <button type="button" onClick={() => update({ detailsOpen: !showDetails })} className="min-w-0 flex-1 text-left">
           <h3 className="truncate text-lg font-semibold text-[#F5F5F7]">{selectedName}</h3>
-          <p className="mt-1 text-sm text-[#8E8E93]">{exercise.sets} × {exercise.reps}{value.weight ? ` · ${value.weight} kg` : hasPreviousLoad ? ` · última ${record.last_weight} kg` : ''}</p>
+          <p className="mt-1 text-sm text-[#8E8E93]">{exercise.sets} × {exercise.reps}{value.weight ? ` · ${value.weight} kg` : hasPreviousLoad ? ` · última ${record.last_weight} kg` : ''}{targetRpeLabel ? ` · RPE alvo ${targetRpeLabel}` : ''}</p>
         </button>
         {showDetails ? <ChevronUp size={20} className="text-[#8E8E93]" /> : <ChevronDown size={20} className="text-[#8E8E93]" />}
       </div>
@@ -121,6 +131,9 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
               </p>
               {hasRecommendation && (
                 <p className="mt-1 text-sm font-semibold text-[#C8FF3D]">Recomendação {recommendation.suggested_load} kg · {recommendationAction}</p>
+              )}
+              {targetRpeLabel && (
+                <p className="mt-1 text-sm text-[#F5F5F7]">RPE alvo {targetRpeLabel}</p>
               )}
               {hasPreviousLoad && record.exact_match === false && (
                 <p className="mt-1 text-xs text-[#8E8E93]">Histórico equivalente: {record.matched_name}</p>
