@@ -32,7 +32,7 @@ export default function Dashboard() {
   const next=useMemo(()=>schedule.configured?schedule.workoutType:getNextWorkoutType(summary?.lastWorkout?.workout_type,types),[summary,types,schedule])
   if(error)return <Card className="border-[#FF453A]/30 bg-[#FF453A]/5 text-[#FF9F95]">{error}</Card>
   if(!profile||!summary)return <p className="animate-pulse text-[#8E8E93]">Preparando seu treino...</p>
-  const target=profile.name==='Nicole'?3:5; const percent=Math.min(100,Math.round(summary.weekCount/target*100))
+  const target=Math.max(1,planOptions.length); const percent=Math.min(100,Math.round(summary.weekCount/target*100))
   const volumeChange = summary.volumeChangePercent
   const volumeComparison = volumeChange == null
     ? 'sem base nos 30 dias anteriores'

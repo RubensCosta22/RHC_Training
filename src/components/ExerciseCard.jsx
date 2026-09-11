@@ -1,6 +1,7 @@
 import { Check, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, ExternalLink, RotateCcw } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import RestTimer from './RestTimer'
+import { getRecentProgramExposures } from '../services/programExecutionService'
 import { youtubeSearchUrl } from '../utils/youtube'
 
 function getInitialReps(exercise, value) {
@@ -13,8 +14,16 @@ function getInitialReps(exercise, value) {
   return match ? Number(match[0]) : 0
 }
 
+function recommendationLabel(action) {
+  if (action === 'increase') return 'Aumentar'
+  if (action === 'regress') return 'Reduzir'
+  if (action === 'hold') return 'Manter'
+  return null
+}
+
 export default function ExerciseCard({ exercise, value = {}, record, onChange }) {
   const [showSwapOptions, setShowSwapOptions] = useState(false)
+  const [recommendation, setRecommendation] = useState(null)
   const selectedName = value.selectedName || exercise.name
   const alternatives = exercise.alternatives || []
   const options = [exercise.name, ...alternatives]
@@ -25,6 +34,20 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
   const repsValue = getInitialReps(exercise, value)
   const hasPreviousLoad = record?.last_weight != null && Number(record.last_weight) > 0
   const hasBestLoad = record?.best_weight != null && Number(record.best_weight) > 0
+  const recommendationAction = recommendationLabel(recommendation?.progression_action)
+  const hasRecommendation = recommendationAction && recommendation?.suggested_load != null
+
+  useEffect(() => {
+    let active = true
+    setRecommendation(null)
+    if (!exercise.programEnrollmentId || !exercise.programExerciseId || !selectedName) return undefined
+
+    getRecentProgramExposures(exercise.programEnrollmentId, exercise.programExerciseId, selectedName, 1)
+      .then((items) => { if (active) setRecommendation(items[0] || null) })
+      .catch(() => { if (active) setRecommendation(null) })
+
+    return () => { active = false }
+  }, [exercise.programEnrollmentId, exercise.programExerciseId, selectedName])
 
   function update(patch) {
     onChange({ ...value, notes: value.notes || '', difficulty: value.difficulty || 'normal', ...patch })
@@ -96,6 +119,9 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
                 {hasPreviousLoad ? `Última carga ${record.last_weight} kg` : 'Sem carga anterior registrada'}
                 {hasBestLoad ? ` · melhor ${record.best_weight} kg` : ''}
               </p>
+              {hasRecommendation && (
+                <p className="mt-1 text-sm font-semibold text-[#C8FF3D]">Recomendação {recommendation.suggested_load} kg · {recommendationAction}</p>
+              )}
               {hasPreviousLoad && record.exact_match === false && (
                 <p className="mt-1 text-xs text-[#8E8E93]">Histórico equivalente: {record.matched_name}</p>
               )}
