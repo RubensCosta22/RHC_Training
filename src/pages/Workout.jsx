@@ -218,10 +218,16 @@ export default function Workout() {
 
   function openRemoteDraft() {
     if (!pendingRemoteDraft) return
-    const remote = pendingRemoteDraft.remote
-    saveLocalWorkoutDraft(remote)
+    const remote = {
+      ...pendingRemoteDraft.remote,
+      userId,
+      profileId,
+      workoutType: type,
+      programEnrollmentId: pendingRemoteDraft.remote.programEnrollmentId || enrollmentId || null
+    }
+    const savedRemote = saveLocalWorkoutDraft(remote)
     setPendingRemoteDraft(null)
-    applyDraftSnapshot(remote, 'Versão mais recente do outro dispositivo restaurada.')
+    applyDraftSnapshot(savedRemote, 'Versão mais recente do outro dispositivo restaurada.')
   }
 
   function continueThisDevice() {
@@ -358,6 +364,25 @@ export default function Workout() {
       setTimeout(() => navigate(`/dashboard/${profileId}`), 700)
     } catch (error) {
       if (stoppedWorkoutTimer) setWorkoutTimer(activeWorkoutTimer(stoppedWorkoutTimer))
+      const connectionLost = !isOnline() || error?.name === 'TypeError' || /fetch|network|offline|connection/i.test(String(error?.message || ''))
+      if (connectionLost && stoppedWorkoutTimer) {
+        const elapsedWorkoutSeconds = getElapsedSeconds(stoppedWorkoutTimer)
+        const automaticDurationMinutes = Math.max(1, Math.ceil(elapsedWorkoutSeconds / 60))
+        const local = persistLocal(exerciseValues, running, {
+          workoutTimer: stoppedWorkoutTimer,
+          durationMinutes: String(automaticDurationMinutes)
+        })
+        const exercises = workout.exercises.map((exercise) => {
+          const values = exerciseValues[exercise.id] || {}
+          return { ...exercise, ...values, name: values.selectedName || exercise.name, originalName: exercise.name }
+        })
+        const payload = { profileId, workoutType: type, date, gymName: sanitizeText(gymName, 80), durationMinutes: automaticDurationMinutes, notes, exercises, draftId: local?.draftId || draft?.draftId, running: type === 'E' ? running : null }
+        addPendingWorkout(payload, userId)
+        setMessage('A conexão caiu durante o salvamento. O treino ficou protegido no aparelho e será sincronizado automaticamente.')
+        setDraftStatus('Finalização pendente de sincronização; rascunho preservado.')
+        setTimeout(() => navigate(`/dashboard/${profileId}`), 1200)
+        return
+      }
       setMessage(friendlyError(error))
       setDraftStatus('Falha ao finalizar; rascunho preservado.')
     } finally {
