@@ -10,7 +10,7 @@ import { supabase } from '../lib/supabaseClient'
 import { calculatePaceSecondsPerKm, formatDuration, getElapsedSeconds, pauseTimer, resetTimer, startTimer } from '../lib/runningSession'
 import { getProfile } from '../services/profileService'
 import { getWorkoutPlan } from '../services/planService'
-import { calculateProgramSuggestion, getRecentProgramExposures, saveProgramExposure } from '../services/programExecutionService'
+import { buildProgramExposurePayloads } from '../services/programExecutionService'
 import { saveWorkoutSessionV2 } from '../services/workoutCompletionV2Service'
 import {
   createWorkoutDraftIdentity,
@@ -22,6 +22,7 @@ import {
 } from '../services/workoutDraftLocalService'
 import {
   getLatestRemoteWorkoutDraft,
+  isWorkoutDraftConsumed,
   remoteRecordToWorkoutDraft,
   removeRemoteWorkoutDraft
 } from '../services/workoutDraftService'
@@ -176,14 +177,25 @@ export default function Workout() {
     async function initializeDraft() {
       purgeExpiredWorkoutDrafts({ userId })
       const saved = loadLocalWorkoutDraft(draftIdentity)
-      const localDraft = saved && !isWorkoutDraftExpired(saved) ? saved : null
+      let localDraft = saved && !isWorkoutDraftExpired(saved) ? saved : null
+      if (localDraft && isOnline()) {
+        try {
+          const consumed = await isWorkoutDraftConsumed({ draftId: localDraft.draftId, profileId })
+          if (consumed) {
+            removeLocalWorkoutDraft(draftIdentity)
+            localDraft = null
+          }
+        } catch {
+          setDraftStatus('Não foi possível validar o rascunho local. Ele foi mantido apenas para recuperação.')
+        }
+      }
       const freshDraft = createWorkoutDraftIdentity({ userId, profileId, workoutType: type, programEnrollmentId: enrollmentId, planFingerprint })
       let remoteDraft = null
 
       if (isOnline()) {
         try {
           const remoteRecord = await getLatestRemoteWorkoutDraft({ profileId, workoutType: type, programEnrollmentId: enrollmentId })
-          remoteDraft = remoteRecordToWorkoutDraft(remoteRecord)
+          remoteDraft = remoteRecordToWorkoutDraft(remoteRecord, { userId })
         } catch {
           setDraftStatus('Não foi possível verificar outros dispositivos. O rascunho local continua protegido.')
         }
@@ -306,19 +318,6 @@ export default function Workout() {
     persistLocal(exerciseValues, normalized)
   }
 
-  async function buildProgramExposure(exercise, values, workoutSessionId) {
-    if (!exercise.programExerciseId || !exercise.programEnrollmentId) return
-    const variation = values.selectedName || exercise.name
-    const recent = await getRecentProgramExposures(exercise.programEnrollmentId, exercise.programExerciseId, variation, 3)
-    let previousFailures = 0
-    for (const item of recent) {
-      if (item.progression_action === 'increase') break
-      previousFailures += 1
-    }
-    const suggestion = calculateProgramSuggestion(exercise, values, previousFailures)
-    await saveProgramExposure({ profileId, workoutSessionId, exercise, value: values, suggestion })
-  }
-
   async function finalizeWorkout() {
     if (savingRef.current || pendingPlanDraft || pendingRemoteDraft) return
     savingRef.current = true
@@ -346,10 +345,8 @@ export default function Workout() {
         setTimeout(() => navigate(`/dashboard/${profileId}`), 900)
         return
       }
-      const savedSession = await saveWorkoutSessionV2(payload)
-      if (workout.enrollment || workout.exercises.some((exercise) => exercise.programExerciseId)) {
-        await Promise.all(workout.exercises.map((exercise) => buildProgramExposure(exercise, exerciseValues[exercise.id] || {}, savedSession?.id || null)))
-      }
+      const programExposures = await buildProgramExposurePayloads({ profileId, exercises })
+      await saveWorkoutSessionV2({ ...payload, programExposures })
       if (local?.draftId || draft?.draftId) {
         removeLocalWorkoutDraft(draftIdentity)
         await removeRemoteWorkoutDraft({ draftId: local?.draftId || draft?.draftId, profileId }).catch(() => undefined)
