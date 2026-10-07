@@ -172,21 +172,24 @@ export function calculateProgramSuggestion(exercise, value, previousFailures = 0
   return { action: 'manual', suggestedLoad: Number(value.weight || 0), reason: 'Progressão manual configurada para este exercício.' }
 }
 
-export async function buildProgramExposurePayload({ profileId, exercise, value }) {
+export async function buildProgramExposurePayload({ profileId, exercise, value, suggestion: suppliedSuggestion = null }) {
   if (!exercise.programEnrollmentId || !exercise.programExerciseId || !exercise.programId) return null
   const variationName = value.selectedName || exercise.name
-  const recent = await getRecentProgramExposures(
-    exercise.programEnrollmentId,
-    exercise.programExerciseId,
-    variationName,
-    3
-  )
-  let previousFailures = 0
-  for (const item of recent) {
-    if (item.progression_action === 'increase') break
-    previousFailures += 1
+  let suggestion = suppliedSuggestion
+  if (!suggestion) {
+    const recent = await getRecentProgramExposures(
+      exercise.programEnrollmentId,
+      exercise.programExerciseId,
+      variationName,
+      3
+    )
+    let previousFailures = 0
+    for (const item of recent) {
+      if (item.progression_action === 'increase') break
+      previousFailures += 1
+    }
+    suggestion = calculateProgramSuggestion(exercise, value, previousFailures)
   }
-  const suggestion = calculateProgramSuggestion(exercise, value, previousFailures)
 
   const { data: variation, error: variationError } = await supabase
     .from('exercise_catalog')
@@ -226,7 +229,7 @@ export async function buildProgramExposurePayloads({ profileId, exercises = [] }
 }
 
 export async function saveProgramExposure({ profileId, workoutSessionId, exercise, value, suggestion }) {
-  const payload = await buildProgramExposurePayload({ profileId, exercise, value })
+  const payload = await buildProgramExposurePayload({ profileId, exercise, value, suggestion })
   if (!payload) return null
   const { data, error } = await supabase
     .from('program_exercise_exposures')
