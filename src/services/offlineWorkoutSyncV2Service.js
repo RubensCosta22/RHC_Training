@@ -27,10 +27,12 @@ async function runPendingWorkoutSyncV2() {
 
     try {
       const { ownerUserId: _ownerUserId, offlineId: _offlineId, ...payload } = item
-      const programExposures = await buildProgramExposurePayloads({
-        profileId: payload.profileId,
-        exercises: payload.exercises || []
-      })
+      const programExposures = Array.isArray(payload.programExposures)
+        ? payload.programExposures
+        : await buildProgramExposurePayloads({
+            profileId: payload.profileId,
+            exercises: payload.exercises || []
+          })
       await saveWorkoutSessionV2({ ...payload, programExposures })
       synced += 1
     } catch (syncError) {
