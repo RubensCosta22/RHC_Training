@@ -338,7 +338,6 @@ export default function Workout() {
         const values = exerciseValues[exercise.id] || {}
         return { ...exercise, ...values, name: values.selectedName || exercise.name, originalName: exercise.name }
       })
-      const programExposures = await buildProgramExposurePayloads({ profileId, exercises })
       const payload = {
         profileId,
         workoutType: type,
@@ -348,8 +347,7 @@ export default function Workout() {
         notes,
         exercises,
         draftId: local?.draftId || draft?.draftId,
-        running: type === 'E' ? running : null,
-        programExposures
+        running: type === 'E' ? running : null
       }
       if (!isOnline()) {
         addPendingWorkout(payload, userId)
@@ -357,7 +355,8 @@ export default function Workout() {
         setTimeout(() => navigate(`/dashboard/${profileId}`), 900)
         return
       }
-      await saveWorkoutSessionV2(payload)
+      const programExposures = await buildProgramExposurePayloads({ profileId, exercises })
+      await saveWorkoutSessionV2({ ...payload, programExposures })
       if (local?.draftId || draft?.draftId) {
         removeLocalWorkoutDraft(draftIdentity)
         await removeRemoteWorkoutDraft({ draftId: local?.draftId || draft?.draftId, profileId }).catch(() => undefined)
