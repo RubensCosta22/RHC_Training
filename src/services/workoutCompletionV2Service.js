@@ -47,7 +47,7 @@ export async function saveWorkoutSessionV2({
   const pace = running?.averagePaceSecondsPerKm > 0 ? Math.round(Number(running.averagePaceSecondsPerKm)) : null
   const activityMode = ['manual', 'stopwatch', 'gps'].includes(running?.mode) ? running.mode : null
 
-  const { data, error } = await supabase.rpc('save_workout_session_v2', {
+  const { data, error } = await supabase.rpc('save_workout_session_v3', {
     p_profile_id: profileId,
     p_workout_code: workoutType,
     p_workout_date: date,
