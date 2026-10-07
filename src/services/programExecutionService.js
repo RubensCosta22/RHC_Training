@@ -172,9 +172,25 @@ export function calculateProgramSuggestion(exercise, value, previousFailures = 0
   return { action: 'manual', suggestedLoad: Number(value.weight || 0), reason: 'Progressão manual configurada para este exercício.' }
 }
 
-export async function saveProgramExposure({ profileId, workoutSessionId, exercise, value, suggestion }) {
+export async function buildProgramExposurePayload({ profileId, exercise, value, suggestion: suppliedSuggestion = null }) {
   if (!exercise.programEnrollmentId || !exercise.programExerciseId || !exercise.programId) return null
   const variationName = value.selectedName || exercise.name
+  let suggestion = suppliedSuggestion
+  if (!suggestion) {
+    const recent = await getRecentProgramExposures(
+      exercise.programEnrollmentId,
+      exercise.programExerciseId,
+      variationName,
+      3
+    )
+    let previousFailures = 0
+    for (const item of recent) {
+      if (item.progression_action === 'increase') break
+      previousFailures += 1
+    }
+    suggestion = calculateProgramSuggestion(exercise, value, previousFailures)
+  }
+
   const { data: variation, error: variationError } = await supabase
     .from('exercise_catalog')
     .select('id')
@@ -184,12 +200,11 @@ export async function saveProgramExposure({ profileId, workoutSessionId, exercis
   if (variationError) throw variationError
   if (!variation) throw new Error(`Exercício não encontrado no catálogo: ${variationName}`)
 
-  const payload = {
+  return {
     profile_id: profileId,
     enrollment_id: exercise.programEnrollmentId,
     program_exercise_id: exercise.programExerciseId,
     program_id: exercise.programId,
-    workout_session_id: workoutSessionId || null,
     variation_exercise_id: variation.id,
     variation_name_snapshot: variationName,
     load: Number(value.weight || 0),
@@ -201,7 +216,26 @@ export async function saveProgramExposure({ profileId, workoutSessionId, exercis
     suggestion_reason: suggestion?.reason || null,
     accepted_action: value.progressionAccepted ?? null
   }
-  const { data, error } = await supabase.from('program_exercise_exposures').insert(payload).select('*').single()
+}
+
+export async function buildProgramExposurePayloads({ profileId, exercises = [] }) {
+  const relevant = exercises.filter((exercise) =>
+    exercise.programEnrollmentId && exercise.programExerciseId && exercise.programId
+  )
+  const payloads = await Promise.all(relevant.map((exercise) =>
+    buildProgramExposurePayload({ profileId, exercise, value: exercise })
+  ))
+  return payloads.filter(Boolean)
+}
+
+export async function saveProgramExposure({ profileId, workoutSessionId, exercise, value, suggestion }) {
+  const payload = await buildProgramExposurePayload({ profileId, exercise, value, suggestion })
+  if (!payload) return null
+  const { data, error } = await supabase
+    .from('program_exercise_exposures')
+    .insert({ ...payload, workout_session_id: workoutSessionId || null })
+    .select('*')
+    .single()
   if (error) throw error
   return data
 }

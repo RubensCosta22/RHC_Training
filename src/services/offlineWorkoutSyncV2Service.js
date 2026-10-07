@@ -1,6 +1,7 @@
 import { logger, createRequestId } from '../lib/observability/logger'
 import { getPendingWorkouts, replacePendingWorkouts } from '../utils/storage'
 import { saveWorkoutSessionV2 } from './workoutCompletionV2Service'
+import { buildProgramExposurePayloads } from './programExecutionService'
 import { supabase } from '../lib/supabaseClient'
 
 let pendingSyncPromise = null
@@ -26,7 +27,13 @@ async function runPendingWorkoutSyncV2() {
 
     try {
       const { ownerUserId: _ownerUserId, offlineId: _offlineId, ...payload } = item
-      await saveWorkoutSessionV2(payload)
+      const programExposures = Array.isArray(payload.programExposures)
+        ? payload.programExposures
+        : await buildProgramExposurePayloads({
+            profileId: payload.profileId,
+            exercises: payload.exercises || []
+          })
+      await saveWorkoutSessionV2({ ...payload, programExposures })
       synced += 1
     } catch (syncError) {
       logger.warn('offline_sync_v2.item_failed', {
