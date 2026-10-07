@@ -1,32 +1,25 @@
 \set ON_ERROR_STOP on
 begin;
 
-do $
-declare
-  v_v3_definer boolean;
-  v_v3_anon boolean;
-  v_draft_definer boolean;
-  v_draft_anon boolean;
-begin
-  select p.prosecdef, has_function_privilege('anon', p.oid, 'EXECUTE')
-    into v_v3_definer, v_v3_anon
+select 1 / case when exists (
+  select 1
   from pg_proc p
   join pg_namespace n on n.oid=p.pronamespace
-  where n.nspname='public' and p.proname='save_workout_session_v3';
+  where n.nspname='public'
+    and p.proname='save_workout_session_v3'
+    and not p.prosecdef
+    and not has_function_privilege('anon', p.oid, 'EXECUTE')
+) then 1 else 0 end as save_workout_session_v3_security_check;
 
-  select p.prosecdef, has_function_privilege('anon', p.oid, 'EXECUTE')
-    into v_draft_definer, v_draft_anon
+select 1 / case when exists (
+  select 1
   from pg_proc p
   join pg_namespace n on n.oid=p.pronamespace
-  where n.nspname='public' and p.proname='save_workout_draft_v2';
-
-  if coalesce(v_v3_definer, true) or coalesce(v_v3_anon, true) then
-    raise exception 'save_workout_session_v3 must be SECURITY INVOKER and denied to anon';
-  end if;
-  if coalesce(v_draft_definer, true) or coalesce(v_draft_anon, true) then
-    raise exception 'save_workout_draft_v2 must be SECURITY INVOKER and denied to anon';
-  end if;
-end $;
+  where n.nspname='public'
+    and p.proname='save_workout_draft_v2'
+    and not p.prosecdef
+    and not has_function_privilege('anon', p.oid, 'EXECUTE')
+) then 1 else 0 end as save_workout_draft_v2_security_check;
 
 insert into auth.users(
   instance_id,id,aud,role,email,encrypted_password,email_confirmed_at,
