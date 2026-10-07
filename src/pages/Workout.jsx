@@ -338,15 +338,26 @@ export default function Workout() {
         const values = exerciseValues[exercise.id] || {}
         return { ...exercise, ...values, name: values.selectedName || exercise.name, originalName: exercise.name }
       })
-      const payload = { profileId, workoutType: type, date, gymName: sanitizeText(gymName, 80), durationMinutes: automaticDurationMinutes, notes, exercises, draftId: local?.draftId || draft?.draftId, running: type === 'E' ? running : null }
+      const programExposures = await buildProgramExposurePayloads({ profileId, exercises })
+      const payload = {
+        profileId,
+        workoutType: type,
+        date,
+        gymName: sanitizeText(gymName, 80),
+        durationMinutes: automaticDurationMinutes,
+        notes,
+        exercises,
+        draftId: local?.draftId || draft?.draftId,
+        running: type === 'E' ? running : null,
+        programExposures
+      }
       if (!isOnline()) {
         addPendingWorkout(payload, userId)
         setMessage('Você está offline. Treino salvo no aparelho e será sincronizado quando a internet voltar.')
         setTimeout(() => navigate(`/dashboard/${profileId}`), 900)
         return
       }
-      const programExposures = await buildProgramExposurePayloads({ profileId, exercises })
-      await saveWorkoutSessionV2({ ...payload, programExposures })
+      await saveWorkoutSessionV2(payload)
       if (local?.draftId || draft?.draftId) {
         removeLocalWorkoutDraft(draftIdentity)
         await removeRemoteWorkoutDraft({ draftId: local?.draftId || draft?.draftId, profileId }).catch(() => undefined)
