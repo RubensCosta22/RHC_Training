@@ -27,7 +27,8 @@ export async function saveWorkoutSessionV2({
   notes,
   exercises,
   draftId = null,
-  running = null
+  running = null,
+  programExposures = []
 }) {
   const requestId = createRequestId()
   const runningDurationSeconds = running?.durationSeconds > 0 ? Math.round(Number(running.durationSeconds)) : null
@@ -60,7 +61,8 @@ export async function saveWorkoutSessionV2({
     p_distance_meters: distanceMeters,
     p_duration_seconds: durationSeconds,
     p_average_pace_seconds_per_km: pace,
-    p_activity_mode: activityMode
+    p_activity_mode: activityMode,
+    p_program_exposures: Array.isArray(programExposures) ? programExposures : []
   })
 
   if (error) {
