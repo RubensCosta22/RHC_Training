@@ -43,11 +43,11 @@ async function discardDraftAlreadyUsedBySession(record, profileId) {
   return null
 }
 
-export function remoteRecordToWorkoutDraft(record) {
+export function remoteRecordToWorkoutDraft(record, { userId = null } = {}) {
   if (!record) return null
   return {
     draftId: record.id,
-    userId: null,
+    userId,
     profileId: record.profile_id,
     workoutType: record.workout_code,
     programEnrollmentId: record.program_enrollment_id || null,
@@ -58,6 +58,20 @@ export function remoteRecordToWorkoutDraft(record) {
     createdAt: record.created_at,
     updatedAt: record.updated_at
   }
+}
+
+export async function isWorkoutDraftConsumed({ draftId, profileId }) {
+  if (!draftId || !profileId) return false
+  const { data, error } = await supabase
+    .from('workout_sessions')
+    .select('id')
+    .eq('profile_id', profileId)
+    .eq('client_operation_id', draftId)
+    .limit(1)
+    .maybeSingle()
+
+  if (error) throw error
+  return Boolean(data?.id)
 }
 
 export async function getRemoteWorkoutDraft({ draftId, profileId }) {
