@@ -19,8 +19,8 @@ export function evaluateLoadProgression({
 }) {
   const load = Number(currentLoad || 0)
   const allSetsCompleted = Number(completedSets || 0) >= Number(targetSets || 0)
-  const allRepsReached = reps.length >= Number(targetSets || 0) && reps.every((value) => Number(value) >= Number(repsMin || 0))
-  const rpeControlled = observedRpe == null || targetRpeMax == null || Number(observedRpe) <= Number(targetRpeMax)
+  const allRepsReached = Number(targetSets) > 0 && reps.length === Number(targetSets) && reps.every((value) => value !== '' && value != null && Number.isFinite(Number(value)) && Number(value) >= Number(repsMin))
+  const rpeControlled = targetRpeMax == null || (observedRpe != null && observedRpe !== '' && Number.isFinite(Number(observedRpe)) && Number(observedRpe) <= Number(targetRpeMax))
 
   if (allSetsCompleted && allRepsReached && rpeControlled) {
     const suggestedLoad = roundLoad(load + Number(loadIncrement || 0), loadIncrement)
@@ -56,11 +56,12 @@ export function evaluateDoubleProgression({
   repsMax,
   targetRpeMax,
   observedRpe,
-  loadIncrement
+  loadIncrement,
+  completedSets
 }) {
   const load = Number(currentLoad || 0)
-  const reachedTop = reps.length >= Number(targetSets || 0) && reps.every((value) => Number(value) >= Number(repsMax || 0))
-  const rpeControlled = observedRpe == null || targetRpeMax == null || Number(observedRpe) <= Number(targetRpeMax)
+  const reachedTop = Number(targetSets) > 0 && Number(completedSets) >= Number(targetSets) && reps.length === Number(targetSets) && reps.every((value) => value !== '' && value != null && Number.isFinite(Number(value)) && Number(value) >= Number(repsMax))
+  const rpeControlled = targetRpeMax == null || (observedRpe != null && observedRpe !== '' && Number.isFinite(Number(observedRpe)) && Number(observedRpe) <= Number(targetRpeMax))
 
   if (reachedTop && rpeControlled && Number(loadIncrement || 0) > 0) {
     return {
