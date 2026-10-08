@@ -63,3 +63,23 @@
 4. Melhorar substituições e referências históricas.
 5. Cadastrar próximo programa inativo, revisar prescrição e executar testes.
 6. PR revisado, CI e merge somente após aprovação explícita.
+
+
+## Verificação do projeto Supabase em 2026-10-08 (somente leitura)
+
+- Advisors segurança: 2 tabelas RLS sem políticas (`event_logs`, `profile_access`), e proteção contra senhas vazadas desativada. Ausência de policy com RLS ligado normalmente nega acesso, não demonstra vazamento. Confirmar intenção e privilégios RPC.
+- Advisors desempenho: FK `profile_invitations_claimed_by_fkey` sem índice de apoio; policy `profile_invitations_self_read` com avaliação repetida de auth; duas policies permissivas SELECT em `profile_invitations`; 21 índices sem uso reportado. **Não remover índices automaticamente**.
+- Migrações efetivas incluem `20261007131318_workout_integrity_atomic_completion` e `20261007132037_workout_draft_invoker_hardening`; verificar alinhamento entre código e banco antes de modificar RPC.
+- Contagens de referência: 73 sessões, 3 rascunhos, 2 matrículas e 292 exposições. Preservar integralmente.
+- Sessões de corrida código E: 12 registros, 11 com distância e 11 com duração; uma sessão precisa de análise de completude antes da migração da interface.
+- Das 292 exposições, 292 possuem `variation_exercise_id` e 290 possuem RPE. **Preferir ID já persistido ao nome**, e tratar 2 RPE ausentes sem presumir sucesso.
+- Há 1 registro de `duration_seconds` em A e 1 em C; não assumir que a coluna só foi usada para corrida.
+- Dados observados por consultas de agregação; nenhum dado individual foi alterado.
+
+### Referências oficiais para remediação
+
+- [RLS sem políticas](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy)
+- [Proteção de senhas](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection)
+- [Índices de FKs](https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys)
+- [Otimização RLS](https://supabase.com/docs/guides/database/database-linter?lint=0003_auth_rls_initplan)
+- [Políticas permissivas](https://supabase.com/docs/guides/database/database-linter?lint=0006_multiple_permissive_policies)
