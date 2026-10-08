@@ -83,3 +83,36 @@
 - [Índices de FKs](https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys)
 - [Otimização RLS](https://supabase.com/docs/guides/database/database-linter?lint=0003_auth_rls_initplan)
 - [Políticas permissivas](https://supabase.com/docs/guides/database/database-linter?lint=0006_multiple_permissive_policies)
+
+
+## Auditoria aprofundada — integridade de execução e offline
+
+### P0 — exposição de exercícios não concluídos no salvamento offline
+
+`src/services/offlineWorkoutSyncV2Service.js` chama `buildProgramExposurePayloads` quando o item pendente não traz exposições. `buildProgramExposurePayloads` filtra apenas a presença de IDs de programa, **não** `completed` ou séries concluídas. Confirmar o comportamento do salvamento online e da RPC para evitar registrar progressão de exercícios não executados.
+
+### P0 — recomendações divergentes no offline
+
+O fluxo offline recalcula recomendações quando a conectividade volta, usando o histórico daquele momento. Isso pode divergir do estado visto pelo usuário ao concluir o treino. Congelar a decisão por operação e validar idempotência da RPC.
+
+### P1 — troca de exercício mantém dados antigos
+
+`src/components/ExerciseCard.jsx` `selectExercise` zera conclusão e séries, mas mantém `weight`, `setReps`, `actualReps`, `rpe` e `progressionAccepted`. Trocar para alternativa pode gravar carga e repetições da máquina anterior. Necessário reset controlado com recuperação de histórico específico.
+
+### P1 — progressão dupla não confere séries efetivamente marcadas
+
+`calculateProgramSuggestion` não envia `completedSets` ao algoritmo de dupla progressão. `evaluateDoubleProgression` avalia repetições presentes mesmo quando séries não foram marcadas. Adicionar validação e testes.
+
+### P1 — histórico de exposição usa nome e matrícula
+
+`getRecentProgramExposures` filtra por `variation_name_snapshot`, `program_exercise_id` e matrícula. O banco já armazena `variation_exercise_id` em todas as exposições existentes. Corrigir resolução por ID, mantendo vínculo com exercícios equivalentes de ciclos anteriores para consulta de referência, mas não transferência automática de carga.
+
+### P2 — fila offline tem capacidade e recuperação limitadas
+
+`src/utils/storage.js` limita fila a 20 itens e substitui silenciosamente o mais antigo ao inserir o 21º. `replacePendingWorkouts` reescreve a fila após sincronização; validar concorrência com novas inserções durante o processo. Exigir aviso de limite e teste de concorrência.
+
+### P2 — registro manual de corrida: sem cronômetro/GPS
+
+`RunningSessionPanel.jsx` contém lógica GPS e relógio em estado, e entrada numérica de tempo em segundos. Reescrever UI como distância, minutos e segundos, mantendo persistência em segundos e compatibilidade histórica. Validar digitação parcial, vírgula decimal, campo vazio, 0/59/60 segundos e duração acima de 60 minutos.
+
+**Estado:** evidências derivadas da leitura de código. Os cenários ainda não foram reproduzidos com testes automatizados ou navegação; classificação de risco provisória.
