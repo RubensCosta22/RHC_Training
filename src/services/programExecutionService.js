@@ -156,6 +156,7 @@ export function calculateProgramSuggestion(exercise, value, previousFailures = 0
   const reps = Array.isArray(value.setReps) ? value.setReps.map(Number) : []
   const common = {
     currentLoad: Number(value.weight || 0), reps, targetSets: Number(exercise.sets || 0),
+    completedSets: (value.completedSets || []).filter(Boolean).length,
     targetRpeMax: exercise.targetRpeMax,
     observedRpe: value.rpe === '' || value.rpe == null ? null : Number(value.rpe),
     loadIncrement: exercise.loadIncrement
@@ -163,7 +164,6 @@ export function calculateProgramSuggestion(exercise, value, previousFailures = 0
   if (exercise.progressionType === 'double_progression') return evaluateDoubleProgression({ ...common, repsMax: exercise.repsMax })
   if (exercise.progressionType === 'load') return evaluateLoadProgression({
     ...common,
-    completedSets: (value.completedSets || []).filter(Boolean).length,
     repsMin: exercise.repsMin,
     failedExposureCount: previousFailures,
     failuresBeforeRegression: exercise.failuresBeforeRegression,
@@ -185,7 +185,8 @@ export async function buildProgramExposurePayload({ profileId, exercise, value, 
     )
     let previousFailures = 0
     for (const item of recent) {
-      if (item.progression_action === 'increase') break
+      if (item.progression_action !== 'regress' && item.progression_action !== 'hold') break
+      if (item.observed_rpe == null || Number(item.completed_sets) <= 0) break
       previousFailures += 1
     }
     suggestion = calculateProgramSuggestion(exercise, value, previousFailures)
