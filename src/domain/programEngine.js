@@ -18,7 +18,7 @@ export function evaluateLoadProgression({
   regressionPercent = 7.5
 }) {
   const load = Number(currentLoad || 0)
-  const allSetsCompleted = Number(completedSets || 0) >= Number(targetSets || 0)
+  const allSetsCompleted = Number(targetSets) > 0 && Number(completedSets) >= Number(targetSets)
   const allRepsReached = Number(targetSets) > 0 && reps.length === Number(targetSets) && reps.every((value) => value !== '' && value != null && Number.isFinite(Number(value)) && Number(value) >= Number(repsMin))
   const rpeControlled = targetRpeMax == null || (observedRpe != null && observedRpe !== '' && Number.isFinite(Number(observedRpe)) && Number(observedRpe) <= Number(targetRpeMax))
 
@@ -31,6 +31,13 @@ export function evaluateLoadProgression({
         ? 'Meta concluída dentro da faixa de repetições e do RPE alvo.'
         : 'Meta concluída; incremento da máquina ainda não foi configurado.'
     }
+  }
+
+  // Incomplete or missing observations are not evidence of a failed exposure.
+  const validReps = Number(targetSets) > 0 && reps.length === Number(targetSets) && reps.every((value) => value !== '' && value != null && Number.isFinite(Number(value)) && Number(value) >= 0)
+  const validRpe = targetRpeMax == null || (observedRpe != null && observedRpe !== '' && Number.isFinite(Number(observedRpe)))
+  if (!allSetsCompleted || !validReps || !validRpe) {
+    return { action: 'hold', suggestedLoad: load, reason: 'Registro incompleto; confirme séries, repetições e esforço antes de ajustar a carga.' }
   }
 
   if (Number(failedExposureCount || 0) + 1 >= Number(failuresBeforeRegression || 2)) {
