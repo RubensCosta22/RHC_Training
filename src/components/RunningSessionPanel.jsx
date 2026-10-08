@@ -1,127 +1,73 @@
-import { MapPin, Pause, Play, RotateCcw, Square } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
-import {
-  accumulateGpsPoint,
-  calculatePaceSecondsPerKm,
-  formatDuration,
-  formatPace,
-  getElapsedSeconds,
-  pauseTimer,
-  resetTimer,
-  startTimer
-} from '../lib/runningSession'
+import { useEffect, useState } from 'react'
+import { calculatePaceSecondsPerKm, formatPace } from '../lib/runningSession'
 
-function normalizeNumber(value) {
-  const number = Number(String(value).replace(',', '.'))
-  return Number.isFinite(number) && number >= 0 ? number : 0
+function formatDistance(meters) {
+  if (!meters) return ''
+  return String(Number((meters / 1000).toFixed(3))).replace('.', ',')
+}
+
+function durationParts(seconds) {
+  const total = Math.max(0, Math.floor(Number(seconds) || 0))
+  return { minutes: String(Math.floor(total / 60)), seconds: String(total % 60).padStart(2, '0') }
+}
+
+function parseDistance(text) {
+  const normalized = text.trim().replace(',', '.')
+  if (!/^\d*(?:\.\d{0,3})?$/.test(normalized)) return null
+  if (!normalized || normalized === '.') return 0
+  return Math.round(Number(normalized) * 1000)
 }
 
 export default function RunningSessionPanel({ value, onChange, onImportantEvent }) {
   const running = value || {}
-  const timer = running.timer || resetTimer()
-  const [now, setNow] = useState(Date.now())
-  const watchIdRef = useRef(null)
-  const gpsStateRef = useRef({ lastPoint: null, distanceMeters: 0 })
-  const runningRef = useRef(running)
-
-  runningRef.current = running
-
-  const elapsedSeconds = timer.status === 'running'
-    ? getElapsedSeconds(timer, now)
-    : Math.max(0, Number(running.durationSeconds || timer.accumulatedSeconds) || 0)
+  const [distanceInput, setDistanceInput] = useState(() => formatDistance(Number(running.distanceMeters) || 0))
+  const [timeInput, setTimeInput] = useState(() => durationParts(running.durationSeconds))
+  const [activeField, setActiveField] = useState(null)
   const distanceMeters = Math.max(0, Number(running.distanceMeters) || 0)
-  const pace = calculatePaceSecondsPerKm(distanceMeters, elapsedSeconds)
+  const durationSeconds = Math.max(0, Number(running.durationSeconds) || 0)
+  const pace = calculatePaceSecondsPerKm(distanceMeters, durationSeconds)
 
+  // Keep inputs editable without overwriting intermediate text such as "6," or "0".
+  // External draft restoration still updates fields that are not being edited.
   useEffect(() => {
-    gpsStateRef.current.distanceMeters = distanceMeters
-  }, [distanceMeters])
-
+    if (activeField !== 'distance') setDistanceInput(formatDistance(distanceMeters))
+  }, [distanceMeters, activeField])
   useEffect(() => {
-    if (timer.status !== 'running') return undefined
-    const interval = window.setInterval(() => setNow(Date.now()), 1000)
-    return () => window.clearInterval(interval)
-  }, [timer.status])
+    if (activeField !== 'minutes' && activeField !== 'seconds') setTimeInput(durationParts(durationSeconds))
+  }, [durationSeconds, activeField])
 
-  useEffect(() => () => {
-    if (watchIdRef.current != null && navigator.geolocation) {
-      navigator.geolocation.clearWatch(watchIdRef.current)
+  function patch(next) {
+    const merged = {
+      ...running,
+      ...next,
+      mode: 'manual',
+      gpsStatus: 'idle',
+      timer: null,
+      status: 'finished'
     }
-  }, [])
-
-  function patch(next, important = false) {
-    const current = runningRef.current || {}
-    const currentTimer = current.timer || resetTimer()
-    const merged = { ...current, ...next }
-    const effectiveDuration = next.durationSeconds ?? getElapsedSeconds(merged.timer || currentTimer)
-    const effectiveDistance = next.distanceMeters ?? Math.max(0, Number(current.distanceMeters) || 0)
-    merged.averagePaceSecondsPerKm = calculatePaceSecondsPerKm(effectiveDistance, effectiveDuration)
-    runningRef.current = merged
-    onChange(merged)
-    if (important) onImportantEvent?.(merged)
-  }
-
-  function start() {
-    patch({ timer: startTimer(timer), mode: running.mode === 'gps' ? 'gps' : 'stopwatch' })
-  }
-
-  function pause() {
-    const nextTimer = pauseTimer(timer)
-    patch({ timer: nextTimer, durationSeconds: nextTimer.accumulatedSeconds }, true)
-  }
-
-  function finish() {
-    const nextTimer = timer.status === 'running' ? pauseTimer(timer) : timer
-    stopGps()
-    patch({ timer: nextTimer, durationSeconds: getElapsedSeconds(nextTimer), status: 'finished' }, true)
-  }
-
-  function reset() {
-    stopGps()
-    gpsStateRef.current = { lastPoint: null, distanceMeters: 0 }
-    patch({ timer: resetTimer(), durationSeconds: 0, distanceMeters: 0, averagePaceSecondsPerKm: null, mode: 'manual', gpsStatus: 'idle', status: 'idle' }, true)
-  }
-
-  function stopGps() {
-    if (watchIdRef.current != null && navigator.geolocation) {
-      navigator.geolocation.clearWatch(watchIdRef.current)
-      watchIdRef.current = null
-    }
-    gpsStateRef.current.lastPoint = null
-  }
-
-  function startGps() {
-    if (!navigator.geolocation) {
-      patch({ gpsStatus: 'unavailable', mode: 'manual' }, true)
-      return
-    }
-    stopGps()
-    gpsStateRef.current = {
-      lastPoint: null,
-      distanceMeters: Math.max(0, Number(runningRef.current?.distanceMeters) || 0)
-    }
-    patch({ gpsStatus: 'acquiring', mode: 'gps', timer: startTimer(timer) })
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (position) => {
-        const point = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-          timestamp: position.timestamp
-        }
-        const nextGpsState = accumulateGpsPoint(gpsStateRef.current, point)
-        gpsStateRef.current = nextGpsState
-        if (!nextGpsState.accepted) {
-          patch({ gpsStatus: nextGpsState.reason === 'accuracy' ? 'weak' : 'tracking' })
-          return
-        }
-        patch({ gpsStatus: 'tracking', distanceMeters: nextGpsState.distanceMeters, mode: 'gps' })
-      },
-      () => {
-        stopGps()
-        patch({ gpsStatus: 'denied', mode: 'manual' }, true)
-      },
-      { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 }
+    merged.averagePaceSecondsPerKm = calculatePaceSecondsPerKm(
+      Math.max(0, Number(merged.distanceMeters) || 0),
+      Math.max(0, Number(merged.durationSeconds) || 0)
     )
+    onChange(merged)
+    onImportantEvent?.(merged)
+  }
+
+  function changeDistance(text) {
+    const meters = parseDistance(text)
+    if (meters === null) return
+    setDistanceInput(text)
+    patch({ distanceMeters: meters })
+  }
+
+  function changeTime(part, text) {
+    if (!/^\d*$/.test(text)) return
+    if (part === 'seconds' && text !== '' && Number(text) > 59) return
+    const next = { ...timeInput, [part]: text }
+    setTimeInput(next)
+    const minutes = Number(next.minutes || 0)
+    const seconds = Number(next.seconds || 0)
+    patch({ durationSeconds: minutes * 60 + seconds })
   }
 
   return (
@@ -129,44 +75,44 @@ export default function RunningSessionPanel({ value, onChange, onImportantEvent 
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[.14em] text-[#C8FF3D]">Corrida</p>
-          <h2 id="running-title" className="mt-1 text-xl font-semibold text-[#F5F5F7]">Distância e tempo</h2>
+          <h2 id="running-title" className="mt-1 text-xl font-semibold text-[#F5F5F7]">Registrar corrida</h2>
         </div>
-        <span className="text-xs text-[#8E8E93]">{running.mode === 'gps' ? 'GPS opcional' : 'Registro manual'}</span>
+        <span className="text-xs text-[#8E8E93]">Registro manual</span>
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-3">
-        <label className="rounded-lg bg-[#0A0A0B] p-3">
+      <div className="mt-5 grid grid-cols-2 gap-3">
+        <label className="col-span-2 rounded-lg bg-[#0A0A0B] p-3 sm:col-span-1">
           <span className="text-xs uppercase tracking-wide text-[#8E8E93]">Distância (km)</span>
-          <input type="number" min="0" step="0.01" value={distanceMeters ? (distanceMeters / 1000).toFixed(2) : ''} onChange={(event) => patch({ distanceMeters: Math.round(normalizeNumber(event.target.value) * 1000), mode: 'manual' })} className="mt-1 w-full border-0 bg-transparent p-0 text-2xl font-semibold" placeholder="0,00" />
+          <input type="text" inputMode="decimal" value={distanceInput}
+            onFocus={() => setActiveField('distance')} onBlur={() => setActiveField(null)}
+            onChange={(event) => changeDistance(event.target.value)}
+            className="mt-1 w-full border-0 bg-transparent p-0 text-2xl font-semibold text-[#F5F5F7] outline-none"
+            placeholder="6,02" aria-label="Distância em quilômetros" />
         </label>
-        <label className="rounded-lg bg-[#0A0A0B] p-3">
-          <span className="text-xs uppercase tracking-wide text-[#8E8E93]">Tempo (segundos)</span>
-          <input type="number" min="0" value={elapsedSeconds || ''} onChange={(event) => patch({ durationSeconds: Math.round(normalizeNumber(event.target.value)), timer: { status: 'paused', accumulatedSeconds: Math.round(normalizeNumber(event.target.value)), startedAt: null }, mode: 'manual' })} className="mt-1 w-full border-0 bg-transparent p-0 text-2xl font-semibold" placeholder="0" />
-        </label>
-        <div className="col-span-2 rounded-lg bg-[#0A0A0B] p-3 md:col-span-1">
-          <span className="text-xs uppercase tracking-wide text-[#8E8E93]">Ritmo médio</span>
+        <div className="col-span-2 grid grid-cols-2 gap-3 sm:col-span-1">
+          <label className="rounded-lg bg-[#0A0A0B] p-3">
+            <span className="text-xs uppercase tracking-wide text-[#8E8E93]">Minutos</span>
+            <input type="text" inputMode="numeric" value={timeInput.minutes}
+              onFocus={() => setActiveField('minutes')} onBlur={() => setActiveField(null)}
+              onChange={(event) => changeTime('minutes', event.target.value)}
+              className="mt-1 w-full border-0 bg-transparent p-0 text-2xl font-semibold text-[#F5F5F7] outline-none"
+              aria-label="Minutos da corrida" placeholder="34" />
+          </label>
+          <label className="rounded-lg bg-[#0A0A0B] p-3">
+            <span className="text-xs uppercase tracking-wide text-[#8E8E93]">Segundos</span>
+            <input type="text" inputMode="numeric" value={timeInput.seconds}
+              onFocus={() => setActiveField('seconds')} onBlur={() => setActiveField(null)}
+              onChange={(event) => changeTime('seconds', event.target.value)}
+              className="mt-1 w-full border-0 bg-transparent p-0 text-2xl font-semibold text-[#F5F5F7] outline-none"
+              aria-label="Segundos da corrida" placeholder="08" />
+          </label>
+        </div>
+        <div className="col-span-2 rounded-lg bg-[#0A0A0B] p-3">
+          <span className="text-xs uppercase tracking-wide text-[#8E8E93]">Ritmo médio (automático)</span>
           <p className="mt-1 text-2xl font-semibold text-[#F5F5F7]">{formatPace(pace)}</p>
         </div>
       </div>
-
-      <div className="mt-5 text-center">
-        <p className="font-mono text-5xl font-semibold tracking-tight text-[#F5F5F7]">{formatDuration(elapsedSeconds)}</p>
-        <div className="mt-4 flex flex-wrap justify-center gap-2">
-          {timer.status === 'running' ? (
-            <button type="button" onClick={pause} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#F5F5F7] px-4 font-semibold text-[#0A0A0B]"><Pause size={18} />Pausar</button>
-          ) : (
-            <button type="button" onClick={start} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#C8FF3D] px-4 font-semibold text-[#0A0A0B]"><Play size={18} />{elapsedSeconds ? 'Continuar' : 'Iniciar'}</button>
-          )}
-          <button type="button" onClick={finish} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#2A2A2E] px-4 font-semibold"><Square size={18} />Finalizar corrida</button>
-          <button type="button" onClick={reset} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#2A2A2E] px-4 font-semibold"><RotateCcw size={18} />Zerar</button>
-        </div>
-      </div>
-
-      <div className="mt-5 border-t border-[#2A2A2E] pt-4">
-        <button type="button" onClick={startGps} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#2A2A2E] px-4 text-sm font-semibold"><MapPin size={18} />Medir com GPS</button>
-        <p className="mt-2 text-xs leading-5 text-[#8E8E93]">O GPS é opcional. A rota não é salva; apenas distância, tempo e ritmo. Se o sinal falhar, informe os dados manualmente.</p>
-        {running.gpsStatus && running.gpsStatus !== 'idle' && <p className="mt-2 text-xs text-[#C8FF3D]" role="status">GPS: {running.gpsStatus}</p>}
-      </div>
+      <p className="mt-3 text-xs leading-5 text-[#8E8E93]">Informe a distância e o tempo do seu aplicativo de corrida. Sem GPS ou cronômetro.</p>
     </section>
   )
 }
