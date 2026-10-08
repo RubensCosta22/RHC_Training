@@ -31,9 +31,9 @@ describe('programEngine', () => {
   it('sugere regressao apos falhas consecutivas', () => {
     expect(evaluateLoadProgression({
       currentLoad: 80,
-      completedSets: 4,
+      completedSets: 5,
       targetSets: 5,
-      reps: [5, 5, 4, 4],
+      reps: [5, 5, 5, 4, 4],
       repsMin: 5,
       failedExposureCount: 1,
       failuresBeforeRegression: 2,
