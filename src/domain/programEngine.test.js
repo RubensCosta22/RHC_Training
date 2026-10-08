@@ -79,6 +79,24 @@ describe('programEngine', () => {
     }).action).toBe('hold')
   })
 
+  it('nao regride carga quando faltam series mesmo apos falha anterior', () => {
+    expect(evaluateLoadProgression({
+      currentLoad: 80, completedSets: 2, targetSets: 3,
+      reps: [8, 8], repsMin: 8, targetRpeMax: 8,
+      observedRpe: 8, failedExposureCount: 1,
+      failuresBeforeRegression: 2, loadIncrement: 2.5
+    })).toMatchObject({ action: 'hold', suggestedLoad: 80 })
+  })
+
+  it('nao regride carga quando o RPE esta ausente', () => {
+    expect(evaluateLoadProgression({
+      currentLoad: 80, completedSets: 3, targetSets: 3,
+      reps: [8, 8, 7], repsMin: 8, targetRpeMax: 8,
+      observedRpe: null, failedExposureCount: 1,
+      failuresBeforeRegression: 2, loadIncrement: 2.5
+    })).toMatchObject({ action: 'hold', suggestedLoad: 80 })
+  })
+
   it('calcula a semana do programa sem avancar antes de sete dias', () => {
     expect(getProgramWeek('2026-07-21', new Date('2026-07-27T10:00:00'))).toBe(1)
     expect(getProgramWeek('2026-07-21', new Date('2026-07-28T10:00:00'))).toBe(2)
