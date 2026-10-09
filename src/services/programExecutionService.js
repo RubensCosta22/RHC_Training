@@ -174,6 +174,7 @@ export function calculateProgramSuggestion(exercise, value, previousFailures = 0
 
 export async function buildProgramExposurePayload({ profileId, exercise, value, suggestion: suppliedSuggestion = null }) {
   if (!exercise.programEnrollmentId || !exercise.programExerciseId || !exercise.programId) return null
+  if (!value?.completed && !(Array.isArray(value?.completedSets) && value.completedSets.some(Boolean))) return null
   const variationName = value.selectedName || exercise.name
   let suggestion = suppliedSuggestion
   if (!suggestion) {
@@ -221,7 +222,8 @@ export async function buildProgramExposurePayload({ profileId, exercise, value, 
 
 export async function buildProgramExposurePayloads({ profileId, exercises = [] }) {
   const relevant = exercises.filter((exercise) =>
-    exercise.programEnrollmentId && exercise.programExerciseId && exercise.programId
+    exercise.programEnrollmentId && exercise.programExerciseId && exercise.programId &&
+    (exercise.completed || (Array.isArray(exercise.completedSets) && exercise.completedSets.some(Boolean)))
   )
   const payloads = await Promise.all(relevant.map((exercise) =>
     buildProgramExposurePayload({ profileId, exercise, value: exercise })
