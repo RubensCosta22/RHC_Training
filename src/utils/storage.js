@@ -20,7 +20,7 @@ export function getSelectedProfile() {
 export function getPendingWorkouts() {
   try {
     const parsed = JSON.parse(localStorage.getItem(PENDING_KEY) || '[]')
-    return Array.isArray(parsed) ? parsed.slice(0, MAX_PENDING_WORKOUTS) : []
+    return Array.isArray(parsed) ? parsed : []
   } catch (error) {
     logger.warn('offline_storage.pending_workouts_parse_failed', {
       storageKey: PENDING_KEY,
@@ -45,14 +45,17 @@ export function addPendingWorkout(payload, ownerUserId) {
     throw new Error('Treino offline excede o limite seguro do aparelho.')
   }
   const current = getPendingWorkouts()
-  localStorage.setItem(PENDING_KEY, JSON.stringify([
-    ...current.slice(-(MAX_PENDING_WORKOUTS - 1)), item
-  ]))
+  if (current.length >= MAX_PENDING_WORKOUTS) {
+    throw new Error('Limite de 20 treinos offline atingido. Sincronize os treinos pendentes antes de continuar.')
+  }
+  localStorage.setItem(PENDING_KEY, JSON.stringify([...current, item]))
 }
 
 export function replacePendingWorkouts(items) {
-  const safeItems = Array.isArray(items) ? items.slice(0, MAX_PENDING_WORKOUTS) : []
-  localStorage.setItem(PENDING_KEY, JSON.stringify(safeItems))
+  if (!Array.isArray(items)) throw new Error('Fila offline inválida.')
+  // Preserve entries added while the async synchronization was running.
+  if (items.length > MAX_PENDING_WORKOUTS) throw new Error('Fila offline acima do limite seguro.')
+  localStorage.setItem(PENDING_KEY, JSON.stringify(items))
 }
 
 export function clearPendingWorkouts() {
