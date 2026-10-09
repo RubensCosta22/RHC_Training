@@ -51,11 +51,13 @@ export function addPendingWorkout(payload, ownerUserId) {
   localStorage.setItem(PENDING_KEY, JSON.stringify([...current, item]))
 }
 
-export function replacePendingWorkouts(items) {
+export function replacePendingWorkouts(items, processedOfflineIds = null) {
   if (!Array.isArray(items)) throw new Error('Fila offline inválida.')
-  // Preserve entries added while the async synchronization was running.
-  if (items.length > MAX_PENDING_WORKOUTS) throw new Error('Fila offline acima do limite seguro.')
-  localStorage.setItem(PENDING_KEY, JSON.stringify(items))
+  const processed = processedOfflineIds == null ? null : new Set(processedOfflineIds)
+  const additions = processed == null ? [] : getPendingWorkouts().filter((item) => !processed.has(item.offlineId))
+  const merged = [...items, ...additions]
+  if (merged.length > MAX_PENDING_WORKOUTS) throw new Error('Fila offline acima do limite seguro.')
+  localStorage.setItem(PENDING_KEY, JSON.stringify(merged))
 }
 
 export function clearPendingWorkouts() {
