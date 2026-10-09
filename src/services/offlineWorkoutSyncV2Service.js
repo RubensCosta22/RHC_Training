@@ -48,15 +48,18 @@ async function runPendingWorkoutSyncV2() {
     }
   }
 
-  replacePendingWorkouts(remaining)
+  // Do not overwrite workouts queued while the network requests were in flight.
+  const initialIds = new Set(pending.map((item) => item.offlineId))
+  const addedDuringSync = getPendingWorkouts().filter((item) => !initialIds.has(item.offlineId))
+  replacePendingWorkouts([...remaining, ...addedDuringSync])
   logger.info('offline_sync_v2.completed', {
     requestId,
     userId,
     pendingCount: pending.length,
     synced,
-    remaining: remaining.length
+    remaining: remaining.length + addedDuringSync.length
   })
-  return { synced, remaining: remaining.length }
+  return { synced, remaining: remaining.length + addedDuringSync.length }
 }
 
 export function syncPendingWorkoutsV2() {
