@@ -54,7 +54,13 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
   }
 
   function selectExercise(name) {
-    update({ selectedName: name, completed: false, completedSets: Array(Number(exercise.sets || 0)).fill(false), expanded: true })
+    update({
+      selectedName: name,
+      weight: '', actualReps: '', setReps: Array(Number(exercise.sets || 0)).fill(''),
+      rpe: '', progressionAccepted: null, restTimerKey: null,
+      completed: false, completedSets: Array(Number(exercise.sets || 0)).fill(false),
+      expanded: true, detailsOpen: true
+    })
     setShowSwapOptions(false)
   }
 
