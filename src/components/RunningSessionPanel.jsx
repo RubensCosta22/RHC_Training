@@ -43,14 +43,13 @@ export default function RunningSessionPanel({ value, onChange, onImportantEvent 
       mode: 'manual',
       gpsStatus: 'idle',
       timer: null,
-      status: 'finished'
+      status: 'idle'
     }
     merged.averagePaceSecondsPerKm = calculatePaceSecondsPerKm(
       Math.max(0, Number(merged.distanceMeters) || 0),
       Math.max(0, Number(merged.durationSeconds) || 0)
     )
     onChange(merged)
-    onImportantEvent?.(merged)
   }
 
   function changeDistance(text) {
