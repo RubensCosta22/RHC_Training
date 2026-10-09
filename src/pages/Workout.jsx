@@ -43,18 +43,15 @@ const activeWorkoutTimer = (savedTimer) => {
 function resolveExerciseRecord(exercise, selectedName, records) {
   const exact = records[selectedName]
   if (exact && Number(exact.last_weight || 0) > 0) return { ...exact, matched_name: selectedName, exact_match: true }
-  const candidates = [exercise.name, ...(exercise.alternatives || [])]
-    .map((name) => records[name])
-    .filter((record) => record && Number(record.last_weight || 0) > 0)
-    .sort((a, b) => String(b.last_date || '').localeCompare(String(a.last_date || '')))
-  return candidates.length ? { ...candidates[0], matched_name: candidates[0].exercise_name, exact_match: false } : null
+  // Different machines and variations must never inherit each other's loads.
+  return null
 }
 
 function buildInitialExerciseValues(workout) {
   const initial = {}
   workout.exercises.forEach((exercise) => {
     initial[exercise.id] = {
-      weight: '', actualReps: '', setReps: Array(Number(exercise.sets || 0)).fill(String(exercise.repsMin || String(exercise.reps || '').match(/\\d+/)?.[0] || '')), rpe: '',
+      weight: '', actualReps: '', setReps: Array(Number(exercise.sets || 0)).fill(''), rpe: '',
       progressionAccepted: null, notes: '', completed: false,
       completedSets: Array(Number(exercise.sets || 0)).fill(false), difficulty: 'normal',
       selectedName: exercise.name, expanded: true, detailsOpen: false, restTimerKey: null
