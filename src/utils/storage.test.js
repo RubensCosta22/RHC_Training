@@ -19,6 +19,22 @@ describe('fila de treinos offline', () => {
     expect(getPendingWorkouts().map((item) => item.draftId)).toEqual(Array.from({ length: 20 }, (_, i) => String(i)))
   })
 
+  it('preserva registros adicionados apos o inicio da sincronizacao', () => {
+    addPendingWorkout({ draftId: 'original' }, 'user')
+    const original = getPendingWorkouts()[0]
+    addPendingWorkout({ draftId: 'novo' }, 'user')
+    replacePendingWorkouts([], [original.offlineId])
+    expect(getPendingWorkouts().map((item) => item.draftId)).toEqual(['novo'])
+  })
+
+  it('preserva registros que falharam junto com novas adicoes', () => {
+    addPendingWorkout({ draftId: 'falhou' }, 'user')
+    const failed = getPendingWorkouts()[0]
+    addPendingWorkout({ draftId: 'novo' }, 'user')
+    replacePendingWorkouts([failed], [failed.offlineId])
+    expect(getPendingWorkouts().map((item) => item.draftId)).toEqual(['falhou', 'novo'])
+  })
+
   it('mantem a fila completa ao substituir registros validos', () => {
     addPendingWorkout({ draftId: 'a' }, 'user')
     const first = getPendingWorkouts()[0]
