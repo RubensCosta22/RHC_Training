@@ -10,9 +10,10 @@ import { getProfile } from '../services/profileService'
 import { getAvailablePlanOptions } from '../services/planService'
 import { getDashboardSummary } from '../services/workoutService'
 import { getTodaySchedule } from '../services/scheduleService'
+import { getProgramStartState } from '../services/programService'
 import { friendlyError } from '../utils/validation'
 import { formatShortDate } from '../utils/date'
-import { getNextWorkoutType } from '../utils/workoutRotation'
+import { getSuggestedWorkoutType } from '../utils/workoutRotation'
 
 const descriptions = { A:'Peito • Ombro • Tríceps', B:'Costas • Bíceps', C:'Pernas • Core', D:'Força funcional • Posterior', E:'Condicionamento • Corrida' }
 const quickLinks = [
@@ -27,9 +28,10 @@ export default function Dashboard() {
   const [profile,setProfile]=useState(null); const [summary,setSummary]=useState(null)
   const [planOptions,setPlanOptions]=useState([{code:'A',title:descriptions.A},{code:'B',title:descriptions.B},{code:'C',title:descriptions.C}]); const [schedule,setSchedule]=useState({configured:false,workoutType:null}); const [error,setError]=useState('')
   const [isAdmin,setIsAdmin]=useState(false)
-  useEffect(()=>{getProfile(profileId).then(async p=>{const [s,options,a,context]=await Promise.all([getDashboardSummary(profileId),getAvailablePlanOptions(p),getTodaySchedule(profileId),getFamilyContext()]);setProfile(p);setSummary(s);setPlanOptions(options);setSchedule(a);setIsAdmin(context?.role==='admin')}).catch(e=>setError(friendlyError(e)))},[profileId])
+  const [programStart,setProgramStart]=useState(null)
+  useEffect(()=>{getProfile(profileId).then(async p=>{const [s,options,a,context,start]=await Promise.all([getDashboardSummary(profileId),getAvailablePlanOptions(p),getTodaySchedule(profileId),getFamilyContext(),getProgramStartState(profileId)]);setProfile(p);setSummary(s);setPlanOptions(options);setSchedule(a);setProgramStart(start);setIsAdmin(context?.role==='admin')}).catch(e=>setError(friendlyError(e)))},[profileId])
   const types=useMemo(()=>planOptions.map((item)=>item.code),[planOptions])
-  const next=useMemo(()=>schedule.configured?schedule.workoutType:getNextWorkoutType(summary?.lastWorkout?.workout_type,types),[summary,types,schedule])
+  const next=useMemo(()=>getSuggestedWorkoutType({programStart,schedule,lastWorkoutType:summary?.lastWorkout?.workout_type,availableTypes:types}),[summary,types,schedule,programStart])
   if(error)return <Card className="border-[#FF453A]/30 bg-[#FF453A]/5 text-[#FF9F95]">{error}</Card>
   if(!profile||!summary)return <p className="animate-pulse text-[#8E8E93]">Preparando seu treino...</p>
   const target=Math.max(1,planOptions.length); const percent=Math.min(100,Math.round(summary.weekCount/target*100))
@@ -47,7 +49,7 @@ export default function Dashboard() {
         <div className="flex h-full max-w-2xl flex-col justify-center">
           <div className="mb-6 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.14em] text-[#C8FF3D]"><span className="h-1.5 w-1.5 rounded-full bg-[#C8FF3D]"/>{next?'Treino de hoje':'Dia de descanso'}</div>
           <h2 className="text-[clamp(3.2rem,6vw,6rem)] font-[780] leading-[.9] tracking-[-.07em] text-[#F5F5F7]">{next?`Treino ${next}`:'Recupere.'}</h2>
-          <p className="mt-5 max-w-lg text-base leading-relaxed text-[#8E8E93]">{next?(descriptions[next]||'Plano personalizado'):'Sono, nutrição e descanso também constroem resultado.'}</p>
+          <p className="mt-5 max-w-lg text-base leading-relaxed text-[#8E8E93]">{next?(planOptions.find(item=>item.code===next)?.title||descriptions[next]||'Plano personalizado'):'Sono, nutrição e descanso também constroem resultado.'}</p>
           {next&&<Link to={`/workout/${profileId}/${next}`} className="btn-primary mt-9 inline-flex w-fit items-center gap-3 px-6"><Play size={18} fill="currentColor"/> Começar agora</Link>}
         </div>
       </section>
