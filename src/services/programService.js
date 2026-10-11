@@ -33,6 +33,26 @@ export async function getProfileProgramEnrollment(profileId) {
   return data || null
 }
 
+export async function getProgramStartState(profileId) {
+  const enrollment = await getProfileProgramEnrollment(profileId)
+  if (!enrollment) return null
+
+  const [sessions, exposures] = await Promise.all([
+    supabase.from('program_sessions').select('code')
+      .eq('program_id', enrollment.program_id).order('day_order').limit(1),
+    supabase.from('program_exercise_exposures')
+      .select('id, workout_sessions!program_exercise_exposures_workout_session_id_fkey!inner(archived_at)')
+      .eq('enrollment_id', enrollment.id).gt('completed_sets', 0)
+      .is('workout_sessions.archived_at', null).limit(1)
+  ])
+  if (sessions.error) throw sessions.error
+  if (exposures.error) throw exposures.error
+  return {
+    firstWorkoutType: sessions.data?.[0]?.code || null,
+    hasStarted: Boolean(exposures.data?.length)
+  }
+}
+
 export async function getProfileTrainingArchives(profileId) {
   const { data, error } = await supabase
     .from('profile_training_archives')
