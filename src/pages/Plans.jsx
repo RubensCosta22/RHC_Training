@@ -1,3 +1,4 @@
+import { WORKOUT_TYPES } from '../domain/workoutTypes'
 import { ArrowDown, ArrowUp, CheckCircle2, Plus, Save, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import PageHeader from '../components/ui/PageHeader'
@@ -82,7 +83,7 @@ export default function Plans() {
       <label className="text-sm text-slate-300">Perfil
         <select className="mt-1" value={profile?.id || ''} onChange={(event)=>setProfile(profiles.find((item)=>item.id===event.target.value))}>{profiles.map((item)=><option value={item.id} key={item.id}>{item.name}</option>)}</select>
       </label>
-      <div className="mt-3 grid grid-cols-5 gap-2">{['A','B','C','D','E'].map((type)=><button type="button" key={type} onClick={()=>setSelectedType(type)} className={type===selectedType?'btn-primary':'btn-secondary'}>{type}</button>)}</div>
+      <div className="mt-3 grid grid-cols-7 gap-2">{WORKOUT_TYPES.map((type)=><button type="button" key={type} onClick={()=>setSelectedType(type)} className={type===selectedType?'btn-primary':'btn-secondary'}>{type}</button>)}</div>
     </section>
 
     {isHenrique && strengthProgram && <section className="card mb-4 border border-[#c8ff3d]/20">

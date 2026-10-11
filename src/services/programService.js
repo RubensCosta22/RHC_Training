@@ -23,7 +23,7 @@ export async function getPublishedPrograms() {
 
 export async function getProfileProgramEnrollment(profileId) {
   const { data, error } = await supabase
-    .from('profile_program_enrollments')
+    .from('program_enrollments')
     .select('*, training_programs(*)')
     .eq('profile_id', profileId)
     .eq('status', 'active')
@@ -58,7 +58,7 @@ export async function archiveCurrentTrainingHistory({ profileId, label, historyT
 
 export async function getExerciseBaselines(enrollmentId) {
   const { data, error } = await supabase
-    .from('profile_program_exercise_baselines')
+    .from('program_exercise_baselines')
     .select('*')
     .eq('enrollment_id', enrollmentId)
     .order('established_at')

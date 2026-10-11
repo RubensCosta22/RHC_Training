@@ -1,3 +1,4 @@
+import { isRunningWorkout } from '../domain/workoutTypes'
 import { ArrowLeft, ChevronDown, ChevronUp, CloudOff, Save } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
@@ -51,7 +52,7 @@ function buildInitialExerciseValues(workout) {
   const initial = {}
   workout.exercises.forEach((exercise) => {
     initial[exercise.id] = {
-      weight: '', actualReps: '', setReps: Array(Number(exercise.sets || 0)).fill(''), rpe: '',
+      weight: exercise.startingLoad ?? '', actualReps: '', setReps: Array(Number(exercise.sets || 0)).fill(''), rpe: '',
       progressionAccepted: null, notes: '', completed: false,
       completedSets: Array(Number(exercise.sets || 0)).fill(false), difficulty: 'normal',
       selectedName: exercise.name, expanded: true, detailsOpen: false, restTimerKey: null
@@ -344,7 +345,7 @@ export default function Workout() {
         notes,
         exercises,
         draftId: local?.draftId || draft?.draftId,
-        running: type === 'E' ? running : null
+        running: isRunningWorkout(workout) ? running : null
       }
       if (!isOnline()) {
         addPendingWorkout(payload, userId)
@@ -401,6 +402,7 @@ export default function Workout() {
         <h1 className="text-3xl font-semibold tracking-tight text-[#F5F5F7]">{workout.title}</h1>
         {workout.description && !workout.enrollment && <p className="mt-2 text-sm text-[#8E8E93]">{workout.description}</p>}
         {workout.enrollment && <p className="mt-2 text-xs font-semibold uppercase tracking-[.12em] text-[#C8FF3D]">{workout.program?.name} · Semana {workout.enrollment?.current_week || workout.phase?.week_start || 1}{workout.phase?.name ? ` · ${workout.phase.name}` : ''}</p>}
+        {workout.programExpired && <p className="mt-3 text-sm text-amber-400">Ciclo concluído. Revise o próximo ciclo; aumentos automáticos estão suspensos.</p>}
         {draftStatus && <p className="mt-3 text-xs text-[#8E8E93]" role="status">{draftStatus}</p>}
       </header>
 
@@ -426,7 +428,7 @@ export default function Workout() {
         </section>
       )}
 
-      {type === 'E' && <RunningSessionPanel value={running} onChange={(next) => updateRunning(next)} onImportantEvent={(next) => updateRunning(next)} />}
+      {isRunningWorkout(workout) && <RunningSessionPanel value={running} onChange={(next) => updateRunning(next)} onImportantEvent={(next) => updateRunning(next)} />}
 
       <button type="button" onClick={() => setShowDetails((current) => !current)} className="mb-3 flex w-full items-center justify-between border-y border-[#2A2A2E] py-3 text-left text-sm font-semibold text-[#F5F5F7]">
         Detalhes do treino {showDetails ? <ChevronUp size={18} /> : <ChevronDown size={18} className="text-[#8E8E93]" />}

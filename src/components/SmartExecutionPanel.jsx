@@ -1,6 +1,6 @@
 import { Check, ChevronRight, Minus, TrendingDown, TrendingUp, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { calculateProgramSuggestion, getRecentProgramExposures } from '../services/programExecutionService'
+import { calculateProgramSuggestion, countFailedExposures, getRecentProgramExposures } from '../services/programExecutionService'
 
 function actionMeta(action) {
   if (action === 'increase') return { label: 'Aumentar', icon: TrendingUp }
@@ -18,6 +18,9 @@ export default function SmartExecutionPanel({ exercise, value = {}, onChange }) 
     let active = true
     const variation = value.selectedName || exercise.name
     setHistoryLoaded(false)
+    if (variation === exercise.name && exercise.recentExposures) {
+      setRecent(exercise.recentExposures); setHistoryLoaded(true); return undefined
+    }
     if (!exercise.programEnrollmentId || !exercise.programExerciseId || !variation) {
       setRecent([]); setHistoryLoaded(true); return undefined
     }
@@ -25,26 +28,19 @@ export default function SmartExecutionPanel({ exercise, value = {}, onChange }) 
       .then((items) => { if (active) { setRecent(items); setHistoryLoaded(true) } })
       .catch(() => { if (active) { setRecent([]); setHistoryLoaded(true) } })
     return () => { active = false }
-  }, [exercise.programEnrollmentId, exercise.programExerciseId, exercise.name, value.selectedName])
+  }, [exercise.programEnrollmentId, exercise.programExerciseId, exercise.name, exercise.recentExposures, value.selectedName])
 
   useEffect(() => { if (value.expanded === false) setMobileOpen(false) }, [value.expanded])
 
-  const previousFailures = useMemo(() => {
-    let count = 0
-    for (const item of recent) {
-      if (item.progression_action === 'increase') break
-      if (item.progression_action === 'manual') continue
-      count += 1
-    }
-    return count
-  }, [recent])
+  const previousFailures = useMemo(() => countFailedExposures(recent, exercise), [recent, exercise])
+  const unit = exercise.executionMode === 'timed' ? 'segundos' : 'repetições'
 
   const setReps = Array.isArray(value.setReps) ? value.setReps : Array(Number(exercise.sets || 0)).fill('')
   const completedSetCount = (value.completedSets || []).filter(Boolean).length
   const allSetsCompleted = completedSetCount === Number(exercise.sets || 0)
   const allRepsFilled = setReps.length === Number(exercise.sets || 0) && setReps.every((rep) => rep !== '' && rep != null && Number(rep) >= 0)
   const hasRpe = value.rpe !== '' && value.rpe != null
-  const canEvaluate = historyLoaded && recent.length > 0 && allSetsCompleted && allRepsFilled && hasRpe
+  const canEvaluate = historyLoaded && allSetsCompleted && allRepsFilled && (hasRpe || exercise.targetRpeMax == null)
   const suggestion = canEvaluate ? calculateProgramSuggestion(exercise, value, previousFailures) : null
   const meta = actionMeta(suggestion?.action)
   const ActionIcon = meta.icon
@@ -54,7 +50,7 @@ export default function SmartExecutionPanel({ exercise, value = {}, onChange }) 
   function update(patch) { onChange({ ...value, ...patch }) }
   function updateSetRep(index, rawValue) {
     const next = [...setReps]
-    next[index] = rawValue === '' ? '' : String(Math.max(0, Math.min(100, Number(rawValue) || 0)))
+    next[index] = rawValue === '' ? '' : String(Math.max(0, Math.min(exercise.executionMode === 'timed' ? 600 : 100, Number(rawValue) || 0)))
     update({ setReps: next })
   }
 
@@ -65,8 +61,8 @@ export default function SmartExecutionPanel({ exercise, value = {}, onChange }) 
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
           {setReps.map((rep, index) => (
             <label key={index} className="rounded-lg bg-[#0A0A0B] p-3">
-              <span className="text-xs font-semibold text-[#8E8E93]">Série {index + 1}</span>
-              <input type="number" min="0" max="100" value={rep} onChange={(event) => updateSetRep(index, event.target.value)} placeholder={String(exercise.repsMin || '')} className="mt-1 w-full border-0 bg-transparent p-0 text-2xl font-semibold text-[#F5F5F7] outline-none" />
+              <span className="text-xs font-semibold text-[#8E8E93]">Série {index + 1} · {unit}</span>
+              <input type="number" min="0" max={exercise.executionMode === 'timed' ? 600 : 100} value={rep} onChange={(event) => updateSetRep(index, event.target.value)} placeholder={String(exercise.repsMin || '')} className="mt-1 w-full border-0 bg-transparent p-0 text-2xl font-semibold text-[#F5F5F7] outline-none" />
             </label>
           ))}
         </div>
@@ -77,7 +73,7 @@ export default function SmartExecutionPanel({ exercise, value = {}, onChange }) 
           ))}
         </div>
         <div className="mt-4 border-t border-[#2A2A2E] pt-4">
-          {!historyLoaded ? <p className="text-sm text-[#8E8E93]">Carregando histórico...</p> : recent.length === 0 ? <p className="text-sm text-[#8E8E93]">Primeiro registro. Salve o treino para criar seu baseline.</p> : !canEvaluate ? <p className="text-sm text-[#8E8E93]">Conclua as séries, reps e RPE para liberar a próxima recomendação.</p> : (
+          {!historyLoaded ? <p className="text-sm text-[#8E8E93]">Carregando histórico...</p> : !canEvaluate ? <p className="text-sm text-[#8E8E93]">Conclua as séries, {unit} e RPE para liberar a próxima recomendação.</p> : (
             <div className="flex items-start gap-3"><ActionIcon size={20} className="mt-0.5 text-[#C8FF3D]" /><div><p className="font-semibold text-[#F5F5F7]">Próximo treino: {meta.label}{suggestion.suggestedLoad != null ? ` ${suggestion.suggestedLoad} kg` : ''}</p><p className="mt-1 text-sm text-[#8E8E93]">{suggestion.reason}</p></div></div>
           )}
         </div>

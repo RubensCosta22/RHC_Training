@@ -1,3 +1,4 @@
+import { equivalentExerciseIds, getExerciseAliases } from './exerciseAliasService'
 import { supabase } from '../lib/supabaseClient'
 import { evaluateDoubleProgression, evaluateLoadProgression, getProgramWeek } from '../domain/programEngine'
 
@@ -35,7 +36,8 @@ export async function getActiveProgramWorkout(profileId, sessionCode) {
     .single()
   if (programError) throw programError
 
-  const currentWeek = Math.min(Number(program.duration_weeks || 52), getProgramWeek(enrollment.start_date))
+  const currentWeek = getProgramWeek(enrollment.start_date)
+  const programExpired = currentWeek > Number(program.duration_weeks || 52)
   const { data: phase, error: phaseError } = await supabase
     .from('program_phases')
     .select('*')
@@ -97,10 +99,23 @@ export async function getActiveProgramWorkout(profileId, sessionCode) {
     return map
   }, new Map())
 
+  const { data: baselines, error: baselineError } = await supabase.from('program_exercise_baselines').select('*').eq('enrollment_id', enrollment.id)
+  if (baselineError) throw baselineError
+  const baselineByExercise = new Map((baselines || []).map(item => [item.program_exercise_id, item]))
+  const { data: exposures, error: exposuresError } = await supabase.from('program_exercise_exposures').select('*').eq('enrollment_id', enrollment.id).in('program_exercise_id', exerciseIds.length ? exerciseIds : ['00000000-0000-0000-0000-000000000000']).order('created_at', { ascending: false })
+  if (exposuresError) throw exposuresError
+  const latestByExercise = new Map()
+  for (const exposure of exposures || []) {
+    if (rawExercises.some(item => item.id === exposure.program_exercise_id && item.exercise_id === exposure.variation_exercise_id) && !latestByExercise.has(exposure.program_exercise_id)) latestByExercise.set(exposure.program_exercise_id, exposure)
+  }
+  const isDeload = /deload/i.test(phase?.name || '') || Number(phase?.volume_modifier ?? 1) < 0.7
+
   const exercises = (rawExercises || []).map((exercise) => {
     const prescribedReps = phaseReps(exercise, phase)
     const prescribedSets = phaseSets(exercise, phase)
     const catalogExercise = catalog.get(exercise.exercise_id)
+    const latestExposure = latestByExercise.get(exercise.id)
+    const latestLoad = latestExposure ? latestExposure.load : baselineByExercise.get(exercise.id)?.starting_load
     const movement = movements.get(catalogExercise?.movement_pattern_id)
     return {
       id: exercise.id,
@@ -113,7 +128,16 @@ export async function getActiveProgramWorkout(profileId, sessionCode) {
       movementPattern: movement?.code || movement?.name || null,
       role: exercise.exercise_role,
       sets: prescribedSets,
-      reps: repsLabel(prescribedReps.min, prescribedReps.max),
+      reps: `${repsLabel(prescribedReps.min, prescribedReps.max)}${exercise.execution_mode === 'timed' ? ' s' : ''}${exercise.is_unilateral ? ' por lado' : ''}`,
+      executionMode: exercise.execution_mode || 'external_load',
+      isUnilateral: exercise.is_unilateral === true,
+      latestExposure: latestExposure || null,
+      recentExposures: (exposures || []).filter(item => item.program_exercise_id === exercise.id && item.variation_exercise_id === exercise.exercise_id).slice(0, 3),
+      startingLoad: exercise.execution_mode === 'timed' ? 0 : latestLoad ?? null,
+      baselineDate: baselineByExercise.get(exercise.id)?.source_workout_date ?? null,
+      baselineSessionId: baselineByExercise.get(exercise.id)?.source_session_id ?? null,
+      progressionPaused: isDeload || programExpired,
+      executionNotes: exercise.execution_notes || null,
       repsMin: prescribedReps.min,
       repsMax: prescribedReps.max,
       targetRpeMin: exercise.target_rpe_min ?? phase?.target_rpe_min ?? null,
@@ -121,7 +145,7 @@ export async function getActiveProgramWorkout(profileId, sessionCode) {
       rest: exercise.rest_seconds_min || 60,
       restMax: exercise.rest_seconds_max,
       progressionType: exercise.progression_type,
-      loadIncrement: exercise.default_load_increment,
+      loadIncrement: baselineByExercise.get(exercise.id)?.load_increment ?? exercise.default_load_increment,
       regressionPercent: exercise.regression_percent,
       failuresBeforeRegression: exercise.failures_before_regression,
       alternatives: (substitutionsByExercise.get(exercise.id) || []).map((item) => alternatives.get(item.alternative_exercise_id)).filter(Boolean)
@@ -132,6 +156,7 @@ export async function getActiveProgramWorkout(profileId, sessionCode) {
     title: session.name,
     description: `${program.name || 'Programa'} • Semana ${currentWeek}${phase?.name ? ` • ${phase.name}` : ''}`,
     program,
+    programExpired,
     enrollment: { ...enrollment, current_week: currentWeek },
     phase,
     session,
@@ -140,20 +165,26 @@ export async function getActiveProgramWorkout(profileId, sessionCode) {
 }
 
 export async function getRecentProgramExposures(enrollmentId, programExerciseId, variationName, limit = 3) {
+  const { data: variation, error: variationError } = await supabase.from('exercise_catalog').select('id').ilike('name', variationName).limit(1).maybeSingle()
+  if (variationError) throw variationError
+  if (!variation) return []
+  const ids = equivalentExerciseIds(variation.id, await getExerciseAliases())
   const { data, error } = await supabase
-    .from('program_exercise_exposures')
-    .select('*')
-    .eq('enrollment_id', enrollmentId)
-    .eq('program_exercise_id', programExerciseId)
-    .eq('variation_name_snapshot', variationName)
-    .order('created_at', { ascending: false })
-    .limit(limit)
+    .from('program_exercise_exposures').select('*')
+    .eq('enrollment_id', enrollmentId).eq('program_exercise_id', programExerciseId)
+    .in('variation_exercise_id', ids)
+    .order('created_at', { ascending: false }).limit(limit)
   if (error) throw error
   return data || []
 }
 
 export function calculateProgramSuggestion(exercise, value, previousFailures = 0) {
-  const reps = Array.isArray(value.setReps) ? value.setReps.map(Number) : []
+  const load = Number(value.weight || 0)
+  if (exercise.progressionPaused) return { action: 'hold', suggestedLoad: load, reason: 'Progressão suspensa durante deload ou após o fim do ciclo.' }
+  if (exercise.executionMode === 'timed') return { action: 'manual', suggestedLoad: null, reason: 'Registre segundos por série. Ao completar 40 s com controle, ajuste a dificuldade; sem aumento automático de carga.' }
+  if (exercise.executionMode === 'bodyweight') return { action: 'manual', suggestedLoad: load, reason: 'Registre somente lastro extra (0 kg sem lastro). Progrida repetições; lastro é opcional, sem assistência.' }
+  if (value.weight === '' || value.weight == null) return { action: 'hold', suggestedLoad: null, reason: 'Informe a carga efetivamente utilizada antes de gerar uma sugestão.' }
+  const reps = Array.isArray(value.setReps) ? value.setReps : []
   const common = {
     currentLoad: Number(value.weight || 0), reps, targetSets: Number(exercise.sets || 0),
     completedSets: (value.completedSets || []).filter(Boolean).length,
@@ -184,12 +215,7 @@ export async function buildProgramExposurePayload({ profileId, exercise, value, 
       variationName,
       3
     )
-    let previousFailures = 0
-    for (const item of recent) {
-      if (item.progression_action !== 'regress' && item.progression_action !== 'hold') break
-      if (item.observed_rpe == null || Number(item.completed_sets) <= 0) break
-      previousFailures += 1
-    }
+    const previousFailures = countFailedExposures(recent, exercise)
     suggestion = calculateProgramSuggestion(exercise, value, previousFailures)
   }
 
@@ -209,8 +235,8 @@ export async function buildProgramExposurePayload({ profileId, exercise, value, 
     program_id: exercise.programId,
     variation_exercise_id: variation.id,
     variation_name_snapshot: variationName,
-    load: Number(value.weight || 0),
-    reps: Array.isArray(value.setReps) ? value.setReps.map((item) => Number(item)) : [],
+    load: exercise.executionMode === 'timed' ? 0 : Number(value.weight || 0),
+    reps: Array.isArray(value.setReps) ? value.setReps.map((item) => item === '' || item == null ? null : Number(item)) : [],
     completed_sets: (value.completedSets || []).filter(Boolean).length,
     observed_rpe: value.rpe === '' || value.rpe == null ? null : Number(value.rpe),
     progression_action: suggestion?.action || 'manual',
@@ -241,4 +267,17 @@ export async function saveProgramExposure({ profileId, workoutSessionId, exercis
     .single()
   if (error) throw error
   return data
+}
+
+export function countFailedExposures(recent = [], exercise) {
+  let failures = 0
+  for (const item of recent) {
+    const reps = item.reps || []
+    if (Number(item.completed_sets) !== Number(exercise.sets) || reps.length !== Number(exercise.sets) || reps.some(v => v === '' || v == null) || item.observed_rpe == null) break
+    if (item.progression_action === 'regress') break
+    const missed = reps.some(v => Number(v) < Number(exercise.repsMin)) || Number(item.observed_rpe) > Number(exercise.targetRpeMax)
+    if (!missed) break
+    failures += 1
+  }
+  return failures
 }

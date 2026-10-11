@@ -1,3 +1,4 @@
+import { WORKOUT_TYPES } from '../domain/workoutTypes'
 import { CalendarDays, Check, Copy, Dumbbell, Save } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -7,7 +8,7 @@ import { listWeeklySchedules, saveWeeklySchedule } from '../services/scheduleSer
 import { friendlyError } from '../utils/validation'
 
 const days = ['Domingo', 'Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta', 'Sabado']
-const options = [null, 'A', 'B', 'C', 'D', 'E']
+const options = [null, ...WORKOUT_TYPES]
 const emptyWeek = () => Array(7).fill(null)
 
 export default function Schedule() {

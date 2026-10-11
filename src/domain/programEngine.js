@@ -23,7 +23,7 @@ export function evaluateLoadProgression({
   const rpeControlled = targetRpeMax == null || (observedRpe != null && observedRpe !== '' && Number.isFinite(Number(observedRpe)) && Number(observedRpe) <= Number(targetRpeMax))
 
   if (allSetsCompleted && allRepsReached && rpeControlled) {
-    const suggestedLoad = roundLoad(load + Number(loadIncrement || 0), loadIncrement)
+    const suggestedLoad = Number((load + Number(loadIncrement || 0)).toFixed(3))
     return {
       action: loadIncrement ? 'increase' : 'hold',
       suggestedLoad,
@@ -73,7 +73,7 @@ export function evaluateDoubleProgression({
   if (reachedTop && rpeControlled && Number(loadIncrement || 0) > 0) {
     return {
       action: 'increase',
-      suggestedLoad: roundLoad(load + Number(loadIncrement), loadIncrement),
+      suggestedLoad: Number((load + Number(loadIncrement)).toFixed(3)),
       reason: 'Topo da faixa atingido em todas as séries com RPE controlado.'
     }
   }
@@ -81,7 +81,9 @@ export function evaluateDoubleProgression({
   return {
     action: 'hold',
     suggestedLoad: load,
-    reason: 'Permaneça na carga atual até atingir o topo da faixa em todas as séries.'
+    reason: reachedTop && rpeControlled && !(Number(loadIncrement) > 0)
+      ? 'Topo atingido. Confirme o menor incremento disponível na máquina antes de aumentar a carga manualmente.'
+      : 'Permaneça na carga atual até atingir o topo da faixa em todas as séries.'
   }
 }
 
