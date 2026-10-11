@@ -183,6 +183,7 @@ export function calculateProgramSuggestion(exercise, value, previousFailures = 0
   if (exercise.progressionPaused) return { action: 'hold', suggestedLoad: load, reason: 'Progressão suspensa durante deload ou após o fim do ciclo.' }
   if (exercise.executionMode === 'timed') return { action: 'manual', suggestedLoad: null, reason: 'Registre segundos por série. Ao completar 40 s com controle, ajuste a dificuldade; sem aumento automático de carga.' }
   if (exercise.executionMode === 'bodyweight') return { action: 'manual', suggestedLoad: load, reason: 'Registre somente lastro extra (0 kg sem lastro). Progrida repetições; lastro é opcional, sem assistência.' }
+  if (value.selectedName && value.selectedName !== exercise.name) return { action: 'manual', suggestedLoad: load, reason: 'Substituição com histórico próprio. Confirme carga, técnica e menor incremento do equipamento; não converter a carga do exercício principal.' }
   if (value.weight === '' || value.weight == null) return { action: 'hold', suggestedLoad: null, reason: 'Informe a carga efetivamente utilizada antes de gerar uma sugestão.' }
   const reps = Array.isArray(value.setReps) ? value.setReps : []
   const common = {

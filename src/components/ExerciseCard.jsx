@@ -181,6 +181,7 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
                 </button>
                 {showSwapOptions && (
                   <div className="pb-3">
+                    <p className="pb-2 text-xs text-[#8E8E93]">Alternativas para o foco muscular; não são equivalências exatas. Use a carga do próprio equipamento. O histórico permanece separado.</p>
                     {options.filter((option) => option !== selectedName).map((option) => (
                       <button key={option} type="button" onClick={() => selectExercise(option)} className="flex w-full items-center justify-between border-t border-[#2A2A2E] py-3 text-left text-sm text-[#F5F5F7] first:border-0">{option}<ChevronRight size={18} className="text-[#8E8E93]" /></button>
                     ))}

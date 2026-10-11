@@ -296,7 +296,7 @@ async function runPendingWorkoutSync() {
       remaining.push(item)
     }
   }
-  replacePendingWorkouts(remaining)
+  replacePendingWorkouts(remaining, pending.map(item => item.offlineId))
   return { synced, remaining: remaining.length }
 }
 

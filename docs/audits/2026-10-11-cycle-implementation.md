@@ -12,7 +12,7 @@ Ciclo `rhc-evolution-8w`, 8 semanas, início previsto em 2026-10-12. Sem readapt
 | Sábado | F — Complementar | 15 |
 | Domingo | G — Longão | 0 |
 
-Total corrigido: **69**, não 68. Séries unilaterais são contadas por músculo/lado, sem dobrar o volume semanal nominal. Halteres são a elevação lateral padrão; máquina é alternativa com histórico independente. Romeno mantido, leg press unilateral substitui afundo no Smith, prancha substitui rollout. Barra fixa exclusivamente pronada sem assistência; lastro opcional.
+Total corrigido: **69**, não 68. Séries unilaterais são contadas por músculo/lado, sem dobrar o volume semanal nominal. Halteres são a elevação lateral padrão; máquina e polia são alternativas com histórico independente. Alternativas do ciclo anterior foram selecionadas por foco muscular, sem tratar como equivalentes exatas; não herdam cargas ou incrementos do principal. Romeno mantido, leg press unilateral substitui afundo no Smith, prancha substitui rollout. Barra fixa exclusivamente pronada sem assistência; lastro opcional.
 
 ## Histórico e cargas
 
