@@ -1,3 +1,4 @@
+import { isRunningWorkout, WORKOUT_TYPES } from '../domain/workoutTypes'
 import { Archive, ChevronLeft, ChevronRight, Filter, Search } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
@@ -9,7 +10,7 @@ const PAGE_SIZE = 10
 
 function historyStatus(session) {
   const exercises = session.workout_exercises || []
-  const isRunning = session.workout_type === 'E'
+  const isRunning = isRunningWorkout(session)
   const completedExercises = exercises.filter((exercise) => exercise.completed).length
 
   return {
@@ -170,7 +171,7 @@ export default function History() {
               </button>
               {open === session.id && (
                 <div className="mt-3 space-y-2">
-                  {session.workout_type === 'E' && !exercises.length && (
+                  {isRunningWorkout(session) && !exercises.length && (
                     <div className="rounded-2xl bg-slate-950/60 p-3 text-sm text-slate-400">
                       Sessão de corrida concluída. Este treino não possui exercícios de musculação.
                     </div>

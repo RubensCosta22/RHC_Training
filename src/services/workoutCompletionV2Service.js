@@ -1,16 +1,20 @@
+import { isRunningWorkout } from '../domain/workoutTypes'
 import { supabase } from '../lib/supabaseClient'
 import { logger, createRequestId } from '../lib/observability/logger'
 import { calculateVolume } from '../utils/progression'
 import { parsePositiveNumber, sanitizeText, validateWorkoutInput } from '../utils/validation'
 
 function normalizeExercise(item) {
-  const setReps = Array.isArray(item.setReps) ? item.setReps.map((value) => String(value).trim()).filter(Boolean) : []
+  const setReps = Array.isArray(item.setReps) ? item.setReps.map((value) => value == null ? '' : String(value).trim()) : []
   const actualReps = sanitizeText(item.actualReps || item.actual_reps || setReps.join('/'), 40)
   return {
     exercise_name: sanitizeText(item.name || item.exercise_name, 120),
     muscle_group: sanitizeText(item.muscleGroup || item.muscle_group, 80),
     sets: Number(item.sets || 0),
     reps: sanitizeText(item.reps || '', 40),
+    executionMode: item.executionMode,
+    setReps: Array.isArray(item.setReps) ? item.setReps : undefined,
+    completedSets: item.completedSets,
     actual_reps: actualReps,
     weight: parsePositiveNumber(item.weight || 0, 'Carga') || 0,
     completed: Boolean(item.completed),
@@ -32,7 +36,7 @@ export async function saveWorkoutSessionV2({
 }) {
   const requestId = createRequestId()
   const runningDurationSeconds = running?.durationSeconds > 0 ? Math.round(Number(running.durationSeconds)) : null
-  const effectiveDurationMinutes = workoutType === 'E' && runningDurationSeconds
+  const effectiveDurationMinutes = isRunningWorkout(workoutType) && runningDurationSeconds
     ? Math.max(1, Math.round(runningDurationSeconds / 60))
     : durationMinutes
   const cleanWorkout = validateWorkoutInput({ gymName, durationMinutes: effectiveDurationMinutes, notes })
@@ -40,7 +44,7 @@ export async function saveWorkoutSessionV2({
   const completedCount = cleanExercises.filter((item) => item.completed).length
   const completionPercentage = cleanExercises.length
     ? Math.round((completedCount / cleanExercises.length) * 100)
-    : 0
+    : runningDurationSeconds && running?.distanceMeters > 0 ? 100 : 0
   const totalVolume = calculateVolume(cleanExercises.map((item) => ({ ...item, name: item.exercise_name })))
   const distanceMeters = running?.distanceMeters > 0 ? Math.round(Number(running.distanceMeters)) : null
   const durationSeconds = runningDurationSeconds

@@ -18,12 +18,12 @@ export function evaluateLoadProgression({
   regressionPercent = 7.5
 }) {
   const load = Number(currentLoad || 0)
-  const allSetsCompleted = Number(completedSets || 0) >= Number(targetSets || 0)
-  const allRepsReached = reps.length >= Number(targetSets || 0) && reps.every((value) => Number(value) >= Number(repsMin || 0))
-  const rpeControlled = observedRpe == null || targetRpeMax == null || Number(observedRpe) <= Number(targetRpeMax)
+  const allSetsCompleted = Number(targetSets) > 0 && Number(completedSets) >= Number(targetSets)
+  const allRepsReached = Number(targetSets) > 0 && reps.length === Number(targetSets) && reps.every((value) => value !== '' && value != null && Number.isFinite(Number(value)) && Number(value) >= Number(repsMin))
+  const rpeControlled = targetRpeMax == null || (observedRpe != null && observedRpe !== '' && Number.isFinite(Number(observedRpe)) && Number(observedRpe) <= Number(targetRpeMax))
 
   if (allSetsCompleted && allRepsReached && rpeControlled) {
-    const suggestedLoad = roundLoad(load + Number(loadIncrement || 0), loadIncrement)
+    const suggestedLoad = Number((load + Number(loadIncrement || 0)).toFixed(3))
     return {
       action: loadIncrement ? 'increase' : 'hold',
       suggestedLoad,
@@ -31,6 +31,13 @@ export function evaluateLoadProgression({
         ? 'Meta concluída dentro da faixa de repetições e do RPE alvo.'
         : 'Meta concluída; incremento da máquina ainda não foi configurado.'
     }
+  }
+
+  // Incomplete or missing observations are not evidence of a failed exposure.
+  const validReps = Number(targetSets) > 0 && reps.length === Number(targetSets) && reps.every((value) => value !== '' && value != null && Number.isFinite(Number(value)) && Number(value) >= 0)
+  const validRpe = targetRpeMax == null || (observedRpe != null && observedRpe !== '' && Number.isFinite(Number(observedRpe)))
+  if (!allSetsCompleted || !validReps || !validRpe) {
+    return { action: 'hold', suggestedLoad: load, reason: 'Registro incompleto; confirme séries, repetições e esforço antes de ajustar a carga.' }
   }
 
   if (Number(failedExposureCount || 0) + 1 >= Number(failuresBeforeRegression || 2)) {
@@ -56,16 +63,17 @@ export function evaluateDoubleProgression({
   repsMax,
   targetRpeMax,
   observedRpe,
-  loadIncrement
+  loadIncrement,
+  completedSets
 }) {
   const load = Number(currentLoad || 0)
-  const reachedTop = reps.length >= Number(targetSets || 0) && reps.every((value) => Number(value) >= Number(repsMax || 0))
-  const rpeControlled = observedRpe == null || targetRpeMax == null || Number(observedRpe) <= Number(targetRpeMax)
+  const reachedTop = Number(targetSets) > 0 && Number(completedSets) >= Number(targetSets) && reps.length === Number(targetSets) && reps.every((value) => value !== '' && value != null && Number.isFinite(Number(value)) && Number(value) >= Number(repsMax))
+  const rpeControlled = targetRpeMax == null || (observedRpe != null && observedRpe !== '' && Number.isFinite(Number(observedRpe)) && Number(observedRpe) <= Number(targetRpeMax))
 
   if (reachedTop && rpeControlled && Number(loadIncrement || 0) > 0) {
     return {
       action: 'increase',
-      suggestedLoad: roundLoad(load + Number(loadIncrement), loadIncrement),
+      suggestedLoad: Number((load + Number(loadIncrement)).toFixed(3)),
       reason: 'Topo da faixa atingido em todas as séries com RPE controlado.'
     }
   }
@@ -73,7 +81,9 @@ export function evaluateDoubleProgression({
   return {
     action: 'hold',
     suggestedLoad: load,
-    reason: 'Permaneça na carga atual até atingir o topo da faixa em todas as séries.'
+    reason: reachedTop && rpeControlled && !(Number(loadIncrement) > 0)
+      ? 'Topo atingido. Confirme o menor incremento disponível na máquina antes de aumentar a carga manualmente.'
+      : 'Permaneça na carga atual até atingir o topo da faixa em todas as séries.'
   }
 }
 

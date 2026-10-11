@@ -32,14 +32,18 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
   const isExpanded = value.expanded !== false
   const showDetails = value.detailsOpen === true
   const repsValue = getInitialReps(exercise, value)
-  const hasPreviousLoad = record?.last_weight != null && Number(record.last_weight) > 0
+  const previousLoad = selectedName === exercise.name && exercise.startingLoad != null && !recommendation ? exercise.startingLoad : record?.last_weight
+  const hasPreviousLoad = exercise.executionMode !== 'timed' && exercise.executionMode !== 'bodyweight' && previousLoad != null && Number(previousLoad) > 0
   const hasBestLoad = record?.best_weight != null && Number(record.best_weight) > 0
   const recommendationAction = recommendationLabel(recommendation?.progression_action)
-  const hasRecommendation = recommendationAction && recommendation?.suggested_load != null
+  const hasRecommendation = !exercise.progressionPaused && exercise.executionMode !== 'timed' && exercise.executionMode !== 'bodyweight' && recommendationAction && recommendation?.suggested_load != null
 
   useEffect(() => {
     let active = true
     setRecommendation(null)
+    if (selectedName === exercise.name && exercise.latestExposure !== undefined) {
+      setRecommendation(exercise.latestExposure); return undefined
+    }
     if (!exercise.programEnrollmentId || !exercise.programExerciseId || !selectedName) return undefined
 
     getRecentProgramExposures(exercise.programEnrollmentId, exercise.programExerciseId, selectedName, 1)
@@ -47,14 +51,20 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
       .catch(() => { if (active) setRecommendation(null) })
 
     return () => { active = false }
-  }, [exercise.programEnrollmentId, exercise.programExerciseId, selectedName])
+  }, [exercise.programEnrollmentId, exercise.programExerciseId, exercise.latestExposure, selectedName])
 
   function update(patch) {
     onChange({ ...value, notes: value.notes || '', difficulty: value.difficulty || 'normal', ...patch })
   }
 
   function selectExercise(name) {
-    update({ selectedName: name, completed: false, completedSets: Array(Number(exercise.sets || 0)).fill(false), expanded: true })
+    update({
+      selectedName: name,
+      weight: '', actualReps: '', setReps: Array(Number(exercise.sets || 0)).fill(''),
+      rpe: '', progressionAccepted: null, restTimerKey: null,
+      completed: false, completedSets: Array(Number(exercise.sets || 0)).fill(false),
+      expanded: true, detailsOpen: true
+    })
     setShowSwapOptions(false)
   }
 
@@ -105,7 +115,7 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
         </button>
         <button type="button" onClick={() => update({ detailsOpen: !showDetails })} className="min-w-0 flex-1 text-left">
           <h3 className="truncate text-lg font-semibold text-[#F5F5F7]">{selectedName}</h3>
-          <p className="mt-1 text-sm text-[#8E8E93]">{exercise.sets} × {exercise.reps}{value.weight ? ` · ${value.weight} kg` : hasPreviousLoad ? ` · última ${record.last_weight} kg` : ''}</p>
+          <p className="mt-1 text-sm text-[#8E8E93]">{exercise.sets} × {exercise.reps}{value.weight ? ` · ${value.weight} kg` : hasPreviousLoad ? ` · última ${previousLoad} kg` : ''}</p>
         </button>
         {showDetails ? <ChevronUp size={20} className="text-[#8E8E93]" /> : <ChevronDown size={20} className="text-[#8E8E93]" />}
       </div>
@@ -116,7 +126,7 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-wide text-[#8E8E93]">Referência</p>
               <p className="mt-1 text-sm text-[#F5F5F7]">
-                {hasPreviousLoad ? `Última carga ${record.last_weight} kg` : 'Sem carga anterior registrada'}
+                {hasPreviousLoad ? `Carga de referência ${previousLoad} kg` : 'Sem carga anterior registrada'}
                 {hasBestLoad ? ` · melhor ${record.best_weight} kg` : ''}
               </p>
               {hasRecommendation && (
@@ -134,8 +144,8 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
 
           <div className="grid grid-cols-2 gap-3">
             <label className="rounded-lg bg-[#141416] p-3">
-              <span className="text-xs font-semibold uppercase tracking-wide text-[#8E8E93]">Carga (kg)</span>
-              <input type="number" min="0" step="0.5" value={value.weight || ''} onChange={(event) => update({ weight: event.target.value })} placeholder={hasPreviousLoad ? String(record.last_weight) : '0'} className="mt-1 w-full border-0 bg-transparent p-0 text-2xl font-semibold text-[#F5F5F7] outline-none" />
+              <span className="text-xs font-semibold uppercase tracking-wide text-[#8E8E93]">{exercise.executionMode === 'bodyweight' ? 'Lastro extra (kg, opcional)' : exercise.executionMode === 'timed' ? 'Sem carga obrigatória' : 'Carga (kg)'}</span>
+              <input disabled={exercise.executionMode === 'timed'} type="number" min="0" step="0.5" value={value.weight || ''} onChange={(event) => update({ weight: event.target.value })} placeholder={hasPreviousLoad ? String(previousLoad) : '0'} className="mt-1 w-full border-0 bg-transparent p-0 text-2xl font-semibold text-[#F5F5F7] outline-none" />
             </label>
             {exercise.programExerciseId ? (
               <div className="rounded-lg bg-[#141416] p-3">
@@ -150,6 +160,7 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
             )}
           </div>
 
+          {exercise.executionNotes && <p className="mt-3 text-xs text-[#8E8E93]">{exercise.executionNotes}</p>}
           <div className="mt-3 flex items-center justify-between text-xs text-[#8E8E93]"><span>Séries</span><span>{completedSetCount} de {exercise.sets}</span></div>
           <div className="mt-2 flex gap-2">
             {completedSets.map((done, index) => (
@@ -170,6 +181,7 @@ export default function ExerciseCard({ exercise, value = {}, record, onChange })
                 </button>
                 {showSwapOptions && (
                   <div className="pb-3">
+                    <p className="pb-2 text-xs text-[#8E8E93]">Alternativas para o foco muscular; não são equivalências exatas. Use a carga do próprio equipamento. O histórico permanece separado.</p>
                     {options.filter((option) => option !== selectedName).map((option) => (
                       <button key={option} type="button" onClick={() => selectExercise(option)} className="flex w-full items-center justify-between border-t border-[#2A2A2E] py-3 text-left text-sm text-[#F5F5F7] first:border-0">{option}<ChevronRight size={18} className="text-[#8E8E93]" /></button>
                     ))}

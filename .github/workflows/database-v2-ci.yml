@@ -33,6 +33,7 @@ jobs:
           supabase init
           mkdir -p supabase/migrations
           cp ../database-v2/baseline/*.sql supabase/migrations/
+          cp ../database-v2/migrations/*.sql supabase/migrations/
 
       - name: Start clean local Supabase and apply V2 SQL
         shell: bash

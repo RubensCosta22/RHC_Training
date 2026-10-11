@@ -1,3 +1,4 @@
+import { canonicalExerciseId, getExerciseAliases } from './exerciseAliasService'
 import { supabase } from '../lib/supabaseClient'
 
 function average(values = []) {
@@ -75,6 +76,7 @@ export async function getProgramStats(profileId) {
   const completedWeeks = Math.max(0, week - 1)
   const expectedThisWeek = requiredSessions.filter((item) => Number(item.day_order || 0) <= dayInWeek).length
   const expectedSessions = (completedWeeks * requiredSessions.length) + expectedThisWeek
+  completedProgramSessions = [...new Map(completedProgramSessions.filter(item => diffDays(enrollment.start_date, new Date(`${item.workout_date}T12:00:00`)) < durationWeeks * 7).map(item => [`${Math.floor(diffDays(enrollment.start_date, new Date(`${item.workout_date}T12:00:00`)) / 7)}:${item.workout_code}`, item])).values()]
   const completedSessions = completedProgramSessions.length
   const adherence = expectedSessions > 0
     ? Math.min(100, Math.round((completedSessions / expectedSessions) * 100))
@@ -101,11 +103,12 @@ export async function getProgramStats(profileId) {
   const regressions = normalized.filter((item) => item.progression_action === 'regress').length
   const holds = normalized.filter((item) => item.progression_action === 'hold').length
 
+  const aliases = await getExerciseAliases()
   const variations = {}
   normalized.forEach((item) => {
-    const key = item.variation_name_snapshot || 'Exercício'
+    const key = canonicalExerciseId(item.variation_exercise_id, aliases) || item.variation_name_snapshot || 'Exercício'
     variations[key] = variations[key] || {
-      name: key,
+      name: item.variation_name_snapshot || 'Exercício',
       firstLoad: null,
       lastLoad: 0,
       maxLoad: 0,

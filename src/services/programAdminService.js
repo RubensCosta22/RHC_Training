@@ -1,3 +1,4 @@
+import { toLocalDateKey } from '../utils/date'
 import { supabase } from '../lib/supabaseClient'
 
 export async function listPublishedPrograms() {
@@ -13,7 +14,7 @@ export async function listPublishedPrograms() {
 
 export async function getProfileProgramState(profileId) {
   const { data, error } = await supabase
-    .from('profile_program_enrollments')
+    .from('program_enrollments')
     .select('id,status,start_date,current_week,program_id,training_programs(id,slug,name,duration_weeks)')
     .eq('profile_id', profileId)
     .eq('status', 'active')
@@ -24,13 +25,10 @@ export async function getProfileProgramState(profileId) {
 }
 
 export async function applyProgramToProfile(profileId, programSlug, startDate = null) {
-  if (programSlug !== 'rhc-strength-12w') {
-    throw new Error('Programa ainda não disponível para publicação administrativa.')
-  }
-
-  const { data, error } = await supabase.rpc('activate_rhc_strength_12w', {
-    p_profile_id: profileId,
-    p_start_date: startDate || new Date().toISOString().slice(0, 10)
+  const { data, error } = await supabase.rpc('activate_training_program_v2', {
+    p_profile_id: profileId, p_program_slug: programSlug,
+    p_start_date: startDate || toLocalDateKey(),
+    p_baseline_before: null
   })
 
   if (error) throw error

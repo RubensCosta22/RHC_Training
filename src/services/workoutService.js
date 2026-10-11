@@ -1,3 +1,5 @@
+import { canonicalExerciseId, equivalentExerciseIds, getExerciseAliases } from './exerciseAliasService'
+import { buildProgramExposurePayloads } from './programExecutionService'
 import { supabase } from '../lib/supabaseClient'
 import { logger, createRequestId } from '../lib/observability/logger'
 import { calculateVolume, getProgressionStatus } from '../utils/progression'
@@ -49,17 +51,22 @@ export async function getExerciseRecords(profileId, exerciseNames = []) {
   if (catalogError) throw catalogError
   if (!catalog?.length) return {}
 
-  const names = new Map(catalog.map((item) => [item.id, item.name]))
+  const aliases = await getExerciseAliases()
+  const names = new Map(catalog.map((item) => [canonicalExerciseId(item.id, aliases), item.name]))
+  const ids = [...new Set(catalog.flatMap(item => equivalentExerciseIds(item.id, aliases)))]
   const { data: records, error } = await supabase
     .from('exercise_records')
     .select('*')
     .eq('profile_id', profileId)
-    .in('exercise_id', [...names.keys()])
+    .in('exercise_id', ids)
   if (error) throw error
 
   return (records || []).reduce((acc, record) => {
-    const exerciseName = names.get(record.exercise_id)
-    if (exerciseName) acc[exerciseName] = { ...record, exercise_name: exerciseName }
+    const exerciseName = names.get(canonicalExerciseId(record.exercise_id, aliases))
+    if (!exerciseName) return acc
+    const current = acc[exerciseName]
+    const latest = !current || String(record.last_date || '') > String(current.last_date || '') ? record : current
+    acc[exerciseName] = { ...latest, exercise_name: exerciseName, best_weight: Math.max(Number(record.best_weight || 0), Number(current?.best_weight || 0)) }
     return acc
   }, {})
 }
@@ -80,7 +87,8 @@ async function detectPersonalRecords(profileId, exercises) {
 
 export async function saveWorkoutSession(payload) {
   const personalRecords = await detectPersonalRecords(payload.profileId, payload.exercises || [])
-  const session = await saveWorkoutSessionV2(payload)
+  const programExposures = payload.programExposures || await buildProgramExposurePayloads({ profileId: payload.profileId, exercises: payload.exercises || [] })
+  const session = await saveWorkoutSessionV2({ ...payload, programExposures })
   return { ...normalizeSessionRow(session), personalRecords }
 }
 
@@ -242,11 +250,15 @@ export async function getProgressData(profileId) {
   if (measurementsError) throw measurementsError
   const measurements = (measurementRows || []).map((item) => ({ ...item, date: item.measured_on }))
 
+  const aliases = await getExerciseAliases()
+  const { data: catalog, error: catalogError } = await supabase.from('exercise_catalog').select('id,name')
+  if (catalogError) throw catalogError
+  const canonicalNames = new Map((catalog || []).map(item => [item.id, item.name]))
   const exercises = chronologicalSessions.flatMap((session) =>
     (session.workout_exercises || []).filter((exercise) => exercise.completed).map((exercise) => ({
       date: session.date,
       workout_type: session.workout_type,
-      exercise_name: exercise.exercise_name,
+      exercise_name: canonicalNames.get(canonicalExerciseId(exercise.exercise_id, aliases)) || exercise.exercise_name,
       weight: Number(exercise.weight || 0),
       volume: calculateVolume([{ ...exercise, completed: true }]),
       progression: getProgressionStatus(exercise.weight, null)
@@ -284,7 +296,7 @@ async function runPendingWorkoutSync() {
       remaining.push(item)
     }
   }
-  replacePendingWorkouts(remaining)
+  replacePendingWorkouts(remaining, pending.map(item => item.offlineId))
   return { synced, remaining: remaining.length }
 }
 

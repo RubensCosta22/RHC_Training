@@ -54,10 +54,16 @@ export function getProgressionSuggestion(exercise, weight, completed, difficulty
 
 export function calculateVolume(exercises = []) {
   return exercises.reduce((total, item) => {
-    if (!item.completed) return total
-    const repsText = item.actual_reps || item.actualReps || item.reps || ''
-    const repsMatch = String(repsText).match(/\d+/g)
-    const reps = repsMatch ? Number(repsMatch[repsMatch.length - 1]) : 1
-    return total + Number(item.weight || 0) * Number(item.sets || 0) * reps
+    const timed = item.executionMode === 'timed' || /(?:seg|seconds|\bs\b)/i.test(item.reps || '')
+    if (timed) return total
+    const completedSets = item.completedSets
+    if (!item.completed && !completedSets?.some(Boolean)) return total
+    const actual = item.setReps || String(item.actual_reps || item.actualReps || '').split(/[/,;]/).map(v => v.trim())
+    const values = actual.filter(v => v !== '' && v != null && Number.isFinite(Number(v))).map(Number)
+    if (!values.length) return total
+    const repTotal = Array.isArray(item.setReps) || actual.length > 1
+      ? actual.reduce((sum, v, i) => sum + ((!completedSets || completedSets[i]) && v !== '' && v != null && Number.isFinite(Number(v)) ? Number(v) : 0), 0)
+      : Number(item.sets || 0) * values[0]
+    return total + Number(item.weight || 0) * repTotal
   }, 0)
 }
