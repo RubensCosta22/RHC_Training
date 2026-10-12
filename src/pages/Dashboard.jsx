@@ -47,7 +47,7 @@ export default function Dashboard() {
     <div className="lg:grid lg:grid-cols-12 lg:gap-6">
       <section className="mb-10 border-y border-[#2A2A2E] py-9 lg:col-span-8 lg:mb-0 lg:min-h-[390px] lg:border lg:bg-[#141416] lg:p-10 xl:p-12">
         <div className="flex h-full max-w-2xl flex-col justify-center">
-          <div className="mb-6 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.14em] text-[#C8FF3D]"><span className="h-1.5 w-1.5 rounded-full bg-[#C8FF3D]"/>{next?'Treino de hoje':'Dia de descanso'}</div>
+          <div className="mb-6 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.14em] text-[#C8FF3D]"><span className="h-1.5 w-1.5 rounded-full bg-[#C8FF3D]"/>{next?'Próximo treino':'Dia de descanso'}</div>
           <h2 className="text-[clamp(3.2rem,6vw,6rem)] font-[780] leading-[.9] tracking-[-.07em] text-[#F5F5F7]">{next?`Treino ${next}`:'Recupere.'}</h2>
           <p className="mt-5 max-w-lg text-base leading-relaxed text-[#8E8E93]">{next?(planOptions.find(item=>item.code===next)?.title||descriptions[next]||'Plano personalizado'):'Sono, nutrição e descanso também constroem resultado.'}</p>
           {next&&<Link to={`/workout/${profileId}/${next}`} className="btn-primary mt-9 inline-flex w-fit items-center gap-3 px-6"><Play size={18} fill="currentColor"/> Começar agora</Link>}

@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabaseClient'
+import { getProgramWorkoutProgress } from '../utils/workoutRotation'
 
 export async function getPublishedPrograms() {
   const { data, error } = await supabase
@@ -37,20 +38,18 @@ export async function getProgramStartState(profileId) {
   const enrollment = await getProfileProgramEnrollment(profileId)
   if (!enrollment) return null
 
-  const [sessions, exposures] = await Promise.all([
-    supabase.from('program_sessions').select('code')
-      .eq('program_id', enrollment.program_id).order('day_order').limit(1),
-    supabase.from('program_exercise_exposures')
-      .select('id, workout_sessions!program_exercise_exposures_workout_session_id_fkey!inner(archived_at)')
-      .eq('enrollment_id', enrollment.id).gt('completed_sets', 0)
-      .is('workout_sessions.archived_at', null).limit(1)
+  const [sessions, workouts] = await Promise.all([
+    supabase.from('program_sessions').select('code,session_type')
+      .eq('program_id', enrollment.program_id).order('day_order'),
+    supabase.from('workout_sessions')
+      .select('workout_code,workout_date,created_at,program_exercise_exposures!program_exercise_exposures_workout_session_id_fkey(enrollment_id,completed_sets)')
+      .eq('profile_id', profileId).gte('created_at', enrollment.created_at)
+      .is('archived_at', null)
+      .order('workout_date', { ascending: false }).order('created_at', { ascending: false })
   ])
   if (sessions.error) throw sessions.error
-  if (exposures.error) throw exposures.error
-  return {
-    firstWorkoutType: sessions.data?.[0]?.code || null,
-    hasStarted: Boolean(exposures.data?.length)
-  }
+  if (workouts.error) throw workouts.error
+  return getProgramWorkoutProgress(sessions.data || [], workouts.data || [], enrollment.id)
 }
 
 export async function getProfileTrainingArchives(profileId) {

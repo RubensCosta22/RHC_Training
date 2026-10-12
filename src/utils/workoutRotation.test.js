@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getNextWorkoutType, getSuggestedWorkoutType } from './workoutRotation'
+import { getNextWorkoutType, getSuggestedWorkoutType, getProgramWorkoutProgress } from './workoutRotation'
 
 describe('workout rotation', () => {
   const henriqueTypes = ['A', 'B', 'C', 'D', 'E']
@@ -34,8 +34,13 @@ describe('new cycle suggestion', () => {
     expect(getSuggestedWorkoutType({ ...input, schedule: { configured: true, workoutType: null } })).toBe('A')
   })
 
-  it('follows the calendar once the active cycle has started', () => {
-    expect(getSuggestedWorkoutType({ ...input, programStart: { ...input.programStart, hasStarted: true } })).toBe('F')
+  it('advances A to B even when the calendar still says A on Monday', () => {
+    expect(getSuggestedWorkoutType({ ...input, schedule: { configured: true, workoutType: 'A' }, programStart: { ...input.programStart, hasStarted: true, lastWorkoutType: 'A' } })).toBe('B')
+  })
+
+  it.each(availableTypes)('advances after %s using the active cycle order', code => {
+    const next = availableTypes[(availableTypes.indexOf(code) + 1) % availableTypes.length]
+    expect(getSuggestedWorkoutType({ ...input, programStart: { workoutTypes: availableTypes, lastWorkoutType: code } })).toBe(next)
   })
 
   it('preserves calendar and rest days without an active program', () => {
@@ -45,5 +50,25 @@ describe('new cycle suggestion', () => {
 
   it('preserves rotation without a calendar or an active program', () => {
     expect(getSuggestedWorkoutType({ ...input, programStart: null, schedule: { configured: false } })).toBe('F')
+  })
+})
+
+describe('active cycle executions', () => {
+  const sessions = ['A','B','C','D','E','F','G'].map(code => ({ code, session_type: ['E','G'].includes(code) ? 'running' : 'strength' }))
+  const saved = (code, enrollment = 'new', sets = 3) => ({ workout_code: code, program_exercise_exposures: [{ enrollment_id: enrollment, completed_sets: sets }] })
+
+  it('ignores previous-cycle executions and unfinished sets', () => {
+    expect(getProgramWorkoutProgress(sessions, [saved('F','old'), saved('C','new',0)], 'new').lastWorkoutType).toBeNull()
+  })
+
+  it('uses the latest saved strength workout from this enrollment', () => {
+    const progress = getProgramWorkoutProgress(sessions, [saved('F','old'), saved('A')], 'new')
+    expect(progress.lastWorkoutType).toBe('A')
+    expect(getSuggestedWorkoutType({ programStart: progress, availableTypes: sessions.map(s=>s.code), schedule: { configured: true, workoutType: 'A' } })).toBe('B')
+  })
+
+  it.each(['E','G'])('includes a saved run %s without exercise exposures', code => {
+    const progress = getProgramWorkoutProgress(sessions, [{workout_code:code}, saved('D')], 'new')
+    expect(progress.lastWorkoutType).toBe(code)
   })
 })
